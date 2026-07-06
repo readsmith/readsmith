@@ -1,0 +1,28 @@
+{
+  "name": "readsmith",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Beautiful, self-hostable, AI-native documentation.",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "format": "biome format --write .",
+    "verify": "pnpm build && pnpm typecheck && pnpm format && pnpm lint && pnpm test",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.10.0",
+    "husky": "^9.1.7",
+    "tsup": "^8.3.5",
+    "turbo": "^2.5.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

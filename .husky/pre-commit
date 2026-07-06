@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# Full verification before every commit: build, typecheck, format, lint, test.
+# Turbo caches, so repeat runs are fast.
+pnpm verify || exit 1
+
+# Re-stage any already-staged files that `pnpm format` reformatted, so the
+# committed content matches the formatted working tree. Only touches files
+# that were already staged; unstaged changes are left alone.
+git diff --cached --name-only --diff-filter=ACMR -z | xargs -0 -r git add --
