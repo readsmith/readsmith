@@ -151,8 +151,8 @@ function stripMdx(node: AnyNode): void {
   node.children = out;
 }
 
-function headingAnchor(node: { data?: { id?: unknown } }): string {
-  const id = node.data?.id;
+function headingAnchor(node: unknown): string {
+  const id = (node as { data?: { id?: unknown } }).data?.id;
   return typeof id === "string" ? id : "";
 }
 
