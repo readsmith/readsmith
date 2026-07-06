@@ -11,7 +11,11 @@ import { parse as parseYaml } from "yaml";
 const MAX_CHARS = 5_000_000;
 const BOM = 0xfeff;
 
-const mdxProcessor = unified().use(remarkParse).use(remarkFrontmatter, ["yaml"]).use(remarkMdx);
+const mdxProcessor = unified()
+  .use(remarkParse)
+  .use(remarkFrontmatter, ["yaml"])
+  .use(remarkMdx)
+  .use(remarkGfm);
 const mdProcessor = unified().use(remarkParse).use(remarkFrontmatter, ["yaml"]).use(remarkGfm);
 
 export interface ParseInput {
