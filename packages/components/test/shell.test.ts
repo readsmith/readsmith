@@ -90,6 +90,37 @@ describe("renderShellBody", () => {
     const evil: ShellSite = { name: "<script>", nav: [] };
     expect(renderShellBody(evil, { ...page, toc: [], breadcrumbs: [] })).not.toContain("<script>");
   });
+
+  it("shows the Powered by Readsmith badge by default and hides it when white-labeled", () => {
+    expect(renderShellBody(site, page)).toContain("Powered by");
+    expect(renderShellBody({ ...site, poweredBy: false }, page)).not.toContain("Powered by");
+  });
+
+  it("renders no tab bar when the site has no tabs", () => {
+    expect(renderShellBody(site, page)).not.toContain("rs-tabbar");
+  });
+
+  it("renders a tab bar and marks the active tab when tabs are present", () => {
+    const tabbed: ShellSite = {
+      ...site,
+      tabs: [
+        { label: "Guides", url: "/guide/setup", active: true },
+        { label: "API", url: "/api", active: false },
+      ],
+    };
+    const html = renderShellBody(tabbed, page);
+    expect(html).toContain('class="rs-tabbar"');
+    expect(html).toContain('class="rs-tab is-active"');
+    expect(html).toContain('aria-current="page"');
+    expect(html).toContain('href="/api"');
+  });
+
+  it("renders a logo image in place of the wordmark when a logo is set", () => {
+    const html = renderShellBody({ ...site, logo: "/logo.svg" }, page);
+    expect(html).toContain('class="rs-brand__logo"');
+    expect(html).toContain('src="/logo.svg"');
+    expect(html).not.toContain("rs-wordmark");
+  });
 });
 
 describe("renderDocument", () => {

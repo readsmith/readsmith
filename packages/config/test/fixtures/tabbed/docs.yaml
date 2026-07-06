@@ -1,0 +1,15 @@
+site:
+  name: Tabbed Docs
+  logo: /brand/logo.svg
+  favicon: /brand/favicon.png
+content:
+  include:
+    - "**/*.mdx"
+tabs:
+  - tab: Guides
+    pages:
+      - index
+      - guide
+  - tab: API
+    pages:
+      - api

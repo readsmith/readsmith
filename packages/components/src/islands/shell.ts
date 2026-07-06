@@ -234,8 +234,16 @@ function initContextMenu(root: ParentNode): void {
 
   const copyMd = menu.querySelector<HTMLElement>("[data-rs-copy-md]");
   copyMd?.addEventListener("click", () => {
-    const prose = root.querySelector<HTMLElement>(".rs-prose");
-    void writeClipboard(prose?.innerText ?? "");
+    const mdUrl = copyMd.dataset.rsMdUrl;
+    const proseText = (): string => root.querySelector<HTMLElement>(".rs-prose")?.innerText ?? "";
+    if (mdUrl) {
+      fetch(mdUrl)
+        .then((response) => response.text())
+        .then((text) => writeClipboard(text))
+        .catch(() => writeClipboard(proseText()));
+    } else {
+      void writeClipboard(proseText());
+    }
     flash(copyMd, "Copied Markdown", close);
   });
   const copyUrl = menu.querySelector<HTMLElement>("[data-rs-copy-url]");

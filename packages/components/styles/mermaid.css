@@ -1,0 +1,135 @@
+/* Mermaid diagrams (FR-8). Before the island renders, the container shows the
+ * raw source as monospace (a sensible no-JS / loading state). After render it
+ * holds the SVG in a pan-and-zoom viewport with overlaid controls. */
+
+.rs-mermaid {
+  margin: var(--rs-space-5) 0;
+  padding: var(--rs-space-4);
+  border: 1px solid var(--rs-rule);
+  border-radius: var(--rs-radius);
+  background: var(--rs-surface);
+  overflow-x: auto;
+  text-align: center;
+  font-family: var(--rs-font-mono);
+  font-size: var(--rs-text-code);
+  line-height: var(--rs-leading-code);
+  color: var(--rs-ink-muted);
+  white-space: pre;
+}
+
+.rs-mermaid.is-rendered {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  white-space: normal;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+.rs-mermaid__viewport {
+  position: relative;
+  height: 400px; /* initial fallback; the island sizes it to the diagram */
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  /* dragging pans; it must not start a text selection over the diagram labels */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.rs-mermaid__viewport.is-grabbing {
+  cursor: grabbing;
+}
+
+.rs-mermaid__canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+/* the island sizes the SVG directly (crisp vector re-render), not via scale() */
+.rs-mermaid__canvas svg {
+  display: block;
+}
+
+.rs-mermaid__controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rs-mermaid__controls button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--rs-ink-muted);
+  background: color-mix(in srgb, var(--rs-paper) 88%, transparent);
+  border: 1px solid var(--rs-rule-strong);
+  border-radius: var(--rs-radius-sm);
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.rs-mermaid__controls button:hover {
+  color: var(--rs-ink);
+  border-color: var(--rs-ink-faint);
+}
+
+.rs-mermaid.is-error {
+  white-space: pre;
+  text-align: left;
+  color: var(--rs-danger);
+}
+
+/* fullscreen modal */
+.rs-mermaid-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3vh 3vw;
+  background: color-mix(in srgb, var(--rs-ink) 55%, transparent);
+  backdrop-filter: blur(4px);
+}
+.rs-mermaid-modal__panel {
+  position: relative;
+  width: min(1280px, 94vw);
+  height: min(88vh, 920px);
+  background: var(--rs-paper);
+  border: 1px solid var(--rs-rule-strong);
+  border-radius: var(--rs-radius-lg);
+  box-shadow: var(--rs-shadow-pop);
+  overflow: hidden;
+}
+.rs-mermaid-modal__panel .rs-mermaid__viewport {
+  height: 100%;
+}
+.rs-mermaid-modal__panel .rs-mermaid__controls {
+  top: auto;
+  bottom: 12px;
+  right: 12px;
+}
+.rs-mermaid-modal__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--rs-ink-muted);
+  background: var(--rs-surface);
+  border: 1px solid var(--rs-rule-strong);
+  border-radius: var(--rs-radius-sm);
+  cursor: pointer;
+}
+.rs-mermaid-modal__close:hover {
+  color: var(--rs-ink);
+  border-color: var(--rs-ink-faint);
+}

@@ -271,6 +271,15 @@ export async function render(body: Root, ctx: RenderContext): Promise<RenderResu
       lang?: string | null;
       value?: string;
     };
+
+    // A ```mermaid fence is a diagram, not code: emit a container carrying the
+    // source, which the Mermaid island renders to SVG on the client.
+    if ((n.lang ?? "").trim().toLowerCase() === "mermaid") {
+      return h("div", { className: ["rs-mermaid"], "data-rs-mermaid": "" }, [
+        { type: "text", value: n.value ?? "" },
+      ]);
+    }
+
     const pre =
       n.data?.hastPre ??
       h("pre", { className: ["shiki"] }, [h("code", [{ type: "text", value: n.value ?? "" }])]);
@@ -345,6 +354,8 @@ async function highlightCodeNodes(
 ): Promise<void> {
   const nodes: CodeNode[] = [];
   visit(tree, "code", (node) => {
+    // mermaid fences are rendered as diagrams, not highlighted code
+    if ((node.lang ?? "").trim().toLowerCase() === "mermaid") return;
     nodes.push(node as unknown as CodeNode);
   });
 

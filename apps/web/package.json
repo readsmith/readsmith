@@ -5,13 +5,18 @@
   "type": "module",
   "description": "The Readsmith serving and island-hydration shell (Next.js). Serves prebuilt pages; it is not the MDX compiler.",
   "scripts": {
+    "predev": "node scripts/copy-assets.mjs",
     "dev": "next dev -p 4321",
+    "prebuild": "node scripts/copy-assets.mjs",
     "build": "next build",
     "start": "next start -p 4321",
     "typecheck": "tsc --noEmit",
     "lint": "biome check ."
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-sans": "^5.2.8",
+    "@fontsource/spectral": "^5.2.8",
     "@readsmith/components": "workspace:*",
     "@readsmith/config": "workspace:*",
     "@readsmith/mdx": "workspace:*",

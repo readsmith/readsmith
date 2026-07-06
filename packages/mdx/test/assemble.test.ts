@@ -112,6 +112,42 @@ describe("nav finalization", () => {
 });
 
 // P7 AC-3 (FR-4, AG-2): broken link + anchor reported; a valid one is not.
+describe("top-level tabs", () => {
+  it("finalizes each tab and scopes prev/next within its own tab", async () => {
+    const f = fixture();
+    f.config.tabs = [
+      {
+        label: "Guide",
+        nav: [
+          { type: "page", slug: "guide/setup" },
+          { type: "page", slug: "guide/usage" },
+        ],
+      },
+      { label: "Home", nav: [{ type: "page", slug: "" }] },
+    ];
+    const build = await assembleSite(inputOf(f));
+
+    expect(build.tabs?.map((t) => t.label)).toEqual(["Guide", "Home"]);
+    // A tab's landing URL is its first page.
+    expect(build.tabs?.[0]?.url).toBe("/guide/setup");
+    expect(build.tabs?.[1]?.url).toBe("/");
+
+    // prev/next stay inside the tab: the last Guide page has no next, and the
+    // lone Home page has neither, even though other pages exist site-wide.
+    const usage = build.pages.find((p) => p.slug === "guide/usage");
+    expect(usage?.prev?.slug).toBe("guide/setup");
+    expect(usage?.next).toBeUndefined();
+    const home = build.pages.find((p) => p.slug === "");
+    expect(home?.prev).toBeUndefined();
+    expect(home?.next).toBeUndefined();
+  });
+
+  it("leaves build.tabs undefined when no tabs are configured", async () => {
+    const build = await assembleSite(inputOf(fixture()));
+    expect(build.tabs).toBeUndefined();
+  });
+});
+
 describe("cross-page link validation", () => {
   it("reports a broken page link and a broken anchor, not a valid link", async () => {
     const f = fixture();
@@ -169,6 +205,17 @@ describe("agent readiness and search handoff", () => {
     expect(build.llmsFullTxt).not.toContain("Hidden.");
     expect(build.skillMd).not.toContain("Secret");
     expect(build.searchChunks.every((c) => c.page_id !== "secret.md")).toBe(true);
+  });
+
+  it("uses absolute URLs across sitemap and agent outputs when a base URL is set", () => {
+    return assembleSite(inputOf(fixture(), { baseUrl: "https://docs.example.com/" })).then(
+      (build) => {
+        expect(build.sitemap).toContain("<loc>https://docs.example.com/guide/setup</loc>");
+        expect(build.llmsTxt).toContain("(https://docs.example.com/guide/setup)");
+        expect(build.llmsFullTxt).toContain("URL: https://docs.example.com/guide/setup");
+        expect(build.rss).toContain("xmlns:atom");
+      },
+    );
   });
 });
 

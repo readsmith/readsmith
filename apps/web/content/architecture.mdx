@@ -1,0 +1,84 @@
+---
+title: Architecture
+description: How a Readsmith build turns a folder of Markdown into a served docs site.
+---
+
+# Architecture
+
+Readsmith is a precompiled-bundle system. The `@readsmith/*` packages compile a folder of Markdown or MDX into an immutable build, and the serving app (Next.js) serves those prebuilt pages and hydrates the interactive islands. The compiler is the packages; Next is only the shell.
+
+<Info title="Big diagram ahead">
+The sequence below is intentionally large. Drag to pan, scroll or use the buttons to zoom, and open it fullscreen with the corners button for a dedicated view.
+</Info>
+
+## The build lifecycle
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Repo as Docs repo
+  participant Cfg as config
+  participant MDX as mdx pipeline
+  participant Comp as components
+  participant Web as apps/web
+  participant Reader
+
+  Repo->>Cfg: resolveConfig(dir)
+  activate Cfg
+  Cfg->>Cfg: load docs.yaml or defaults
+  Cfg->>Cfg: discover pages (deterministic)
+  Cfg->>Cfg: build nav tree
+  Cfg-->>Web: ResolvedConfig
+  deactivate Cfg
+
+  Web->>MDX: assembleSite(config, readPage, registry)
+  activate MDX
+  loop each page
+    MDX->>MDX: P1 parse frontmatter and AST
+    MDX->>MDX: P3 expand snippets and variables
+    MDX->>MDX: P2 assign slugs and resolve links
+    MDX->>MDX: P4 project TOC, rawMd, chunks
+    MDX->>MDX: P5 highlight code (Shiki dual theme)
+    MDX->>Comp: P6 render AST with the registry
+    activate Comp
+    Comp-->>MDX: static HTML plus island manifest
+    deactivate Comp
+  end
+  MDX->>MDX: P7 finalize nav, prev/next, breadcrumbs
+  MDX->>MDX: P7 validate cross-page links and anchors
+  MDX->>MDX: P7 emit sitemap, RSS, llms.txt, chunks
+  MDX->>MDX: P7 compute deterministic bundle hash
+  MDX-->>Web: SiteBuild (PageModel array)
+  deactivate MDX
+
+  Web->>Comp: renderShellBody(site, page)
+  activate Comp
+  Comp-->>Web: header, nav, content, TOC, palette
+  deactivate Comp
+  Web->>Web: SSG each page to static HTML
+
+  Reader->>Web: request a page
+  Web-->>Reader: prebuilt static HTML (zero JS for prose)
+  Reader->>Comp: hydrate() on load
+  activate Comp
+  Comp->>Comp: enhance copy, tabs, code groups
+  Comp->>Comp: scroll-spy, palette, theme, mermaid
+  Comp-->>Reader: interactive reading shell
+  deactivate Comp
+```
+
+## Incremental rebuilds
+
+On a change, only the affected pages re-render. The P6 render cache key is a content hash over the page source, the resolved variable scope, the theme, the library version, and the content hashes of exactly the snippets that page used. A changed snippet invalidates every dependent page and nothing else.
+
+```mermaid
+flowchart LR
+  CH["a file changes"] --> Q{"what changed?"}
+  Q -->|page prose| ONE["re-render that page only"]
+  Q -->|shared snippet| DEP["re-render every dependent page"]
+  Q -->|theme or lib version| ALL["re-render all pages"]
+  ONE --> CACHE["render cache by cacheKey"]
+  DEP --> CACHE
+  ALL --> CACHE
+  CACHE --> BUILD["new SiteBuild"]
+```

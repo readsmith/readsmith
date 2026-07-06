@@ -17,6 +17,17 @@ const navItemInputSchema: z.ZodType<NavItemInput> = z.lazy(() =>
   ]),
 );
 
+/** A top-level navigation tab: a named section with its own navigation. */
+export interface NavTabInput {
+  tab: string;
+  pages: NavItemInput[];
+}
+
+const navTabInputSchema = z.object({
+  tab: z.string(),
+  pages: z.array(navItemInputSchema),
+});
+
 /**
  * The user-authored site config (our `docs.yaml` shape). Everything except
  * `site.name` is optional. When `navigation` is omitted the site auto-discovers
@@ -25,6 +36,15 @@ const navItemInputSchema: z.ZodType<NavItemInput> = z.lazy(() =>
 export const configInputSchema = z.object({
   site: z.object({
     name: z.string(),
+    /** Canonical base URL, e.g. https://docs.example.com. Enables absolute URLs
+     * in the sitemap, RSS, llms.txt, and page metadata. */
+    url: z.string().optional(),
+    /** One-line site description, used in metadata and the agent outputs. */
+    description: z.string().optional(),
+    /** Logo image URL (served from content). Replaces the wordmark in the header. */
+    logo: z.string().optional(),
+    /** Favicon URL (served from content). Wired into page metadata. */
+    favicon: z.string().optional(),
     theme: z.record(z.string(), z.unknown()).optional(),
   }),
   content: z
@@ -35,7 +55,11 @@ export const configInputSchema = z.object({
     })
     .optional(),
   navigation: z.array(navItemInputSchema).optional(),
+  /** Top-level navigation tabs. When set, the sidebar is scoped to the active tab. */
+  tabs: z.array(navTabInputSchema).optional(),
   variables: z.record(z.string(), z.unknown()).optional(),
+  /** Show the "Powered by Readsmith" badge. Defaults to true; set false to white-label. */
+  branding: z.boolean().optional(),
 });
 
 export type ConfigInput = z.infer<typeof configInputSchema>;
@@ -53,13 +77,30 @@ export type NavNode =
   | { type: "page"; slug: string }
   | { type: "group"; label: string; children: NavNode[] };
 
+/** A resolved top-level tab: a label and its own navigation tree. */
+export interface NavTab {
+  label: string;
+  nav: NavNode[];
+}
+
 /** The fully resolved, defaulted config plus the discovered content. */
 export interface ResolvedConfig {
-  site: { name: string; theme: Record<string, unknown> };
+  site: {
+    name: string;
+    url?: string;
+    description?: string;
+    logo?: string;
+    favicon?: string;
+    theme: Record<string, unknown>;
+  };
   content: { root: string; include: string[]; exclude: string[] };
   variables: Record<string, unknown>;
   pages: PageRef[];
   nav: NavNode[];
+  /** Top-level tabs, when configured. Each carries its own navigation subtree. */
+  tabs?: NavTab[];
+  /** Whether to show the "Powered by Readsmith" badge (white-label when false). */
+  branding: boolean;
   diagnostics: Diagnostic[];
 }
 

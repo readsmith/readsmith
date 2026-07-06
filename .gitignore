@@ -10,6 +10,9 @@ out/
 .turbo/
 *.tsbuildinfo
 
+# apps/web copies content static assets here at build time (generated)
+apps/web/public/
+
 # env / secrets
 .env
 .env.*

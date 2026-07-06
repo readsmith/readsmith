@@ -1,0 +1,16 @@
+site:
+  name: Readsmith
+  url: https://readsmith.dev
+  description: Beautiful, self-hostable, AI-native documentation.
+# branding: false   # uncomment to white-label (hide the "Powered by Readsmith" badge)
+tabs:
+  - tab: Guides
+    pages:
+      - index
+      - group: Guides
+        pages:
+          - guides/setup
+          - guides/usage
+  - tab: Architecture
+    pages:
+      - architecture

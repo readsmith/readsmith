@@ -37,12 +37,20 @@ export interface SitePage {
   slug: string;
 }
 
+/** A top-level navigation tab as consumed by assembly: a label and its nav subtree. */
+export interface NavTab {
+  label: string;
+  nav: NavNode[];
+}
+
 /** The subset of a resolved config that assembly consumes. */
 export interface SiteConfig {
-  site: { name: string; description?: string; theme?: Record<string, unknown> };
+  site: { name: string; url?: string; description?: string; theme?: Record<string, unknown> };
   variables?: Record<string, unknown>;
   pages: SitePage[];
   nav: NavNode[];
+  /** Top-level tabs, when configured. Each scopes its own sidebar navigation. */
+  tabs?: NavTab[];
 }
 
 export interface AssembleInput {
@@ -60,6 +68,9 @@ export interface AssembleInput {
   failOnError?: boolean;
   /** Participates in every page's cache key so a library bump invalidates all. */
   libVersion?: string;
+  /** Canonical base URL for absolute links in sitemap, RSS, and agent outputs.
+   * Falls back to `config.site.url`. Without either, URLs stay root-relative. */
+  baseUrl?: string;
 }
 
 export interface Breadcrumb {
@@ -97,9 +108,18 @@ export type FinalNavNode =
   | { type: "page"; slug: string; url: string; title: string }
   | { type: "group"; label: string; children: FinalNavNode[] };
 
+/** A finalized top-level tab: label, landing URL (first page), and its nav tree. */
+export interface FinalNavTab {
+  label: string;
+  url: string;
+  nav: FinalNavNode[];
+}
+
 export interface SiteBuild {
   pages: PageModel[];
   nav: FinalNavNode[];
+  /** Finalized top-level tabs, when configured. Absent for single-nav sites. */
+  tabs?: FinalNavTab[];
   sitemap: string;
   rss: string;
   llmsTxt: string;
@@ -139,14 +159,25 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
   // Nav finalization needs titles and hidden flags from the built pages.
   const bySlug = new Map(models.map((m) => [m.slug, m]));
   const nav = finalizeNav(config.nav, bySlug);
-  applyNavRelations(nav, bySlug);
+  let tabs: FinalNavTab[] | undefined;
+  if (config.tabs && config.tabs.length > 0) {
+    // Each page belongs to exactly one tab; compute prev/next/breadcrumbs within it.
+    tabs = config.tabs.map((tab) => {
+      const tabNav = finalizeNav(tab.nav, bySlug);
+      applyNavRelations(tabNav, bySlug);
+      return { label: tab.label, url: firstPageUrl(tabNav) ?? "/", nav: tabNav };
+    });
+  } else {
+    applyNavRelations(nav, bySlug);
+  }
 
   const visible = models.filter((m) => !m.hidden);
-  const sitemap = buildSitemap(visible);
-  const rss = buildRss(config, visible);
-  const llmsTxt = buildLlmsTxt(config, visible);
-  const llmsFullTxt = buildLlmsFullTxt(config, visible);
-  const skillMd = buildSkillMd(config, visible);
+  const base = (input.baseUrl ?? config.site.url ?? "").replace(/\/+$/, "");
+  const sitemap = buildSitemap(visible, base);
+  const rss = buildRss(config, visible, base);
+  const llmsTxt = buildLlmsTxt(config, visible, base);
+  const llmsFullTxt = buildLlmsFullTxt(config, visible, base);
+  const skillMd = buildSkillMd(config, visible, base);
   const searchChunks = visible.flatMap((m) => m.chunks);
 
   const diagnostics = models.flatMap((m) => m.diagnostics);
@@ -158,6 +189,7 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
       .sort((a, b) => a.slug.localeCompare(b.slug))
       .map((m) => ({ slug: m.slug, title: m.title, html: m.html, hidden: m.hidden })),
     nav,
+    tabs: tabs ?? null,
     sitemap,
     rss,
     llmsTxt,
@@ -168,6 +200,7 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
   return {
     pages: models,
     nav,
+    tabs,
     sitemap,
     rss,
     llmsTxt,
@@ -416,6 +449,16 @@ function finalizeNav(nav: NavNode[], bySlug: Map<string, PageModel>): FinalNavNo
   return out;
 }
 
+/** The URL of the first page in a finalized nav tree (a tab's landing target). */
+function firstPageUrl(nav: FinalNavNode[]): string | undefined {
+  for (const node of nav) {
+    if (node.type === "page") return node.url;
+    const nested = firstPageUrl(node.children);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
 /** Compute prev/next and breadcrumbs from the finalized nav order. */
 function applyNavRelations(nav: FinalNavNode[], bySlug: Map<string, PageModel>): void {
   const order: { slug: string; trail: Breadcrumb[] }[] = [];
@@ -451,47 +494,68 @@ function navLink(model: PageModel | undefined): NavLink | undefined {
   return { slug: model.slug, url: model.url, title: model.title };
 }
 
-function buildSitemap(pages: PageModel[]): string {
+/** Prepend the canonical base to a root-relative URL, when a base is configured. */
+function absUrl(base: string, url: string): string {
+  return base ? base + url : url;
+}
+
+function buildSitemap(pages: PageModel[], base: string): string {
   const urls = [...pages]
     .sort((a, b) => a.slug.localeCompare(b.slug))
-    .map((p) => `  <url><loc>${xml(p.url)}</loc></url>`)
+    .map((p) => {
+      const date = typeof p.frontmatter.date === "string" ? p.frontmatter.date : undefined;
+      const lastmod = date ? `<lastmod>${xml(date)}</lastmod>` : "";
+      return `  <url><loc>${xml(absUrl(base, p.url))}</loc>${lastmod}</url>`;
+    })
     .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 
 /** RSS from pages that carry a frontmatter `date` (the changelog convention), newest first. */
-function buildRss(config: SiteConfig, pages: PageModel[]): string {
+function buildRss(config: SiteConfig, pages: PageModel[], base: string): string {
   const dated = pages
     .filter((p) => typeof p.frontmatter.date === "string")
     .sort((a, b) => String(b.frontmatter.date).localeCompare(String(a.frontmatter.date)));
   const items = dated
     .map((p) => {
+      const link = absUrl(base, p.url);
       const desc = p.description ? `<description>${xml(p.description)}</description>` : "";
-      return `    <item><title>${xml(p.title)}</title><link>${xml(p.url)}</link><pubDate>${xml(String(p.frontmatter.date))}</pubDate>${desc}</item>`;
+      const date = `<pubDate>${xml(String(p.frontmatter.date))}</pubDate>`;
+      const guid = `<guid isPermaLink="true">${xml(link)}</guid>`;
+      return `    <item><title>${xml(p.title)}</title><link>${xml(link)}</link>${guid}${date}${desc}</item>`;
     })
     .join("\n");
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel>\n    <title>${xml(config.site.name)}</title>\n${items}${items ? "\n" : ""}  </channel></rss>\n`;
+  const channelLink = base || "/";
+  const desc = config.site.description ? xml(config.site.description) : xml(config.site.name);
+  const self = base
+    ? `\n    <atom:link href="${xml(`${base}/rss.xml`)}" rel="self" type="application/rss+xml"/>`
+    : "";
+  const head = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>`;
+  const channel = `    <title>${xml(config.site.name)}</title>\n    <link>${xml(channelLink)}</link>\n    <description>${desc}</description>${self}`;
+  return `${head}\n${channel}\n${items}${items ? "\n" : ""}  </channel></rss>\n`;
 }
 
-function buildLlmsTxt(config: SiteConfig, pages: PageModel[]): string {
+function buildLlmsTxt(config: SiteConfig, pages: PageModel[], base: string): string {
   const lines = [`# ${config.site.name}`, ""];
   if (config.site.description) lines.push(`> ${config.site.description}`, "");
   lines.push("## Pages", "");
   for (const p of pages) {
-    lines.push(`- [${p.title}](${p.url})${p.description ? `: ${p.description}` : ""}`);
+    lines.push(
+      `- [${p.title}](${absUrl(base, p.url)})${p.description ? `: ${p.description}` : ""}`,
+    );
   }
   return `${lines.join("\n")}\n`;
 }
 
-function buildLlmsFullTxt(config: SiteConfig, pages: PageModel[]): string {
+function buildLlmsFullTxt(config: SiteConfig, pages: PageModel[], base: string): string {
   const parts = [`# ${config.site.name}`, ""];
   for (const p of pages) {
-    parts.push(`# ${p.title}`, `URL: ${p.url}`, "", p.rawMd.trim(), "");
+    parts.push(`# ${p.title}`, `URL: ${absUrl(base, p.url)}`, "", p.rawMd.trim(), "");
   }
   return `${parts.join("\n")}\n`;
 }
 
-function buildSkillMd(config: SiteConfig, pages: PageModel[]): string {
+function buildSkillMd(config: SiteConfig, pages: PageModel[], base: string): string {
   const description = config.site.description ?? `Documentation for ${config.site.name}.`;
   const lines = [
     "---",
@@ -505,7 +569,9 @@ function buildSkillMd(config: SiteConfig, pages: PageModel[]): string {
     "",
   ];
   for (const p of pages) {
-    lines.push(`- [${p.title}](${p.url})${p.description ? `: ${p.description}` : ""}`);
+    lines.push(
+      `- [${p.title}](${absUrl(base, p.url)})${p.description ? `: ${p.description}` : ""}`,
+    );
   }
   return `${lines.join("\n")}\n`;
 }

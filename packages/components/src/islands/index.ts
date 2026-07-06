@@ -1,5 +1,6 @@
 import { enhanceCodeGroup } from "./codegroup.js";
 import { mountCopyButtons } from "./copy.js";
+import { initMermaid } from "./mermaid.js";
 import { initShell } from "./shell.js";
 import { enhanceTabs } from "./tabs.js";
 
@@ -7,6 +8,7 @@ export { mountCopyButtons } from "./copy.js";
 export { enhanceTabs } from "./tabs.js";
 export { enhanceCodeGroup } from "./codegroup.js";
 export { initShell } from "./shell.js";
+export { initMermaid } from "./mermaid.js";
 
 /** Enhancers keyed by the island component name emitted in `data-island`. */
 const ENHANCERS: Record<string, (mount: HTMLElement) => void> = {
@@ -22,6 +24,7 @@ const ENHANCERS: Record<string, (mount: HTMLElement) => void> = {
  */
 export function hydrate(root: ParentNode = document): void {
   initShell(root);
+  void initMermaid(root);
   mountCopyButtons(root);
   for (const mount of root.querySelectorAll<HTMLElement>("[data-island]")) {
     if (mount.dataset.rsHydrated === "true") continue;

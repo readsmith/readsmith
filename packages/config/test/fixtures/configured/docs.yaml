@@ -1,5 +1,6 @@
 site:
   name: Configured Docs
+branding: false
 content:
   include:
     - "**/*.mdx"

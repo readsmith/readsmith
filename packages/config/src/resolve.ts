@@ -33,15 +33,30 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
     nav = buildAutoNav(pages);
   }
 
+  let tabs: ResolvedConfig["tabs"];
+  if (input?.tabs) {
+    tabs = input.tabs.map((tab) => {
+      const built = buildExplicitNav(tab.pages, pages);
+      diagnostics.push(...built.diagnostics);
+      return { label: tab.tab, nav: built.nav };
+    });
+  }
+
   return {
     site: {
       name: input?.site.name ?? defaultSiteName(root),
+      url: input?.site.url,
+      description: input?.site.description,
+      logo: input?.site.logo,
+      favicon: input?.site.favicon,
       theme: input?.site.theme ?? {},
     },
     content: { root: contentRel, include, exclude },
     variables: input?.variables ?? {},
     pages,
     nav,
+    tabs,
+    branding: input?.branding ?? true,
     diagnostics,
   };
 }

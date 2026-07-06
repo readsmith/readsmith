@@ -40,6 +40,11 @@ describe("resolveConfig: minimal repo (no config file)", () => {
     const b = await resolveConfig(join(fixtures, "minimal"));
     expect(a).toEqual(b);
   });
+
+  it("defaults branding to true when the config omits it", async () => {
+    const r = await resolveConfig(join(fixtures, "minimal"));
+    expect(r.branding).toBe(true);
+  });
 });
 
 // Config spec AC-2 (explicit navigation is authoritative) and AC-7
@@ -63,5 +68,38 @@ describe("resolveConfig: configured repo", () => {
     const missing = r.diagnostics.find((d) => d.code === "nav-missing-page");
     expect(missing).toBeDefined();
     expect(missing?.message).toContain("not-a-real-page");
+  });
+
+  it("honors branding:false for white-labeling", async () => {
+    const r = await resolveConfig(join(fixtures, "configured"));
+    expect(r.branding).toBe(false);
+  });
+});
+
+// Config: top-level tabs and brand assets (logo/favicon).
+describe("resolveConfig: tabbed repo", () => {
+  it("resolves each tab into a labeled navigation subtree", async () => {
+    const r = await resolveConfig(join(fixtures, "tabbed"));
+    expect(r.tabs).toEqual([
+      {
+        label: "Guides",
+        nav: [
+          { type: "page", slug: "" },
+          { type: "page", slug: "guide" },
+        ],
+      },
+      { label: "API", nav: [{ type: "page", slug: "api" }] },
+    ]);
+  });
+
+  it("passes through the logo and favicon", async () => {
+    const r = await resolveConfig(join(fixtures, "tabbed"));
+    expect(r.site.logo).toBe("/brand/logo.svg");
+    expect(r.site.favicon).toBe("/brand/favicon.png");
+  });
+
+  it("leaves tabs undefined when the config omits them", async () => {
+    const r = await resolveConfig(join(fixtures, "configured"));
+    expect(r.tabs).toBeUndefined();
   });
 });

@@ -9,7 +9,23 @@ export interface ShellSite {
   /** Optional GitHub URL for the header link. */
   github?: string;
   description?: string;
+  /** Canonical base URL, used to build absolute "open in ChatGPT/Claude" links. */
+  url?: string;
+  /** Logo image URL. When set, replaces the wordmark in the header. */
+  logo?: string;
+  /** Top-level navigation tabs. When present, a tab bar renders below the header. */
+  tabs?: ShellTab[];
+  /** Show the "Powered by Readsmith" badge. Defaults to true; false white-labels. */
+  poweredBy?: boolean;
 }
+
+export interface ShellTab {
+  label: string;
+  url: string;
+  active: boolean;
+}
+
+const READSMITH_URL = "https://readsmith.dev";
 
 export interface ShellPage {
   title: string;
@@ -46,11 +62,14 @@ export function renderShellBody(site: ShellSite, page: ShellPage): string {
   return `<a class="rs-skip" href="#rs-content">Skip to content</a>
 <div class="rs-progress" data-rs-progress aria-hidden="true"></div>
 ${header(site)}
+${tabbar(site)}
 <div class="rs-scrim" data-rs-scrim hidden></div>
 <div class="rs-shell">
-  <div class="rs-nav-col" data-rs-navcol>${renderNav(site.nav, page.slug)}</div>
+  <div class="rs-nav-col" data-rs-navcol>${renderNav(site.nav, page.slug)}${
+    site.poweredBy === false ? "" : poweredBy()
+  }</div>
   <main class="rs-main" id="rs-content" tabindex="-1">
-    ${topbar(page)}
+    ${topbar(site, page)}
     <article class="rs-prose">${page.html}</article>
     ${pager(page)}
     ${pagefoot()}
@@ -86,9 +105,12 @@ ${options.scriptHref ? `<script type="module" src="${esc(options.scriptHref)}"><
 }
 
 function header(site: ShellSite): string {
+  const brand = site.logo
+    ? `<img class="rs-brand__logo" src="${esc(site.logo)}" alt="${esc(site.name)}" />`
+    : `${HALLMARK_SVG}<span class="rs-wordmark">${esc(site.name)}</span>`;
   return `<header class="rs-header">
   <button class="rs-icon-btn rs-header__burger" data-rs-nav-toggle aria-label="Open navigation" aria-expanded="false">${ICONS.menu}</button>
-  <a class="rs-brand" href="/">${HALLMARK_SVG}<span class="rs-wordmark">${esc(site.name)}</span></a>
+  <a class="rs-brand" href="/">${brand}</a>
   <span class="rs-header__spacer"></span>
   <button class="rs-search" data-rs-palette-open aria-label="Search or ask AI">${ICONS.search}<span>Search or ask AI</span><kbd class="rs-kbd">⌘K</kbd></button>
   ${site.github ? `<a class="rs-icon-btn" href="${esc(site.github)}" aria-label="GitHub repository" rel="noopener">${ICONS.github}</a>` : ""}
@@ -96,14 +118,37 @@ function header(site: ShellSite): string {
 </header>`;
 }
 
-function topbar(page: ShellPage): string {
+function tabbar(site: ShellSite): string {
+  if (!site.tabs || site.tabs.length === 0) return "";
+  const tabs = site.tabs
+    .map(
+      (tab) =>
+        `<a class="rs-tab${tab.active ? " is-active" : ""}" href="${esc(tab.url)}"${
+          tab.active ? ' aria-current="page"' : ""
+        }>${esc(tab.label)}</a>`,
+    )
+    .join("");
+  return `<nav class="rs-tabbar" aria-label="Sections">${tabs}</nav>`;
+}
+
+function topbar(site: ShellSite, page: ShellPage): string {
+  const mdUrl = `/md${page.url === "/" ? "" : page.url}`;
+  const base = site.url ? site.url.replace(/\/+$/, "") : "";
+  const absMd = base ? base + mdUrl : mdUrl;
+  const prompt = encodeURIComponent(
+    `Read ${absMd} and help me with questions about the "${page.title}" page.`,
+  );
   return `<div class="rs-topbar">
   ${breadcrumbs(page.breadcrumbs)}
   <div class="rs-menu-wrap">
     <button class="rs-icon-btn" data-rs-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Page actions">${ICONS.kebab}</button>
     <div class="rs-menu" data-rs-menu role="menu" hidden>
-      <button role="menuitem" data-rs-copy-md>${ICONS.markdown}Copy as Markdown</button>
+      <button role="menuitem" data-rs-copy-md data-rs-md-url="${esc(mdUrl)}">${ICONS.markdown}Copy as Markdown</button>
       <button role="menuitem" data-rs-copy-url>${ICONS.link}Copy page URL</button>
+      <div class="rs-menu__sep"></div>
+      <a role="menuitem" href="${esc(mdUrl)}" target="_blank" rel="noopener">${ICONS.markdown}View as Markdown</a>
+      <a role="menuitem" href="https://chatgpt.com/?q=${prompt}" target="_blank" rel="noopener">${ICONS.ai}Open in ChatGPT</a>
+      <a role="menuitem" href="https://claude.ai/new?q=${prompt}" target="_blank" rel="noopener">${ICONS.ai}Open in Claude</a>
     </div>
   </div>
 </div>`;
@@ -144,6 +189,10 @@ function pagefoot(): string {
   <button class="rs-fbtn" type="button" data-rs-feedback="yes">Yes</button>
   <button class="rs-fbtn" type="button" data-rs-feedback="no">Could be better</button>
 </footer>`;
+}
+
+function poweredBy(): string {
+  return `<a class="rs-poweredby" href="${READSMITH_URL}" target="_blank" rel="noopener">${HALLMARK_SVG}<span>Powered by <strong>Readsmith</strong></span></a>`;
 }
 
 function palette(site: ShellSite): string {

@@ -215,4 +215,13 @@ describe("code block chrome", () => {
     expect(r.html).toContain('class="rs-code"');
     expect(r.html).not.toContain("rs-code__bar");
   });
+
+  it("renders a mermaid fence as a diagram container, not highlighted code", async () => {
+    const r = await render(bodyOf("```mermaid\ngraph TD;\n  A-->B;\n```\n"), ctx());
+    expect(r.html).toContain('class="rs-mermaid"');
+    expect(r.html).toContain("data-rs-mermaid");
+    expect(r.html).toContain("A-->B"); // diagram source carried through verbatim
+    expect(r.html).not.toContain('class="rs-code"');
+    expect(r.diagnostics.some((d) => d.code === "unknown-language")).toBe(false);
+  });
 });
