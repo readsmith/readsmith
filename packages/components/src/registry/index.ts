@@ -1,13 +1,23 @@
 import type { ComponentRegistry } from "@readsmith/mdx";
+import { accordion, accordionGroup } from "./accordion.js";
 import { callout, calloutOfKind } from "./callout.js";
+import { card, cardGroup } from "./card.js";
+import { update } from "./changelog.js";
+import { codeGroup } from "./codegroup.js";
+import { frame } from "./frame.js";
+import { badge, kbd, tooltip } from "./inline.js";
+import { step, steps } from "./steps.js";
+import { tab, tabs } from "./tabs.js";
 
 /**
  * Build the Readsmith component registry for the P6 render pipeline. Each entry
- * maps a component name to a hast-producing render (static components ship no
- * JS; interactive ones are added as islands as the library grows).
+ * maps a component name to a hast-producing render. Static components ship zero
+ * JS; islands (tabs, code groups) are marked so the pipeline lists them in the
+ * hydration manifest and the client runtime enhances them.
  */
 export function createRegistry(): ComponentRegistry {
   return {
+    // callouts
     Callout: { render: callout },
     Note: { render: calloutOfKind("note") },
     Info: { render: calloutOfKind("info") },
@@ -15,8 +25,29 @@ export function createRegistry(): ComponentRegistry {
     Warning: { render: calloutOfKind("warning") },
     Danger: { render: calloutOfKind("danger") },
     Check: { render: calloutOfKind("check") },
+    // cards
+    Card: { render: card },
+    CardGroup: { render: cardGroup },
+    // steps
+    Steps: { render: steps },
+    Step: { render: step },
+    // frame
+    Frame: { render: frame },
+    // accordion (native details, static)
+    Accordion: { render: accordion },
+    AccordionGroup: { render: accordionGroup },
+    // changelog
+    Update: { render: update },
+    // inline
+    Kbd: { render: kbd },
+    Badge: { render: badge },
+    Tooltip: { render: tooltip },
+    // islands
+    Tabs: { render: tabs, island: true },
+    Tab: { render: tab },
+    CodeGroup: { render: codeGroup, island: true },
   };
 }
 
 export { callout } from "./callout.js";
-export type { ComponentArgs } from "./callout.js";
+export type { ComponentArgs } from "./util.js";

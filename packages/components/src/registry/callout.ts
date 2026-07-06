@@ -1,15 +1,9 @@
-import type { Props } from "@readsmith/mdx";
 import type { ElementContent } from "hast";
 import { h } from "hastscript";
 import { calloutIcon } from "./icons.js";
+import type { ComponentArgs } from "./util.js";
 
 const KINDS = new Set(["note", "info", "tip", "warning", "danger", "check"]);
-
-export interface ComponentArgs {
-  name: string;
-  props: Props;
-  children: ElementContent[];
-}
 
 /**
  * A callout / admonition. `<Callout type="warning" title="...">body</Callout>`,

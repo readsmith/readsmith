@@ -1,0 +1,84 @@
+/* Inline: kbd, badges, tooltips (FR-10). */
+
+.rs-kbd {
+  font-family: var(--rs-font-mono);
+  font-size: 0.78em;
+  color: var(--rs-ink-muted);
+  background: var(--rs-paper);
+  border: 1px solid var(--rs-rule-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--rs-radius-sm);
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.rs-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--rs-font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rs-ink-muted);
+  background: var(--rs-surface);
+  border: 1px solid var(--rs-rule-strong);
+  border-radius: var(--rs-radius-sm);
+  padding: 2px 8px;
+}
+.rs-badge--new,
+.rs-badge--tip {
+  color: var(--rs-tip);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--rs-tip) 40%, transparent);
+}
+.rs-badge--warning {
+  color: var(--rs-warning);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--rs-warning) 40%, transparent);
+}
+.rs-badge--accent {
+  color: var(--rs-accent);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--rs-accent) 40%, transparent);
+}
+
+.rs-tooltip {
+  position: relative;
+  display: inline-flex;
+  cursor: help;
+  border-bottom: 1px dotted var(--rs-ink-faint);
+}
+.rs-tooltip__pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  z-index: 20;
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 10px;
+  border-radius: var(--rs-radius-sm);
+  background: var(--rs-ink);
+  color: var(--rs-paper);
+  font-family: var(--rs-font-sans);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: var(--rs-shadow-pop);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--rs-dur) var(--rs-ease), transform var(--rs-dur) var(--rs-ease);
+}
+.rs-tooltip:hover .rs-tooltip__pop,
+.rs-tooltip:focus .rs-tooltip__pop,
+.rs-tooltip:focus-visible .rs-tooltip__pop {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-tooltip__pop {
+    transition: opacity var(--rs-dur) var(--rs-ease);
+  }
+}

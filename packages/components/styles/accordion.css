@@ -1,0 +1,59 @@
+/* Accordions (FR-3), built on native <details>/<summary>. Zero JS. */
+
+.rs-accordion {
+  margin: var(--rs-space-4) 0;
+  border: 1px solid var(--rs-rule);
+  border-radius: var(--rs-radius);
+  background: var(--rs-surface);
+  overflow: hidden;
+}
+.rs-accordions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-space-2);
+  margin: var(--rs-space-5) 0;
+}
+.rs-accordions .rs-accordion {
+  margin: 0;
+}
+
+.rs-accordion__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--rs-space-2);
+  padding: var(--rs-space-3) var(--rs-space-4);
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+.rs-accordion__summary::-webkit-details-marker {
+  display: none;
+}
+
+.rs-accordion__chevron {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--rs-ink-faint);
+  transition: transform var(--rs-dur) var(--rs-ease);
+}
+.rs-accordion[open] .rs-accordion__chevron {
+  transform: rotate(90deg);
+}
+
+.rs-accordion__body {
+  padding: 0 var(--rs-space-4) var(--rs-space-4) calc(var(--rs-space-4) + 16px + var(--rs-space-2));
+  color: var(--rs-ink-muted);
+}
+.rs-accordion__body > :first-child {
+  margin-top: 0;
+}
+.rs-accordion__body > :last-child {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-accordion__chevron {
+    transition: none;
+  }
+}

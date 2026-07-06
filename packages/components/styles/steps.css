@@ -1,0 +1,58 @@
+/* Steps (FR-6). A real sequence, so an ordered list with a connected rhythm. */
+
+.rs-steps {
+  list-style: none;
+  counter-reset: rs-step;
+  margin: var(--rs-space-5) 0;
+  padding: 0;
+}
+
+.rs-step {
+  counter-increment: rs-step;
+  position: relative;
+  padding: 0 0 var(--rs-space-5) var(--rs-space-7);
+}
+.rs-step:last-child {
+  padding-bottom: 0;
+}
+
+.rs-step::before {
+  content: counter(rs-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--rs-surface);
+  border: 1px solid var(--rs-rule-strong);
+  color: var(--rs-accent);
+  font-family: var(--rs-font-mono);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.rs-step::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 32px;
+  bottom: 0;
+  width: 1px;
+  background: var(--rs-rule);
+}
+.rs-step:last-child::after {
+  display: none;
+}
+
+.rs-step__title {
+  margin: 4px 0 var(--rs-space-2);
+  font-weight: 600;
+}
+.rs-step__body > :first-child {
+  margin-top: 0;
+}
+.rs-step__body > :last-child {
+  margin-bottom: 0;
+}

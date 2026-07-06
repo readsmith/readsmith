@@ -1,0 +1,25 @@
+/* Frames (FR-7). A media wrapper with a caption and reserved aspect-ratio. */
+
+.rs-frame {
+  margin: var(--rs-space-5) 0;
+}
+
+.rs-frame__media {
+  border: 1px solid var(--rs-rule);
+  border-radius: var(--rs-radius);
+  overflow: hidden;
+  background: var(--rs-surface);
+}
+.rs-frame__media img,
+.rs-frame__media video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.rs-frame__caption {
+  margin-top: var(--rs-space-2);
+  text-align: center;
+  font-size: var(--rs-text-small);
+  color: var(--rs-ink-muted);
+}

@@ -1,0 +1,53 @@
+/* Tabs (FR-2). A stamped label row with a teal active underline. */
+
+.rs-tabs {
+  margin: var(--rs-space-5) 0;
+}
+
+.rs-tabs__list {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--rs-rule);
+  overflow-x: auto;
+}
+
+.rs-tabs__tab {
+  margin-bottom: -1px;
+  padding: 9px 14px;
+  font-family: var(--rs-font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--rs-ink-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--rs-dur) var(--rs-ease);
+}
+.rs-tabs__tab:hover {
+  color: var(--rs-ink);
+}
+.rs-tabs__tab[aria-selected="true"] {
+  color: var(--rs-ink);
+  border-bottom-color: var(--rs-accent);
+}
+
+.rs-tabs__panels {
+  padding-top: var(--rs-space-4);
+}
+.rs-tab[hidden] {
+  display: none;
+}
+.rs-tab > :first-child {
+  margin-top: 0;
+}
+.rs-tab > :last-child {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-tabs__tab {
+    transition: none;
+  }
+}

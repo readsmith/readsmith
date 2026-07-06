@@ -1,0 +1,56 @@
+/* Changelog / Update entries (FR-9). A dated timeline with a stamped date. */
+
+.rs-update {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  margin: var(--rs-space-5) 0;
+}
+
+.rs-update__meta {
+  padding-top: 2px;
+}
+.rs-update__date {
+  font-family: var(--rs-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--rs-ink-faint);
+}
+
+.rs-update__body {
+  position: relative;
+  padding: 0 0 var(--rs-space-3) var(--rs-space-5);
+  border-left: 1px solid var(--rs-rule);
+}
+.rs-update__body::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--rs-accent);
+  transform: rotate(45deg);
+}
+.rs-update__title {
+  margin: 0 0 var(--rs-space-2);
+  font-size: 1.15rem;
+  scroll-margin-top: calc(var(--rs-header-height, 60px) + var(--rs-space-4));
+}
+.rs-update__body > :last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .rs-update {
+    grid-template-columns: 1fr;
+    gap: var(--rs-space-1);
+  }
+  .rs-update__body {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .rs-update__body::before {
+    display: none;
+  }
+}
