@@ -12,7 +12,7 @@
     "test": "turbo test",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
-    "format": "biome format --write .",
+    "format": "biome check --write .",
     "verify": "pnpm build && pnpm typecheck && pnpm format && pnpm lint && pnpm test",
     "prepare": "husky"
   },
