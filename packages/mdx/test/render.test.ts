@@ -198,3 +198,21 @@ describe("determinism", () => {
     expect(r.html).toContain("shiki");
   });
 });
+
+// P6 + component-library code-block chrome (figure wrapper, title bar from meta).
+describe("code block chrome", () => {
+  it("wraps code in a figure and shows a title bar from the fence meta", async () => {
+    const r = await render(bodyOf('```ts title="build.ts"\nconst x = 1;\n```\n'), ctx());
+    expect(r.html).toContain('class="rs-code"');
+    expect(r.html).toContain("rs-code__bar");
+    expect(r.html).toContain("build.ts");
+    expect(r.html).toContain('data-lang="ts"');
+    expect(r.html).toContain("shiki");
+  });
+
+  it("wraps a plain code block in a figure with no title bar", async () => {
+    const r = await render(bodyOf("```js\nconst x = 1;\n```\n"), ctx());
+    expect(r.html).toContain('class="rs-code"');
+    expect(r.html).not.toContain("rs-code__bar");
+  });
+});

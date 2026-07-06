@@ -1,0 +1,128 @@
+/*
+ * The code block: the developer's hero surface. The pipeline (P6) emits
+ * <figure class="rs-code" data-lang> with an optional <figcaption class="rs-code__bar">
+ * and the Shiki <pre class="shiki">. Shiki renders both themes once via CSS
+ * variables; we force a transparent Shiki background so the block sits on the
+ * --rs-surface token, and swap token colors under the dark theme.
+ */
+
+.rs-code {
+  position: relative;
+  margin: var(--rs-space-5) 0;
+  border: 1px solid var(--rs-rule);
+  border-radius: var(--rs-radius);
+  background: var(--rs-surface);
+  overflow: hidden;
+}
+
+.rs-code__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--rs-rule);
+  font-family: var(--rs-font-mono);
+}
+
+.rs-code__file {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--rs-ink);
+}
+.rs-code__file::before {
+  content: "";
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  background: var(--rs-ink-faint);
+  -webkit-mask: var(--rs-file-icon) center / contain no-repeat;
+  mask: var(--rs-file-icon) center / contain no-repeat;
+}
+
+.rs-code__lang {
+  margin-left: auto;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rs-ink-faint);
+}
+
+.rs-code pre.shiki {
+  margin: 0;
+  padding: 14px 0;
+  overflow-x: auto;
+  background: transparent !important;
+  font-family: var(--rs-font-mono);
+  font-size: var(--rs-text-code);
+  line-height: var(--rs-leading-code);
+}
+/* grid rows let a highlighted line span the full horizontal-scroll width */
+.rs-code .shiki code {
+  display: grid;
+}
+.rs-code .shiki .line {
+  padding: 0 18px;
+}
+.rs-code .shiki .line.highlighted {
+  background: var(--rs-accent-wash);
+  box-shadow: inset 2px 0 var(--rs-accent);
+}
+
+/* Shiki dual theme: swap token colors to the dark set under the dark theme */
+:root[data-theme="dark"] .rs-code .shiki,
+:root[data-theme="dark"] .rs-code .shiki span {
+  color: var(--shiki-dark) !important;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .rs-code .shiki,
+  :root:not([data-theme="light"]) .rs-code .shiki span {
+    color: var(--shiki-dark) !important;
+  }
+}
+
+/* the copy control is injected by the copy island (interactive, needs JS) */
+.rs-code__copy {
+  font-family: var(--rs-font-mono);
+  font-size: 0.7rem;
+  color: var(--rs-ink-muted);
+  background: var(--rs-surface);
+  border: 1px solid var(--rs-rule-strong);
+  border-radius: var(--rs-radius-sm);
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: color var(--rs-dur) var(--rs-ease), border-color var(--rs-dur) var(--rs-ease), opacity
+    var(--rs-dur) var(--rs-ease);
+}
+.rs-code__copy:hover {
+  color: var(--rs-ink);
+  border-color: var(--rs-ink-faint);
+}
+.rs-code__copy.is-done {
+  color: var(--rs-accent);
+  border-color: var(--rs-accent);
+}
+.rs-code__bar .rs-code__copy {
+  margin-left: 8px;
+}
+/* when there is no title bar, the button floats and reveals on hover */
+.rs-code__copy--float {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  opacity: 0;
+}
+.rs-code:hover .rs-code__copy--float,
+.rs-code__copy--float:focus-visible {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-code__copy {
+    transition: none;
+  }
+}

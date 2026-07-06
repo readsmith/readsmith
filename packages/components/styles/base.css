@@ -1,0 +1,142 @@
+/*
+ * Reading prose. The content column is wrapped in .rs-prose; every element the
+ * MDX pipeline emits is set here. Vertical rhythm comes from the spacing scale,
+ * never ad-hoc margins, so a page reads as "set", not assembled.
+ */
+
+.rs-prose {
+  color: var(--rs-ink);
+  font-family: var(--rs-font-sans);
+  font-size: var(--rs-text-body);
+  line-height: var(--rs-leading-body);
+  max-width: var(--rs-measure);
+}
+
+.rs-prose > :first-child {
+  margin-top: 0;
+}
+
+.rs-prose h1,
+.rs-prose h2,
+.rs-prose h3,
+.rs-prose h4 {
+  font-family: var(--rs-font-serif);
+  line-height: var(--rs-leading-heading);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  scroll-margin-top: calc(var(--rs-header-height, 60px) + var(--rs-space-4));
+}
+
+.rs-prose h1 {
+  font-size: var(--rs-text-h1);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin: 0 0 var(--rs-space-4);
+}
+.rs-prose h2 {
+  font-size: var(--rs-text-h2);
+  font-weight: 600;
+  margin: var(--rs-space-7) 0 var(--rs-space-4);
+}
+.rs-prose h3 {
+  font-size: var(--rs-text-h3);
+  font-weight: 600;
+  margin: var(--rs-space-6) 0 var(--rs-space-3);
+}
+.rs-prose h4 {
+  font-size: var(--rs-text-h4);
+  font-weight: 600;
+  font-family: var(--rs-font-sans);
+  margin: var(--rs-space-5) 0 var(--rs-space-2);
+}
+
+.rs-prose p {
+  margin: 0 0 var(--rs-space-4);
+}
+
+.rs-prose a {
+  color: var(--rs-accent);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.rs-prose a:hover {
+  color: var(--rs-accent-hover);
+}
+
+.rs-prose strong {
+  font-weight: 600;
+}
+
+.rs-prose ul,
+.rs-prose ol {
+  margin: 0 0 var(--rs-space-4);
+  padding-left: var(--rs-space-5);
+}
+.rs-prose li {
+  margin: var(--rs-space-2) 0;
+}
+.rs-prose li::marker {
+  color: var(--rs-ink-faint);
+}
+
+.rs-prose blockquote {
+  margin: var(--rs-space-5) 0;
+  padding-left: var(--rs-space-4);
+  border-left: 2px solid var(--rs-rule-strong);
+  color: var(--rs-ink-muted);
+}
+
+.rs-prose hr {
+  margin: var(--rs-space-7) 0;
+  border: none;
+  border-top: 1px solid var(--rs-rule);
+}
+
+/* inline code (not the fenced code block, which is .rs-code) */
+.rs-prose :not(pre) > code {
+  font-family: var(--rs-font-mono);
+  font-size: 0.86em;
+  background: var(--rs-surface);
+  border: 1px solid var(--rs-rule);
+  padding: 1px 5px;
+  border-radius: var(--rs-radius-sm);
+}
+
+.rs-prose img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* tables scroll inside their own wrapper, never the page */
+.rs-prose .rs-table-scroll {
+  overflow-x: auto;
+  margin: var(--rs-space-5) 0;
+  border: 1px solid var(--rs-rule);
+  border-radius: var(--rs-radius);
+}
+.rs-prose table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--rs-text-small);
+}
+.rs-prose thead th {
+  text-align: left;
+  font-family: var(--rs-font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rs-ink-faint);
+  font-weight: 500;
+  padding: 11px 16px;
+  background: var(--rs-surface);
+  border-bottom: 1px solid var(--rs-rule);
+  white-space: nowrap;
+}
+.rs-prose tbody td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--rs-rule);
+  vertical-align: top;
+}
+.rs-prose tbody tr:last-child td {
+  border-bottom: none;
+}

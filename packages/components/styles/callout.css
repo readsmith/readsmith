@@ -1,0 +1,77 @@
+/*
+ * Callouts (note / info / tip / warning / danger / check). A tinted surface with
+ * a semantic left rule and an icon. Text stays --rs-ink; only the rule and icon
+ * carry the hue, so a callout guides without shouting. Color is never the sole
+ * signal: the icon and (optional) title carry meaning too.
+ */
+
+.rs-callout {
+  display: flex;
+  gap: var(--rs-space-3);
+  margin: var(--rs-space-5) 0;
+  padding: var(--rs-space-3) var(--rs-space-4);
+  border: 1px solid var(--rs-rule);
+  border-left: 3px solid var(--rs-rule-strong);
+  border-radius: var(--rs-radius);
+  background: var(--rs-surface);
+}
+
+.rs-callout__icon {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  color: var(--rs-ink-muted);
+}
+
+.rs-callout__body {
+  min-width: 0;
+}
+.rs-callout__body > :first-child {
+  margin-top: 0;
+}
+.rs-callout__body > :last-child {
+  margin-bottom: 0;
+}
+
+.rs-callout__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 0 0 var(--rs-space-1);
+}
+
+.rs-callout--info {
+  border-left-color: var(--rs-info);
+  background: var(--rs-accent-wash);
+}
+.rs-callout--info .rs-callout__icon {
+  color: var(--rs-info);
+}
+
+.rs-callout--tip {
+  border-left-color: var(--rs-tip);
+}
+.rs-callout--tip .rs-callout__icon {
+  color: var(--rs-tip);
+}
+
+.rs-callout--warning {
+  border-left-color: var(--rs-warning);
+}
+.rs-callout--warning .rs-callout__icon {
+  color: var(--rs-warning);
+}
+
+.rs-callout--danger {
+  border-left-color: var(--rs-danger);
+}
+.rs-callout--danger .rs-callout__icon {
+  color: var(--rs-danger);
+}
+
+.rs-callout--check {
+  border-left-color: var(--rs-tip);
+}
+.rs-callout--check .rs-callout__icon {
+  color: var(--rs-tip);
+}

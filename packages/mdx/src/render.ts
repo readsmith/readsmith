@@ -265,10 +265,32 @@ export async function render(body: Root, ctx: RenderContext): Promise<RenderResu
   };
 
   const codeHandler = (_state: State, node: unknown): ElementContent => {
-    const pre = (node as { data?: { hastPre?: ElementContent } }).data?.hastPre;
-    if (pre) return pre;
-    const code = (node as { value?: string }).value ?? "";
-    return h("pre", h("code", [{ type: "text", value: code }]));
+    const n = node as {
+      data?: { hastPre?: ElementContent };
+      meta?: string | null;
+      lang?: string | null;
+      value?: string;
+    };
+    const pre =
+      n.data?.hastPre ??
+      h("pre", { className: ["shiki"] }, [h("code", [{ type: "text", value: n.value ?? "" }])]);
+    const lang = (n.lang ?? "").trim();
+    const title = parseCodeTitle(n.meta ?? undefined);
+
+    const figureChildren: ElementContent[] = [];
+    if (title) {
+      const bar: ElementContent[] = [
+        h("span", { className: ["rs-code__file"] }, [{ type: "text", value: title }]),
+      ];
+      if (lang)
+        bar.push(h("span", { className: ["rs-code__lang"] }, [{ type: "text", value: lang }]));
+      figureChildren.push(h("figcaption", { className: ["rs-code__bar"] }, bar));
+    }
+    figureChildren.push(pre);
+
+    const props: Properties = { className: ["rs-code"] };
+    if (lang) props["data-lang"] = lang;
+    return h("figure", props, figureChildren);
   };
 
   const esmHandler = (_state: State, node: unknown): undefined => {
@@ -461,6 +483,13 @@ function errorPlaceholder(message: string): ElementContent {
 function toArray(value: ElementContent | ElementContent[] | undefined): ElementContent[] {
   if (value == null) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+/** Read a code fence's `title="..."` (or `filename="..."`) meta, if present. */
+function parseCodeTitle(meta?: string): string | undefined {
+  if (!meta) return undefined;
+  const match = meta.match(/(?:title|filename)="([^"]*)"/);
+  return match?.[1]?.trim() || undefined;
 }
 
 interface CodeNode {
