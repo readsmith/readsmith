@@ -21,6 +21,8 @@
   "dependencies": {
     "@readsmith/model": "workspace:*",
     "github-slugger": "^2.0.0",
+    "mdast-util-gfm": "^3.0.0",
+    "mdast-util-to-markdown": "^2.1.0",
     "mdast-util-to-string": "^4.0.0",
     "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.0",
