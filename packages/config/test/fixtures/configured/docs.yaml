@@ -1,0 +1,11 @@
+site:
+  name: Configured Docs
+content:
+  include:
+    - "**/*.mdx"
+navigation:
+  - setup
+  - group: Advanced
+    pages:
+      - advanced/webhooks
+  - not-a-real-page
