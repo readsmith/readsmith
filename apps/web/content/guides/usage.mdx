@@ -1,0 +1,26 @@
+---
+title: Usage
+description: Author pages and components.
+---
+
+# Usage
+
+Write Markdown or MDX. Components like callouts, tabs, and cards are available in `.mdx` files. Variables and snippets resolve at build time, so pages ship as static HTML.
+
+<Note>Static prose ships zero JavaScript. Only interactive components (tabs, code groups) hydrate as islands.</Note>
+
+## Code groups
+
+A code group switches between samples. It syncs page-wide with tabs that share a group.
+
+<CodeGroup group="lang">
+
+```python
+print("hello from readsmith")
+```
+
+```javascript
+console.log("hello from readsmith");
+```
+
+</CodeGroup>

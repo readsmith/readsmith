@@ -53,8 +53,9 @@ describe("renderNav", () => {
     expect(html).toContain("Guides");
   });
 
-  it("opens the group containing the current page", () => {
+  it("renders groups open by default so a section never auto-collapses", () => {
     expect(renderNav(nav, "guide/usage")).toContain('<details class="rs-nav__group" open>');
+    expect(renderNav(nav, "")).toContain('<details class="rs-nav__group" open>');
   });
 });
 

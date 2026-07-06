@@ -1,6 +1,9 @@
 import type { FinalNavNode } from "@readsmith/mdx";
 import { esc } from "./util.js";
 
+const CHEVRON =
+  '<svg class="rs-nav__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+
 /**
  * Render the left navigation from the finalized nav tree. Groups become
  * collapsible sections with a stamped label; pages become links, the current
@@ -20,16 +23,12 @@ function navItems(nodes: FinalNavNode[], current: string): string {
           active ? ' aria-current="page"' : ""
         }>${esc(node.title)}</a>`;
       }
-      const open = containsSlug(node.children, current);
-      return `<details class="rs-nav__group"${open ? " open" : ""}><summary class="rs-nav__label">${esc(
+      // Groups render open by default and stay open across navigations (the state
+      // is not recomputed per page), so a section never collapses on its own. The
+      // reader can still collapse a group by hand via the native disclosure.
+      return `<details class="rs-nav__group" open><summary class="rs-nav__label">${CHEVRON}<span>${esc(
         node.label,
-      )}</summary><div class="rs-nav__children">${navItems(node.children, current)}</div></details>`;
+      )}</span></summary><div class="rs-nav__children">${navItems(node.children, current)}</div></details>`;
     })
     .join("");
-}
-
-function containsSlug(nodes: FinalNavNode[], slug: string): boolean {
-  return nodes.some((node) =>
-    node.type === "page" ? node.slug === slug : containsSlug(node.children, slug),
-  );
 }

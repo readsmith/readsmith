@@ -23,6 +23,20 @@
   top: 12px;
 }
 
+/* reading-progress gauge: sits along the bottom edge of the sticky header, so it
+ * reads as the header underline filling with teal as you scroll. */
+.rs-progress {
+  position: fixed;
+  top: calc(var(--rs-header-height) - 2px);
+  left: 0;
+  height: 2px;
+  width: 100%;
+  z-index: 45;
+  background: linear-gradient(90deg, var(--rs-accent), var(--rs-hallmark));
+  transform: scaleX(var(--rs-p, 0));
+  transform-origin: 0 50%;
+}
+
 /* header */
 .rs-header {
   position: sticky;
@@ -57,7 +71,8 @@
 .rs-header__spacer {
   flex: 1;
 }
-.rs-header__burger {
+/* scoped so it beats `.rs-icon-btn { display: grid }` regardless of source order */
+.rs-header .rs-header__burger {
   display: none;
 }
 
@@ -97,12 +112,34 @@
   margin-right: auto;
 }
 
-/* three-column layout */
+/* Reading layout: nav pinned left, TOC pinned right, content fills the middle.
+ * The reading measure widens at breakpoints (see below) so the content column
+ * grows with the screen instead of staying narrow. */
 .rs-shell {
   display: grid;
-  grid-template-columns: 270px minmax(0, 1fr) 236px;
-  max-width: 1460px;
-  margin: 0 auto;
+  grid-template-columns: 288px minmax(0, 1fr) 256px;
+}
+
+/* Widen the reading measure as the viewport grows, so big screens use more width. */
+@media (min-width: 1280px) {
+  :root {
+    --rs-measure: 78ch;
+  }
+}
+@media (min-width: 1536px) {
+  :root {
+    --rs-measure: 90ch;
+  }
+}
+@media (min-width: 1792px) {
+  :root {
+    --rs-measure: 102ch;
+  }
+}
+@media (min-width: 2200px) {
+  :root {
+    --rs-measure: 118ch;
+  }
 }
 
 .rs-nav-col {
@@ -120,7 +157,9 @@
   margin-bottom: 6px;
 }
 .rs-nav__label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   padding: 6px 10px;
   font-family: var(--rs-font-mono);
   font-size: 0.7rem;
@@ -129,9 +168,24 @@
   color: var(--rs-ink-faint);
   cursor: pointer;
   list-style: none;
+  border-radius: 7px;
+}
+.rs-nav__label:hover {
+  color: var(--rs-ink-muted);
+  background: var(--rs-surface);
 }
 .rs-nav__label::-webkit-details-marker {
   display: none;
+}
+.rs-nav__chevron {
+  flex: 0 0 11px;
+  width: 11px;
+  height: 11px;
+  color: var(--rs-ink-faint);
+  transition: transform var(--rs-dur) var(--rs-ease);
+}
+.rs-nav__group[open] > .rs-nav__label .rs-nav__chevron {
+  transform: rotate(90deg);
 }
 .rs-nav__children {
   padding-bottom: 10px;
@@ -158,7 +212,7 @@
 /* content column */
 .rs-main {
   min-width: 0;
-  padding: 30px 56px 96px;
+  padding: 30px 44px 96px;
 }
 .rs-main:focus {
   outline: none;
@@ -471,7 +525,7 @@
   .rs-shell {
     grid-template-columns: 1fr;
   }
-  .rs-header__burger {
+  .rs-header .rs-header__burger {
     display: grid;
   }
   .rs-search span,
@@ -506,6 +560,7 @@
 @media (prefers-reduced-motion: reduce) {
   .rs-skip,
   .rs-nav-col,
+  .rs-nav__chevron,
   .rs-toc__marker,
   .rs-toc__link,
   .rs-pager__link {

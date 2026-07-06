@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "The Readsmith component library and reading shell: design tokens, in-content components, and island hydration.",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

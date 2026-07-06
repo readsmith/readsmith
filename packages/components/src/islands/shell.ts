@@ -7,11 +7,24 @@
  */
 export function initShell(root: ParentNode = document): void {
   initTheme(root);
+  initProgress(root);
   initMobileNav(root);
   initScrollSpy(root);
   initPalette(root);
   initContextMenu(root);
   initFeedback(root);
+}
+
+function initProgress(root: ParentNode): void {
+  const bar = root.querySelector<HTMLElement>("[data-rs-progress]");
+  if (!bar) return;
+  const update = (): void => {
+    const el = document.documentElement;
+    const max = el.scrollHeight - el.clientHeight;
+    bar.style.setProperty("--rs-p", (max > 0 ? el.scrollTop / max : 0).toFixed(4));
+  };
+  addEventListener("scroll", update, { passive: true });
+  update();
 }
 
 function initTheme(root: ParentNode): void {

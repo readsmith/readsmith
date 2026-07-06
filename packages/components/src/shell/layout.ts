@@ -44,6 +44,7 @@ const THEME_INIT =
  */
 export function renderShellBody(site: ShellSite, page: ShellPage): string {
   return `<a class="rs-skip" href="#rs-content">Skip to content</a>
+<div class="rs-progress" data-rs-progress aria-hidden="true"></div>
 ${header(site)}
 <div class="rs-scrim" data-rs-scrim hidden></div>
 <div class="rs-shell">
