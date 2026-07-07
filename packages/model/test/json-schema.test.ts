@@ -13,6 +13,6 @@ describe("json-schema export", () => {
 
   it("exports every registered schema by name", () => {
     const all = exportAllJsonSchemas();
-    expect(Object.keys(all).sort()).toEqual(["diagnostic", "position"]);
+    expect(Object.keys(all).sort()).toEqual(["diagnostic", "normalizedSpec", "position"]);
   });
 });

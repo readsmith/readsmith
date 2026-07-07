@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { diagnosticSchema, positionSchema } from "./common.js";
+import { normalizedSpecSchema } from "./normalized-spec.js";
 
 /**
  * The registry of top-level schemas we publish JSON-Schema for. JSON-Schema
@@ -9,6 +10,7 @@ import { diagnosticSchema, positionSchema } from "./common.js";
 export const schemaRegistry = {
   position: positionSchema,
   diagnostic: diagnosticSchema,
+  normalizedSpec: normalizedSpecSchema,
 } as const;
 
 export type SchemaName = keyof typeof schemaRegistry;
