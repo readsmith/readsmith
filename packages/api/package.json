@@ -1,0 +1,24 @@
+{
+  "name": "@readsmith/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The portable Hono API: routes plus a dependency contract, runtime-agnostic (Node or edge). Hosts inject a database and other services.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "hono": "^4.6.14"
+  }
+}

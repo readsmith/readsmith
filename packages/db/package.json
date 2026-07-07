@@ -1,0 +1,31 @@
+{
+  "name": "@readsmith/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Persistence backbone: Postgres pool, migrations, typed access layer, storage, and the pg-boss job runner.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "migrations"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@readsmith/model": "workspace:*",
+    "pg": "^8.13.1",
+    "pg-boss": "^9.0.3",
+    "zod": "^4.0.5"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10"
+  }
+}

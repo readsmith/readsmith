@@ -1,0 +1,41 @@
+# Readsmith self-host: the app plus Postgres, zero external services.
+#   cp .env.example .env  &&  docker compose up
+services:
+  db:
+    # Pin by digest in production for reproducibility.
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-readsmith}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-readsmith}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-readsmith} -d ${POSTGRES_DB:-readsmith}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-readsmith}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-readsmith}
+      READSMITH_STORAGE_ROOT: /storage
+      READSMITH_MIGRATIONS_DIR: /app/migrations
+    volumes:
+      # Docs pages are prerendered into the image at build time; the persisted
+      # spec blobs live here so they survive restarts.
+      - storage-data:/storage
+    ports:
+      - "${PORT:-4321}:4321"
+
+volumes:
+  db-data:
+  storage-data:

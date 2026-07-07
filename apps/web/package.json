@@ -17,9 +17,12 @@
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/ibm-plex-sans": "^5.2.8",
     "@fontsource/spectral": "^5.2.8",
+    "@readsmith/api": "workspace:*",
     "@readsmith/components": "workspace:*",
     "@readsmith/config": "workspace:*",
+    "@readsmith/db": "workspace:*",
     "@readsmith/mdx": "workspace:*",
+    "hono": "^4.6.14",
     "next": "^14.2.18",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
