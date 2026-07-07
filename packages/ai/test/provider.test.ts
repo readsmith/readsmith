@@ -1,4 +1,3 @@
-import { embed } from "ai";
 import { describe, expect, it } from "vitest";
 import {
   type AiConfig,
@@ -54,13 +53,13 @@ describe("model provider (real, ai-sdk backed)", () => {
     expect(noKey.hasEmbedding()).toBe(false);
   });
 
-  it("constructs a model when keyed, throws typed errors when not", () => {
+  it("constructs a chat model when keyed, throws typed errors when not", async () => {
     const keyed = createModelProvider(cfg(), envKeySource({ OPENAI_API_KEY: "k" }));
     expect(keyed.chat()).toBeDefined();
-    expect(keyed.embedding()).toBeDefined();
 
     const unkeyed = createModelProvider(cfg(), envKeySource({}));
     expect(() => unkeyed.chat()).toThrow(MissingKeyError);
+    await expect(unkeyed.embedMany(["x"])).rejects.toBeInstanceOf(MissingKeyError);
 
     const noChat = createModelProvider(
       cfg({ chat: undefined }),
@@ -89,10 +88,11 @@ describe("mock provider", () => {
     expect(norm).toBeCloseTo(1);
   });
 
-  it("its embedding model works end-to-end with the real ai-sdk embed()", async () => {
+  it("embedMany runs the real ai-sdk embedMany and returns 1024-dim vectors", async () => {
     const provider = createMockProvider();
-    const { embedding } = await embed({ model: provider.embedding(), value: "hello world" });
-    expect(embedding).toHaveLength(1024);
-    expect(embedding).toEqual(fakeEmbedding("hello world"));
+    const vectors = await provider.embedMany(["hello world", "second"]);
+    expect(vectors).toHaveLength(2);
+    expect(vectors[0]).toHaveLength(1024);
+    expect(vectors[0]).toEqual(fakeEmbedding("hello world"));
   });
 });

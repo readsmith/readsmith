@@ -1,13 +1,14 @@
-import type { EmbeddingModel, LanguageModel } from "ai";
+import { type LanguageModel, embedMany } from "ai";
 import { MockEmbeddingModelV4, MockLanguageModelV4 } from "ai/test";
 import { EMBEDDING_DIMENSIONS } from "./config.js";
 import type { ModelProvider } from "./provider.js";
 
 /**
- * A deterministic mock ModelProvider for tests: no network, no key. The embedding
- * model returns a stable 1024-dim vector derived from the input text, so indexing
- * and retrieval tests are reproducible. Downstream slices pass a scripted chat
- * model for the Ask-AI agent.
+ * A deterministic mock ModelProvider for tests: no network, no key. `embedMany`
+ * runs the real ai-sdk `embedMany` against a mock embedding model that returns a
+ * stable 1024-dim vector derived from the input text, so indexing and retrieval
+ * tests are reproducible and exercise the real embedding wiring. Downstream
+ * slices pass a scripted chat model for the Ask-AI agent.
  */
 
 /** A stable, normalized 1024-dim embedding derived from text (no randomness). */
@@ -40,7 +41,7 @@ export function createMockProvider(opts: MockProviderOptions = {}): ModelProvide
     modelId: "mock-embed",
     maxEmbeddingsPerCall: 2048,
     doEmbed: async ({ values }) => ({ embeddings: values.map((v) => embed(v)), warnings: [] }),
-  }) as unknown as EmbeddingModel;
+  });
 
   const chatModel =
     opts.chatModel ??
@@ -53,6 +54,10 @@ export function createMockProvider(opts: MockProviderOptions = {}): ModelProvide
     hasChat: () => hasChat,
     hasEmbedding: () => hasEmbedding,
     chat: () => chatModel,
-    embedding: () => embeddingModel,
+    async embedMany(texts) {
+      if (texts.length === 0) return [];
+      const { embeddings } = await embedMany({ model: embeddingModel, values: [...texts] });
+      return embeddings;
+    },
   };
 }
