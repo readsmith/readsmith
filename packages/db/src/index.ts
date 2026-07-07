@@ -11,17 +11,20 @@ export {
   type NewAiQuery,
   type NewDocChunk,
   type NewEndpoint,
+  type SearchChunkRow,
   type SiteRow,
   aiQueryRowSchema,
   apiEndpointRowSchema,
   apiSpecRowSchema,
   docChunkRowSchema,
+  searchChunkRowSchema,
   siteRowSchema,
 } from "./schema.js";
 export {
   type NewSpec,
   deleteChunksNotIn,
   findSpecByHash,
+  ftsSearchChunks,
   getSite,
   insertAiQuery,
   insertEndpoints,
@@ -34,6 +37,7 @@ export {
   upsertDocChunks,
   upsertSite,
   vectorLiteral,
+  vectorSearchChunks,
 } from "./repos.js";
 export { type JobDefinition, type JobRunner, createJobRunner, defineJob } from "./jobs.js";
 export { type Logger, type LogLevel, createLogger } from "./log.js";

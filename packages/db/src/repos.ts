@@ -7,11 +7,13 @@ import {
   type NewAiQuery,
   type NewDocChunk,
   type NewEndpoint,
+  type SearchChunkRow,
   type SiteRow,
   aiQueryRowSchema,
   apiEndpointRowSchema,
   apiSpecRowSchema,
   docChunkRowSchema,
+  searchChunkRowSchema,
   siteRowSchema,
 } from "./schema.js";
 import { type SqlQuery, joinSql, sql } from "./sql.js";
@@ -171,6 +173,48 @@ export async function upsertDocChunks(
       method = EXCLUDED.method, version_id = EXCLUDED.version_id, locale = EXCLUDED.locale,
       content_hash = EXCLUDED.content_hash, text = EXCLUDED.text, embedding = EXCLUDED.embedding`);
   return input.chunks.length;
+}
+
+/**
+ * Vector kNN over the chunk index (cosine), hard-filtered by site/version/locale.
+ * Rows without an embedding (FTS-only) are excluded. Returns rows best-first; the
+ * caller fuses ranks. The query embedding is bound as a parameter, cast
+ * `::halfvec` in SQL (no interpolation).
+ */
+export async function vectorSearchChunks(
+  db: Db,
+  input: {
+    siteId: string;
+    versionId: string;
+    locale: string;
+    embedding: number[];
+    limit: number;
+  },
+): Promise<SearchChunkRow[]> {
+  const emb = vectorLiteral(input.embedding);
+  const rows = await db.query(sql`
+    SELECT id, kind, page_id, path, header_path, anchor, method, text
+    FROM app.doc_chunks
+    WHERE site_id = ${input.siteId} AND version_id = ${input.versionId} AND locale = ${input.locale}
+      AND embedding IS NOT NULL
+    ORDER BY embedding <=> ${emb}::halfvec
+    LIMIT ${input.limit}`);
+  return rows.map((r) => searchChunkRowSchema.parse(r));
+}
+
+/** Full-text (websearch) over the chunk index, hard-filtered by site/version/locale. */
+export async function ftsSearchChunks(
+  db: Db,
+  input: { siteId: string; versionId: string; locale: string; query: string; limit: number },
+): Promise<SearchChunkRow[]> {
+  const rows = await db.query(sql`
+    SELECT id, kind, page_id, path, header_path, anchor, method, text
+    FROM app.doc_chunks
+    WHERE site_id = ${input.siteId} AND version_id = ${input.versionId} AND locale = ${input.locale}
+      AND search_tsv @@ websearch_to_tsquery('english', ${input.query})
+    ORDER BY ts_rank(search_tsv, websearch_to_tsquery('english', ${input.query})) DESC
+    LIMIT ${input.limit}`);
+  return rows.map((r) => searchChunkRowSchema.parse(r));
 }
 
 /** The (id, contentHash) of every chunk for a site: the incremental-diff basis. */

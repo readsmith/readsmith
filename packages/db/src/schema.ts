@@ -78,6 +78,23 @@ export const docChunkRowSchema = z.object({
 });
 export type DocChunkRow = z.infer<typeof docChunkRowSchema>;
 
+/**
+ * A chunk row as returned by retrieval (vector or FTS). Omits `embedding`/tsv
+ * (opaque, not needed downstream); the caller derives a citation + snippet from
+ * these fields and fuses the two arms by rank.
+ */
+export const searchChunkRowSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  page_id: z.string().nullable(),
+  path: z.string(),
+  header_path: z.array(z.string()),
+  anchor: z.string().nullable(),
+  method: z.string().nullable(),
+  text: z.string(),
+});
+export type SearchChunkRow = z.infer<typeof searchChunkRowSchema>;
+
 /** A chunk to index. `embedding` is null when no embedding provider is configured. */
 export interface NewDocChunk {
   id: string;

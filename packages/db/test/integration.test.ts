@@ -7,6 +7,7 @@ import { runMigrations } from "../src/migrate.js";
 import {
   deleteChunksNotIn,
   findSpecByHash,
+  ftsSearchChunks,
   getSite,
   insertAiQuery,
   insertEndpoints,
@@ -18,6 +19,7 @@ import {
   setAiQueryFeedback,
   upsertDocChunks,
   upsertSite,
+  vectorSearchChunks,
 } from "../src/repos.js";
 import { sql } from "../src/sql.js";
 
@@ -344,5 +346,87 @@ describe.skipIf(!DATABASE_URL)("persistence backbone (integration)", () => {
     );
     const purged = await purgeAiQueries(db, { olderThanDays: 90 });
     expect(purged).toBe(1);
+  });
+
+  // M3 (Slice 4): the two retrieval arms. Proves halfvec cosine kNN, FTS, and
+  // the version/locale hard-filter. Isolated under its own site.
+  it("vector + FTS search rank by relevance and hard-filter by version/locale", async () => {
+    const unit = (i: number): number[] => {
+      const v = new Array<number>(1024).fill(0);
+      v[i] = 1;
+      return v;
+    };
+    await upsertSite(db, { id: "search-test", name: "S" });
+    await upsertDocChunks(db, {
+      siteId: "search-test",
+      chunks: [
+        {
+          id: "sca",
+          kind: "doc",
+          endpointId: null,
+          pageId: "pa",
+          path: "/auth",
+          headerPath: ["Authentication"],
+          anchor: "auth",
+          method: null,
+          versionId: "current",
+          locale: "en",
+          contentHash: "sa",
+          text: "authentication guide and access tokens",
+          embedding: unit(0),
+        },
+        {
+          id: "scb",
+          kind: "doc",
+          endpointId: null,
+          pageId: "pb",
+          path: "/billing",
+          headerPath: ["Billing"],
+          anchor: "bill",
+          method: null,
+          versionId: "current",
+          locale: "en",
+          contentHash: "sb",
+          text: "billing overview and invoices",
+          embedding: unit(1),
+        },
+        {
+          id: "scc",
+          kind: "doc",
+          endpointId: null,
+          pageId: "pc",
+          path: "/auth-fr",
+          headerPath: ["Auth"],
+          anchor: "auth",
+          method: null,
+          versionId: "current",
+          locale: "fr",
+          contentHash: "sc",
+          text: "authentication guide french",
+          embedding: unit(0),
+        },
+      ],
+    });
+
+    const v = await vectorSearchChunks(db, {
+      siteId: "search-test",
+      versionId: "current",
+      locale: "en",
+      embedding: unit(0),
+      limit: 10,
+    });
+    expect(v[0]?.id).toBe("sca"); // closest to the query vector
+    expect(v.map((h) => h.id)).not.toContain("scc"); // fr filtered out
+
+    const f = await ftsSearchChunks(db, {
+      siteId: "search-test",
+      versionId: "current",
+      locale: "en",
+      query: "authentication",
+      limit: 10,
+    });
+    expect(f.map((h) => h.id)).toContain("sca");
+    expect(f.map((h) => h.id)).not.toContain("scb"); // no keyword match
+    expect(f.map((h) => h.id)).not.toContain("scc"); // fr filtered out
   });
 });
