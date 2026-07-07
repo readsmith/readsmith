@@ -71,6 +71,12 @@ export const configInputSchema = z.object({
   variables: z.record(z.string(), z.unknown()).optional(),
   /** Show the "Powered by Readsmith" badge. Defaults to true; set false to white-label. */
   branding: z.boolean().optional(),
+  /**
+   * AI: search, Ask-AI, and MCP. Passed through opaquely and validated by
+   * `@readsmith/ai` at the boundary (this package must not depend on it). Keys
+   * are NEVER here; they come from env/secrets.
+   */
+  ai: z.unknown().optional(),
 });
 
 export type ConfigInput = z.infer<typeof configInputSchema>;
@@ -114,6 +120,8 @@ export interface ResolvedConfig {
   apiReference?: { spec: string; path: string; label: string };
   /** Whether to show the "Powered by Readsmith" badge (white-label when false). */
   branding: boolean;
+  /** Opaque AI config block, validated downstream by `@readsmith/ai`. */
+  ai?: unknown;
   diagnostics: Diagnostic[];
 }
 

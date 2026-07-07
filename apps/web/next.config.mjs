@@ -26,8 +26,14 @@ const nextConfig = {
     "pg",
     "pg-boss",
     "@readsmith/db",
+    "@readsmith/ai",
     "@readsmith/api-reference",
     "@apidevtools/swagger-parser",
+    "ai",
+    "@ai-sdk/openai",
+    "@ai-sdk/anthropic",
+    "@ai-sdk/google",
+    "@modelcontextprotocol/sdk",
   ],
 };
 

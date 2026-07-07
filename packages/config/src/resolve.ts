@@ -66,6 +66,7 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
     tabs,
     apiReference,
     branding: input?.branding ?? true,
+    ai: input?.ai,
     diagnostics,
   };
 }

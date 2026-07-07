@@ -22,6 +22,8 @@ export interface Site {
   favicon?: string;
   /** The API-reference config from docs.yaml, when set (for the header cross-link). */
   apiReference?: { spec: string; path: string; label: string };
+  /** Opaque AI config block from docs.yaml (validated at runtime by @readsmith/ai). */
+  ai?: unknown;
 }
 
 /** The normalized API reference, ready to render. */

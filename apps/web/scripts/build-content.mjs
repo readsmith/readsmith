@@ -94,6 +94,7 @@ async function main() {
     logo: config.site.logo,
     favicon: config.site.favicon,
     apiReference: config.apiReference,
+    ai: config.ai ?? null,
   };
   const apiReference = await buildApiReference(config, contentRoot);
 

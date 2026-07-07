@@ -1,2 +1,2 @@
 export { createApiApp } from "./app.js";
-export type { ApiDatabase, ApiDeps } from "./deps.js";
+export type { AiCapabilities, AiServices, ApiDatabase, ApiDeps } from "./deps.js";

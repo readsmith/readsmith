@@ -41,6 +41,9 @@ importers:
       '@fontsource/spectral':
         specifier: ^5.2.8
         version: 5.2.8
+      '@readsmith/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@readsmith/api':
         specifier: workspace:*
         version: link:../../packages/api
@@ -111,9 +114,15 @@ importers:
 
   packages/api:
     dependencies:
+      '@readsmith/model':
+        specifier: workspace:*
+        version: link:../model
       hono:
         specifier: ^4.6.14
         version: 4.12.28
+      zod:
+        specifier: ^4.0.5
+        version: 4.4.3
 
   packages/api-reference:
     dependencies:
