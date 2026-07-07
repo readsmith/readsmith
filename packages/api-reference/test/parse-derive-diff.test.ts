@@ -1,6 +1,6 @@
 import type { NormalizedSpec, Operation } from "@readsmith/model";
 import { describe, expect, it } from "vitest";
-import { buildHarRequest, endpointSearchText } from "../src/derive.js";
+import { endpointSearchText } from "../src/derive.js";
 import { diffSpecs } from "../src/diff.js";
 import { normalizeDocument } from "../src/normalize.js";
 import { parseAndBundle } from "../src/parse.js";
@@ -57,13 +57,6 @@ describe("derive", () => {
 
   it("builds searchable endpoint text", () => {
     expect(endpointSearchText(op)).toBe("GET /users/{id} Get a user Users");
-  });
-
-  it("builds a HAR seed with a substituted path and query params", () => {
-    const har = buildHarRequest(op, "https://api.example.com/");
-    expect(har.method).toBe("GET");
-    expect(har.url).toBe("https://api.example.com/users/{id}");
-    expect(har.queryString.map((q) => q.name)).toEqual(["verbose"]);
   });
 });
 

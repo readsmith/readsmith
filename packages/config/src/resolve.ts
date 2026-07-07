@@ -42,6 +42,14 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
     });
   }
 
+  const apiReference = input?.apiReference
+    ? {
+        spec: input.apiReference.spec,
+        path: input.apiReference.path ?? "/api-reference",
+        label: input.apiReference.label ?? "API Reference",
+      }
+    : undefined;
+
   return {
     site: {
       name: input?.site.name ?? defaultSiteName(root),
@@ -56,6 +64,7 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
     pages,
     nav,
     tabs,
+    apiReference,
     branding: input?.branding ?? true,
     diagnostics,
   };

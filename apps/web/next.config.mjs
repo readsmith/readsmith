@@ -18,14 +18,16 @@ const nextConfig = {
     "@readsmith/model",
     "@readsmith/api",
   ],
-  experimental: {
-    // Enables instrumentation.ts (boot-time migrations + job worker).
-    instrumentationHook: true,
-    // Server-only packages stay external, loaded by Node at runtime rather than
-    // bundled by webpack. @readsmith/db must be external so its runtime
-    // `import.meta.url` migration-dir resolution is not rewritten by the bundler.
-    serverComponentsExternalPackages: ["pg", "pg-boss", "@readsmith/db"],
-  },
+  // Server-only packages stay external, loaded by Node at runtime rather than
+  // bundled by the compiler. @readsmith/db must be external so its runtime
+  // `import.meta.url` migration-dir resolution is not rewritten by the bundler.
+  serverExternalPackages: [
+    "pg",
+    "pg-boss",
+    "@readsmith/db",
+    "@readsmith/api-reference",
+    "@apidevtools/swagger-parser",
+  ],
 };
 
 export default nextConfig;

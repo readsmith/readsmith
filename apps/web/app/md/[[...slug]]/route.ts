@@ -10,9 +10,9 @@ export async function generateStaticParams(): Promise<{ slug?: string[] }[]> {
 }
 
 /** Serve a page's raw Markdown at /md/{slug}, for agents and "view as Markdown". */
-export async function GET(_request: Request, { params }: { params: { slug?: string[] } }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ slug?: string[] }> }) {
   const { build } = await getSite();
-  const slug = (params.slug ?? []).join("/");
+  const slug = ((await params).slug ?? []).join("/");
   const page = build.pages.find((p) => p.slug === slug);
   if (!page) return new Response("Not found", { status: 404 });
   return new Response(page.rawMd, {

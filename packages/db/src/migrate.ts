@@ -1,5 +1,5 @@
 import { readFile, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Db } from "./client.js";
 import type { Logger } from "./log.js";
@@ -38,11 +38,12 @@ export function resolveMigrations(files: readonly string[]): Migration[] {
 
 /** The directory holding this package's migration files. */
 export function migrationsDir(): string {
-  // The relative path is held in a variable so bundlers do not special-case the
-  // `new URL(<literal>, import.meta.url)` form and try to resolve it at build
-  // time; resolution happens at runtime against the real module location.
-  const relative = "../migrations";
-  return fileURLToPath(new URL(relative, import.meta.url));
+  // Resolve at runtime from this module's directory. Deliberately NOT
+  // `new URL('../migrations', import.meta.url)`: bundlers (webpack, Turbopack)
+  // special-case that form as an asset reference and fail on a directory. A
+  // path.join off the module dir is opaque to them and resolves at runtime.
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  return join(moduleDir, "..", "migrations");
 }
 
 /**

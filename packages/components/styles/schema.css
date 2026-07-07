@@ -1,0 +1,232 @@
+/* SchemaViewer (view mode): reference documentation for a NormalizedSchema.
+ * Nesting reads as indented, rule-separated rows; refs and composition are
+ * called out with the accent; constraints are quiet chips. Themed via tokens. */
+
+.rs-schema {
+  font-family: var(--rs-font-sans);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--rs-ink);
+}
+
+.rs-schema__head,
+.rs-schema__prop-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.rs-schema__t {
+  font-family: var(--rs-font-mono);
+  font-size: 0.82rem;
+  color: var(--rs-accent);
+}
+.rs-schema__any {
+  font-style: italic;
+}
+.rs-schema__fmt {
+  font-family: var(--rs-font-mono);
+  font-size: 0.75rem;
+  color: var(--rs-ink-faint);
+}
+.rs-schema__ref,
+.rs-schema__comp {
+  font-family: var(--rs-font-mono);
+  font-size: 0.82rem;
+  color: var(--rs-accent);
+  font-weight: 500;
+}
+
+/* property list: a left rule signals a nesting level */
+.rs-schema__props {
+  border-left: 2px solid var(--rs-rule);
+  margin: 6px 0 2px;
+}
+.rs-schema__prop {
+  padding: 8px 0 8px 14px;
+  border-top: 1px solid var(--rs-rule);
+}
+.rs-schema__props > .rs-schema__prop:first-child {
+  border-top: none;
+}
+.rs-schema__key {
+  font-family: var(--rs-font-mono);
+  font-size: 0.84rem;
+  color: var(--rs-ink);
+  font-weight: 600;
+}
+.rs-schema__prop-type {
+  color: var(--rs-ink-muted);
+}
+.rs-schema__desc {
+  margin: 4px 0 0;
+  color: var(--rs-ink-muted);
+  font-size: 0.85rem;
+}
+.rs-schema__prop-body {
+  margin-top: 6px;
+  padding-left: 14px;
+}
+
+details.rs-schema__prop--nested > summary {
+  cursor: pointer;
+  list-style: none;
+}
+details.rs-schema__prop--nested > summary::-webkit-details-marker {
+  display: none;
+}
+details.rs-schema__prop--nested > summary::before {
+  content: "▸";
+  color: var(--rs-ink-faint);
+  font-size: 0.7rem;
+  margin-right: 2px;
+}
+details.rs-schema__prop--nested[open] > summary::before {
+  content: "▾";
+}
+
+/* required + flags */
+.rs-schema__req {
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rs-hallmark-ink);
+  background: var(--rs-hallmark-wash);
+  padding: 1px 6px;
+  border-radius: var(--rs-radius-sm);
+}
+.rs-schema__flag {
+  font-size: 0.66rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--rs-ink-faint);
+  border: 1px solid var(--rs-rule-strong);
+  padding: 0 5px;
+  border-radius: var(--rs-radius-sm);
+}
+.rs-schema__flag--deprecated {
+  color: var(--rs-danger);
+  border-color: var(--rs-danger);
+}
+.rs-schema__flag--recursive {
+  color: var(--rs-accent);
+  border-color: var(--rs-accent);
+}
+
+/* constraint chips */
+.rs-schema__meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.rs-schema__chip {
+  font-size: 0.72rem;
+  color: var(--rs-ink-muted);
+  background: var(--rs-surface);
+  border: 1px solid var(--rs-rule);
+  padding: 0 6px;
+  border-radius: var(--rs-radius-sm);
+}
+.rs-schema__chip code {
+  font-family: var(--rs-font-mono);
+  font-size: 0.72rem;
+}
+
+/* array items + additional properties */
+.rs-schema__items,
+.rs-schema__extra {
+  margin: 6px 0 2px;
+  padding-left: 14px;
+  border-left: 2px solid var(--rs-rule);
+}
+.rs-schema__items-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rs-ink-faint);
+  margin-bottom: 2px;
+}
+.rs-schema__note {
+  font-size: 0.8rem;
+  color: var(--rs-ink-faint);
+  padding: 4px 0;
+}
+
+/* composition */
+.rs-schema__variants {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--rs-rule);
+  border-radius: var(--rs-radius);
+  background: var(--rs-surface);
+}
+.rs-schema__comp-kind {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rs-accent);
+  font-weight: 600;
+}
+.rs-schema__disc {
+  font-size: 0.8rem;
+  color: var(--rs-ink-muted);
+  margin: 3px 0 8px;
+}
+.rs-schema__disc code {
+  font-family: var(--rs-font-mono);
+}
+
+/* enum */
+.rs-schema__enum-wrap {
+  margin: 6px 0;
+}
+.rs-schema__enum-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rs-ink-faint);
+  cursor: default;
+}
+details.rs-schema__enum-wrap > summary {
+  cursor: pointer;
+}
+.rs-schema__enum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+.rs-schema__enum-val {
+  font-family: var(--rs-font-mono);
+  font-size: 0.76rem;
+  color: var(--rs-ink);
+  background: var(--rs-surface);
+  border: 1px solid var(--rs-rule);
+  padding: 1px 6px;
+  border-radius: var(--rs-radius-sm);
+}
+
+/* merge-conflict warning */
+.rs-schema__warn {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--rs-warning);
+  border-radius: var(--rs-radius);
+  background: var(--rs-hallmark-wash);
+}
+.rs-schema__warn-label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rs-hallmark-ink);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.rs-schema__warn ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.82rem;
+  color: var(--rs-ink-muted);
+}

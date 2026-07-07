@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@readsmith/mdx": "workspace:*",
+    "@readsmith/model": "workspace:*",
     "hastscript": "^9.0.1",
     "mermaid": "^11.16.0"
   },

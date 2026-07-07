@@ -15,6 +15,8 @@ export interface ShellSite {
   logo?: string;
   /** Top-level navigation tabs. When present, a tab bar renders below the header. */
   tabs?: ShellTab[];
+  /** Header links, for example a cross-link between the docs and the API reference. */
+  links?: { label: string; href: string }[];
   /** Show the "Powered by Readsmith" badge. Defaults to true; false white-labels. */
   poweredBy?: boolean;
 }
@@ -104,13 +106,16 @@ ${options.scriptHref ? `<script type="module" src="${esc(options.scriptHref)}"><
 </html>`;
 }
 
-function header(site: ShellSite): string {
+export function header(site: ShellSite): string {
   const brand = site.logo
     ? `<img class="rs-brand__logo" src="${esc(site.logo)}" alt="${esc(site.name)}" />`
     : `${HALLMARK_SVG}<span class="rs-wordmark">${esc(site.name)}</span>`;
   return `<header class="rs-header">
   <button class="rs-icon-btn rs-header__burger" data-rs-nav-toggle aria-label="Open navigation" aria-expanded="false">${ICONS.menu}</button>
   <a class="rs-brand" href="/">${brand}</a>
+  ${(site.links ?? [])
+    .map((link) => `<a class="rs-headerlink" href="${esc(link.href)}">${esc(link.label)}</a>`)
+    .join("")}
   <span class="rs-header__spacer"></span>
   <button class="rs-search" data-rs-palette-open aria-label="Search or ask AI">${ICONS.search}<span>Search or ask AI</span><kbd class="rs-kbd">⌘K</kbd></button>
   ${site.github ? `<a class="rs-icon-btn" href="${esc(site.github)}" aria-label="GitHub repository" rel="noopener">${ICONS.github}</a>` : ""}
@@ -195,7 +200,7 @@ function poweredBy(): string {
   return `<a class="rs-poweredby" href="${READSMITH_URL}" target="_blank" rel="noopener">${HALLMARK_SVG}<span>Powered by <strong>Readsmith</strong></span></a>`;
 }
 
-function palette(site: ShellSite): string {
+export function palette(site: ShellSite): string {
   return `<div class="rs-palette" data-rs-palette role="dialog" aria-modal="true" aria-label="Search ${esc(
     site.name,
   )}" hidden>

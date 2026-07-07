@@ -12,4 +12,6 @@
 @import "./tabs.css";
 @import "./codegroup.css";
 @import "./mermaid.css";
+@import "./schema.css";
 @import "./shell.css";
+@import "./reference.css";

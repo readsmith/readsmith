@@ -22,6 +22,10 @@ export interface Site {
   description?: string;
   logo?: string;
   favicon?: string;
+  /** Absolute path to the resolved content root (for reading side files like the OpenAPI spec). */
+  contentRoot: string;
+  /** The API-reference config, when set in docs.yaml. */
+  apiReference?: { spec: string; path: string; label: string };
 }
 
 let cached: Promise<Site> | null = null;
@@ -59,5 +63,7 @@ async function buildSite(): Promise<Site> {
     description: config.site.description,
     logo: config.site.logo,
     favicon: config.site.favicon,
+    contentRoot,
+    apiReference: config.apiReference,
   };
 }

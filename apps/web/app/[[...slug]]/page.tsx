@@ -48,11 +48,11 @@ function baseUrl(url: string | undefined): URL | undefined {
   }
 }
 
-export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const { build, name, url, description, favicon } = await getSite();
   const base = baseUrl(url);
   const icons = favicon ? { icon: favicon } : undefined;
-  const slug = (params.slug ?? []).join("/");
+  const slug = ((await params).slug ?? []).join("/");
   const page = build.pages.find((p) => p.slug === slug);
   if (!page) return { title: name, metadataBase: base, icons };
 
@@ -69,14 +69,15 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   };
 }
 
-export default async function DocPage({ params }: { params: Params }) {
-  const { build, name, branding, url, logo } = await getSite();
-  const slug = (params.slug ?? []).join("/");
+export default async function DocPage({ params }: { params: Promise<Params> }) {
+  const { build, name, branding, url, logo, apiReference } = await getSite();
+  const slug = ((await params).slug ?? []).join("/");
   const page = build.pages.find((p) => p.slug === slug);
   if (!page) notFound();
 
   const { nav, bar } = resolveTabs(build.tabs, build.nav, slug);
-  const site: ShellSite = { name, nav, tabs: bar, poweredBy: branding, url, logo };
+  const links = apiReference ? [{ label: apiReference.label, href: apiReference.path }] : undefined;
+  const site: ShellSite = { name, nav, tabs: bar, poweredBy: branding, url, logo, links };
   const html = renderShellBody(site, page);
 
   const base = url ? url.replace(/\/+$/, "") : "";

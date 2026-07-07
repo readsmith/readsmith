@@ -1,0 +1,177 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Pets API",
+    "version": "1.0.0",
+    "description": "A tiny sample OpenAPI spec so the API reference renders out of the box. Replace this file with your own and it just works."
+  },
+  "servers": [{ "url": "https://api.example.com/v1" }],
+  "tags": [
+    { "name": "Pets", "description": "Everything about your pets" },
+    { "name": "Store", "description": "Orders and inventory" }
+  ],
+  "paths": {
+    "/pets": {
+      "get": {
+        "operationId": "listPets",
+        "summary": "List pets",
+        "description": "Returns a page of pets, newest first.",
+        "tags": ["Pets"],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of results (1-100).",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of pets.",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Pet" } },
+                "examples": {
+                  "ok": { "value": [{ "id": "pet_01", "name": "Rex", "species": "dog" }] }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      },
+      "post": {
+        "operationId": "createPet",
+        "summary": "Create a pet",
+        "description": "Adds a new pet to the store.",
+        "tags": ["Pets"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NewPet" },
+              "example": { "name": "Rex", "species": "dog" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created pet.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Pet" },
+                "examples": {
+                  "ok": { "value": { "id": "pet_02", "name": "Rex", "species": "dog" } }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
+    "/pets/{id}": {
+      "get": {
+        "operationId": "getPet",
+        "summary": "Retrieve a pet",
+        "tags": ["Pets"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The pet identifier.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The pet.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Pet" } } }
+          },
+          "404": {
+            "description": "No pet with that id.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
+    "/store/inventory": {
+      "get": {
+        "operationId": "getInventory",
+        "summary": "Get inventory counts",
+        "tags": ["Store"],
+        "responses": {
+          "200": {
+            "description": "A map of status to count.",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "additionalProperties": { "type": "integer" } }
+              }
+            }
+          }
+        },
+        "security": [{ "apiKey": [] }]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "A signed session token."
+      },
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Api-Key",
+        "description": "Your secret API key."
+      }
+    },
+    "schemas": {
+      "Pet": {
+        "type": "object",
+        "required": ["id", "name", "species"],
+        "properties": {
+          "id": { "type": "string", "readOnly": true },
+          "name": { "type": "string" },
+          "species": { "type": "string", "enum": ["dog", "cat", "bird", "reptile"] },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "microchip": {
+            "type": "string",
+            "nullable": true,
+            "description": "The chip id, if registered."
+          }
+        }
+      },
+      "NewPet": {
+        "type": "object",
+        "required": ["name", "species"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "species": { "type": "string", "enum": ["dog", "cat", "bird", "reptile"] },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}

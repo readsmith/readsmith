@@ -14,3 +14,7 @@ tabs:
   - tab: Architecture
     pages:
       - architecture
+apiReference:
+  spec: openapi.json
+  # path: /api-reference   # default
+  # label: API Reference   # default

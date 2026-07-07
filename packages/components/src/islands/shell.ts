@@ -106,6 +106,10 @@ function initScrollSpy(root: ParentNode): void {
 interface Hit {
   title: string;
   url: string;
+  /** HTTP method (API-reference links), e.g. "GET". */
+  method?: string;
+  /** The method's color modifier, e.g. "get" (for rs-method--get). */
+  methodClass?: string;
 }
 
 function initPalette(root: ParentNode): void {
@@ -115,10 +119,25 @@ function initPalette(root: ParentNode): void {
   const results = palette?.querySelector<HTMLElement>("[data-rs-palette-results]");
   if (!palette || !input || !results) return;
 
-  const index: Hit[] = [...root.querySelectorAll<HTMLAnchorElement>(".rs-nav__link")].map((a) => ({
-    title: (a.textContent ?? "").trim(),
-    url: a.getAttribute("href") ?? "#",
-  }));
+  const index: Hit[] = [...root.querySelectorAll<HTMLAnchorElement>(".rs-nav__link")].map((a) => {
+    const url = a.getAttribute("href") ?? "#";
+    // API-reference links carry a method badge and a separate label; keep them
+    // apart so the result shows a spaced, coloured method instead of "GETList pets".
+    const methodEl = a.querySelector<HTMLElement>(".rs-method");
+    const labelEl = a.querySelector<HTMLElement>(".rs-apinav__label");
+    if (methodEl && labelEl) {
+      const methodClass = [...methodEl.classList]
+        .find((c) => c.startsWith("rs-method--") && c !== "rs-method--sm")
+        ?.replace("rs-method--", "");
+      return {
+        title: (labelEl.textContent ?? "").trim(),
+        url,
+        method: (methodEl.textContent ?? "").trim(),
+        ...(methodClass ? { methodClass } : {}),
+      };
+    }
+    return { title: (a.textContent ?? "").trim(), url };
+  });
 
   let rows: HTMLElement[] = [];
   let cursor = 0;
@@ -140,9 +159,14 @@ function initPalette(root: ParentNode): void {
     if (matches.length > 0) {
       html += '<div class="rs-palette__group">Pages</div>';
       for (const hit of matches) {
-        html += `<button class="rs-palette__row" data-url="${escapeAttr(hit.url)}">${escapeHtml(
-          hit.title,
-        )}</button>`;
+        const verb = hit.method
+          ? `<span class="rs-method rs-method--sm rs-method--${escapeAttr(
+              hit.methodClass ?? "",
+            )}">${escapeHtml(hit.method)}</span>`
+          : "";
+        html += `<button class="rs-palette__row" data-url="${escapeAttr(
+          hit.url,
+        )}">${verb}<span class="rs-palette__title">${escapeHtml(hit.title)}</span></button>`;
       }
     }
     results.innerHTML = html;

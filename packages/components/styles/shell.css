@@ -82,6 +82,16 @@
 .rs-header__spacer {
   flex: 1;
 }
+.rs-headerlink {
+  font-family: var(--rs-font-sans);
+  font-size: 0.88rem;
+  color: var(--rs-ink-muted);
+  text-decoration: none;
+  padding: 0 4px;
+}
+.rs-headerlink:hover {
+  color: var(--rs-ink);
+}
 
 /* top-level tabs: a secondary bar pinned under the header, scoping the sidebar */
 .rs-tabbar {
@@ -605,6 +615,19 @@
 .rs-palette__row:hover,
 .rs-palette__row.is-cursor {
   background: var(--rs-accent-wash);
+}
+/* API-reference results: a coloured, bold method in its own column (matches the
+ * sidebar), so the label reads cleanly beside it. */
+.rs-palette__row .rs-method--sm {
+  font-size: 0.72rem;
+  font-weight: 700;
+  width: 40px;
+  flex: 0 0 40px;
+}
+.rs-palette__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rs-palette__sub {
   margin-left: auto;
