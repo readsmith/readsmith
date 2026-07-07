@@ -5,4 +5,5 @@ export * from "./provider.js";
 export * from "./capabilities.js";
 export * from "./indexing.js";
 export * from "./retrieval.js";
+export * from "./ask.js";
 export * from "./mock.js";
