@@ -4,23 +4,36 @@ export { type SqlQuery, joinSql, sql } from "./sql.js";
 export { type Migration, migrationsDir, resolveMigrations, runMigrations } from "./migrate.js";
 export { type Storage, createFsStorage } from "./storage.js";
 export {
+  type AiQueryRow,
   type ApiEndpointRow,
   type ApiSpecRow,
+  type DocChunkRow,
+  type NewAiQuery,
+  type NewDocChunk,
   type NewEndpoint,
   type SiteRow,
+  aiQueryRowSchema,
   apiEndpointRowSchema,
   apiSpecRowSchema,
+  docChunkRowSchema,
   siteRowSchema,
 } from "./schema.js";
 export {
   type NewSpec,
+  deleteChunksNotIn,
   findSpecByHash,
   getSite,
+  insertAiQuery,
   insertEndpoints,
   insertSpec,
+  listChunkHashes,
   listEndpointsBySpec,
+  purgeAiQueries,
   searchEndpoints,
+  setAiQueryFeedback,
+  upsertDocChunks,
   upsertSite,
+  vectorLiteral,
 } from "./repos.js";
 export { type JobDefinition, type JobRunner, createJobRunner, defineJob } from "./jobs.js";
 export { type Logger, type LogLevel, createLogger } from "./log.js";

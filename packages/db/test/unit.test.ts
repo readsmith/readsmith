@@ -5,6 +5,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { hasDatabase, loadDbConfig } from "../src/config.js";
 import { resolveMigrations } from "../src/migrate.js";
 import { maskUrlCredentials, redactConnectionString, redactForLog } from "../src/redact.js";
+import { vectorLiteral } from "../src/repos.js";
+import { aiQueryRowSchema, docChunkRowSchema } from "../src/schema.js";
 import { joinSql, sql } from "../src/sql.js";
 import { createFsStorage } from "../src/storage.js";
 
@@ -119,5 +121,49 @@ describe("fs storage", () => {
     expect((await store.get(ref1)).toString()).toBe("hello world");
     expect(await store.has(ref1)).toBe(true);
     expect(await store.has("sha256:deadbeef")).toBe(false);
+  });
+});
+
+// M3 (0002): doc-chunk index + Ask-AI query-log row shapes and vector formatting.
+describe("ai index rows", () => {
+  it("formats an embedding as a pgvector literal or passes null through", () => {
+    expect(vectorLiteral([0.1, 0.2, -0.3])).toBe("[0.1,0.2,-0.3]");
+    expect(vectorLiteral(null)).toBeNull();
+  });
+
+  it("parses a doc_chunk row and an ai_query row at the boundary", () => {
+    const chunk = docChunkRowSchema.parse({
+      id: "c1",
+      site_id: "default",
+      kind: "doc",
+      endpoint_id: null,
+      page_id: "p1",
+      path: "/guide",
+      header_path: ["Guide", "Setup"],
+      anchor: "setup",
+      method: null,
+      version_id: "current",
+      locale: "en",
+      content_hash: "h1",
+      text: "hello",
+      created_at: new Date(),
+    });
+    expect(chunk.header_path).toEqual(["Guide", "Setup"]);
+
+    const q = aiQueryRowSchema.parse({
+      id: "q1",
+      site_id: "default",
+      query: "how do i",
+      filters: { version: "current" },
+      retrieved_chunk_ids: ["c1"],
+      answer: "do x",
+      cited_ids: ["c1"],
+      model: { chat: "openai:gpt" },
+      latency_ms: 42,
+      feedback: null,
+      created_at: new Date(),
+    });
+    expect(q.cited_ids).toEqual(["c1"]);
+    expect(q.model).toEqual({ chat: "openai:gpt" });
   });
 });

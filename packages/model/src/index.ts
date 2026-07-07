@@ -3,4 +3,5 @@ export * from "./serialize.js";
 export * from "./redact.js";
 export * from "./versioning.js";
 export * from "./normalized-spec.js";
+export * from "./ai.js";
 export * from "./json-schema.js";

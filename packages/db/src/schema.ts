@@ -54,3 +54,72 @@ export interface NewEndpoint {
   deprecated: boolean;
   searchText: string | null;
 }
+
+/**
+ * A retrievable chunk row (M3, migration 0002). Reads omit `embedding` and
+ * `search_tsv` (large/opaque, not needed by consumers); retrieval computes
+ * scores in SQL and returns the metadata that forms the citation.
+ */
+export const docChunkRowSchema = z.object({
+  id: z.string(),
+  site_id: z.string(),
+  kind: z.string(),
+  endpoint_id: z.string().nullable(),
+  page_id: z.string().nullable(),
+  path: z.string(),
+  header_path: z.array(z.string()),
+  anchor: z.string().nullable(),
+  method: z.string().nullable(),
+  version_id: z.string(),
+  locale: z.string(),
+  content_hash: z.string(),
+  text: z.string(),
+  created_at: z.date(),
+});
+export type DocChunkRow = z.infer<typeof docChunkRowSchema>;
+
+/** A chunk to index. `embedding` is null when no embedding provider is configured. */
+export interface NewDocChunk {
+  id: string;
+  kind: "doc" | "endpoint";
+  endpointId: string | null;
+  pageId: string | null;
+  path: string;
+  headerPath: string[];
+  anchor: string | null;
+  method: string | null;
+  versionId: string;
+  locale: string;
+  contentHash: string;
+  text: string;
+  embedding: number[] | null;
+}
+
+/** An Ask-AI query-log row (M3). Never holds a key, headers, or reader identity. */
+export const aiQueryRowSchema = z.object({
+  id: z.string(),
+  site_id: z.string(),
+  query: z.string(),
+  filters: z.record(z.string(), z.unknown()),
+  retrieved_chunk_ids: z.array(z.string()),
+  answer: z.string().nullable(),
+  cited_ids: z.array(z.string()),
+  model: z.record(z.string(), z.unknown()),
+  latency_ms: z.number().int().nullable(),
+  feedback: z.number().int().nullable(),
+  created_at: z.date(),
+});
+export type AiQueryRow = z.infer<typeof aiQueryRowSchema>;
+
+/** A new Ask-AI query to log. `model` carries provider+model ids, never a key. */
+export interface NewAiQuery {
+  id: string;
+  siteId: string;
+  query: string;
+  filters: Record<string, unknown>;
+  retrievedChunkIds: string[];
+  answer: string | null;
+  citedIds: string[];
+  model: Record<string, unknown>;
+  latencyMs: number | null;
+}

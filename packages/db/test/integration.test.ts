@@ -5,12 +5,18 @@ import type { DbConfig } from "../src/config.js";
 import { createJobRunner, defineJob } from "../src/jobs.js";
 import { runMigrations } from "../src/migrate.js";
 import {
+  deleteChunksNotIn,
   findSpecByHash,
   getSite,
+  insertAiQuery,
   insertEndpoints,
   insertSpec,
+  listChunkHashes,
   listEndpointsBySpec,
+  purgeAiQueries,
   searchEndpoints,
+  setAiQueryFeedback,
+  upsertDocChunks,
   upsertSite,
 } from "../src/repos.js";
 import { sql } from "../src/sql.js";
@@ -221,4 +227,116 @@ describe.skipIf(!DATABASE_URL)("persistence backbone (integration)", () => {
     expect(done).toContain("still-alive");
     await runner.stop();
   }, 20000);
+
+  // M3 (0002): the doc-chunk index. Proves halfvec DDL, null-embedding rows, the
+  // incremental-diff basis, idempotent upsert, and removed-page pruning.
+  it("indexes doc_chunks (halfvec + null embedding), lists hashes, upserts idempotently", async () => {
+    await upsertSite(db, { id: "default", name: "Readsmith" });
+    const emb = Array.from({ length: 1024 }, (_, i) => (i === 0 ? 1 : 0));
+    const n = await upsertDocChunks(db, {
+      siteId: "default",
+      chunks: [
+        {
+          id: "dc1",
+          kind: "doc",
+          endpointId: null,
+          pageId: "p1",
+          path: "/a",
+          headerPath: ["A"],
+          anchor: "a",
+          method: null,
+          versionId: "current",
+          locale: "en",
+          contentHash: "h1",
+          text: "hello world",
+          embedding: emb,
+        },
+        {
+          id: "dc2",
+          kind: "doc",
+          endpointId: null,
+          pageId: "p2",
+          path: "/b",
+          headerPath: [],
+          anchor: null,
+          method: null,
+          versionId: "current",
+          locale: "en",
+          contentHash: "h2",
+          text: "no vector here",
+          embedding: null,
+        },
+      ],
+    });
+    expect(n).toBe(2);
+
+    const hashes = (await listChunkHashes(db, { siteId: "default" })).sort((a, b) =>
+      a.id.localeCompare(b.id),
+    );
+    expect(hashes).toEqual([
+      { id: "dc1", contentHash: "h1" },
+      { id: "dc2", contentHash: "h2" },
+    ]);
+
+    // Re-upsert dc1 with a new hash: overwrite in place, not a duplicate row.
+    await upsertDocChunks(db, {
+      siteId: "default",
+      chunks: [
+        {
+          id: "dc1",
+          kind: "doc",
+          endpointId: null,
+          pageId: "p1",
+          path: "/a",
+          headerPath: ["A"],
+          anchor: "a",
+          method: null,
+          versionId: "current",
+          locale: "en",
+          contentHash: "h1b",
+          text: "hello world v2",
+          embedding: emb,
+        },
+      ],
+    });
+    const after = await listChunkHashes(db, { siteId: "default" });
+    expect(after.length).toBe(2);
+    expect(after.find((h) => h.id === "dc1")?.contentHash).toBe("h1b");
+  });
+
+  it("prunes chunks not in the current set", async () => {
+    const deleted = await deleteChunksNotIn(db, { siteId: "default", keepIds: ["dc1"] });
+    expect(deleted).toBe(1); // dc2 removed
+    const remaining = await listChunkHashes(db, { siteId: "default" });
+    expect(remaining.map((h) => h.id)).toEqual(["dc1"]);
+  });
+
+  // M3 (0002): the Ask-AI query log + retention purge. Model ids stored, no key.
+  it("logs an ai_query, records feedback, and purges by retention", async () => {
+    const q = await insertAiQuery(db, {
+      id: "q1",
+      siteId: "default",
+      query: "how do i set up",
+      filters: { version: "current", locale: "en" },
+      retrievedChunkIds: ["dc1"],
+      answer: "Do X then Y.",
+      citedIds: ["dc1"],
+      model: { chat: "mock:chat", embedding: "mock:embed" },
+      latencyMs: 120,
+    });
+    expect(q.cited_ids).toEqual(["dc1"]);
+    expect(q.model).toEqual({ chat: "mock:chat", embedding: "mock:embed" });
+    expect(q.feedback).toBeNull();
+
+    await setAiQueryFeedback(db, { id: "q1", feedback: 1 });
+    const kept = await purgeAiQueries(db, { olderThanDays: 90 });
+    expect(kept).toBe(0); // a just-logged row is retained
+
+    // Backdate past the window, then purge.
+    await db.query(
+      sql`UPDATE app.ai_queries SET created_at = now() - interval '100 days' WHERE id = ${"q1"}`,
+    );
+    const purged = await purgeAiQueries(db, { olderThanDays: 90 });
+    expect(purged).toBe(1);
+  });
 });

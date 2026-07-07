@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { searchHitSchema } from "./ai.js";
 import { diagnosticSchema, positionSchema } from "./common.js";
 import { normalizedSpecSchema } from "./normalized-spec.js";
 
@@ -11,6 +12,7 @@ export const schemaRegistry = {
   position: positionSchema,
   diagnostic: diagnosticSchema,
   normalizedSpec: normalizedSpecSchema,
+  searchHit: searchHitSchema,
 } as const;
 
 export type SchemaName = keyof typeof schemaRegistry;
