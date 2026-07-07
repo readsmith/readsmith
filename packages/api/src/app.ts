@@ -36,6 +36,12 @@ export function createApiApp(deps: ApiDeps): Hono {
     }
   });
 
+  // Which AI capabilities are live, so the static shell shows/hides the right
+  // controls (the degradation ladder). Always answers; defaults to all-off.
+  app.get("/ai/capabilities", (c) => {
+    return c.json(deps.ai?.capabilities ?? { search: false, vectorSearch: false, askAi: false });
+  });
+
   // Hybrid search for the command palette. No LLM.
   app.post("/search", async (c) => {
     if (!deps.ai?.capabilities.search) {

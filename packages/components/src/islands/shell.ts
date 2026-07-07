@@ -6,13 +6,35 @@
  * respects reduced-motion; nothing here blocks reading.
  */
 export function initShell(root: ParentNode = document): void {
+  // One lazy capabilities probe per hydrate, shared by the palette and console.
+  // Lazy (fetched on first open) so it always reads the live rung and never
+  // fires on a page nobody searches.
+  const getCaps = makeCapabilities();
   initTheme(root);
   initProgress(root);
   initMobileNav(root);
   initScrollSpy(root);
-  initPalette(root);
+  initPalette(root, getCaps);
   initContextMenu(root);
   initFeedback(root);
+  initAsk(root, getCaps);
+}
+
+type GetCapabilities = () => Promise<Capabilities>;
+
+function makeCapabilities(): GetCapabilities {
+  let pending: Promise<Capabilities> | null = null;
+  return () => {
+    if (!pending) {
+      pending = fetch("/api/ai/capabilities")
+        .then((r) =>
+          r.ok ? (r.json() as Promise<Partial<Capabilities>>) : ({} as Partial<Capabilities>),
+        )
+        .then((c) => ({ search: Boolean(c.search), askAi: Boolean(c.askAi) }))
+        .catch(() => ({ search: false, askAi: false }));
+    }
+    return pending;
+  };
 }
 
 function initProgress(root: ParentNode): void {
@@ -110,9 +132,31 @@ interface Hit {
   method?: string;
   /** The method's color modifier, e.g. "get" (for rs-method--get). */
   methodClass?: string;
+  /** A one-line excerpt (server search results). */
+  snippet?: string;
 }
 
-function initPalette(root: ParentNode): void {
+interface Capabilities {
+  search: boolean;
+  askAi: boolean;
+}
+
+/** The Ask-AI sparkle (inlined; the island does not import the server icon set). */
+const SPARKLE =
+  '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2l1.7 6.1a3 3 0 0 0 2.2 2.2L22 12l-6.1 1.7a3 3 0 0 0-2.2 2.2L12 22l-1.7-6.1a3 3 0 0 0-2.2-2.2L2 12l6.1-1.7a3 3 0 0 0 2.2-2.2z"/></svg>';
+
+/** The hallmark stamp that marks a cited source (the signature). */
+const HALLMARK =
+  '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3l7 4v6.5c0 3.6-3 6-7 7.5-4-1.5-7-3.9-7-7.5V7z"/><path d="M9.2 12l2 2 3.6-4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+interface AskSource {
+  ref: number;
+  id: string;
+  title: string;
+  url: string;
+}
+
+function initPalette(root: ParentNode, getCaps: GetCapabilities): void {
   const palette = root.querySelector<HTMLElement>("[data-rs-palette]");
   const opener = root.querySelector<HTMLElement>("[data-rs-palette-open]");
   const input = palette?.querySelector<HTMLInputElement>("[data-rs-palette-input]");
@@ -142,32 +186,35 @@ function initPalette(root: ParentNode): void {
   let rows: HTMLElement[] = [];
   let cursor = 0;
   let lastFocus: HTMLElement | null = null;
+  let caps: Capabilities = { search: false, askAi: false };
+  let searchAbort: AbortController | null = null;
+  let debounce: ReturnType<typeof setTimeout> | undefined;
+  let seq = 0;
 
   const paintCursor = (): void => {
     rows.forEach((row, i) => row.classList.toggle("is-cursor", i === cursor));
   };
 
-  const render = (query: string): void => {
-    const q = query.trim().toLowerCase();
-    const matches = index.filter((hit) => !q || hit.title.toLowerCase().includes(q));
+  const rowHtml = (hit: Hit): string => {
+    const verb = hit.method
+      ? `<span class="rs-method rs-method--sm rs-method--${escapeAttr(hit.methodClass ?? "")}">${escapeHtml(hit.method)}</span>`
+      : "";
+    const snip = hit.snippet
+      ? `<span class="rs-palette__snip">${escapeHtml(hit.snippet)}</span>`
+      : "";
+    return `<button class="rs-palette__row" data-url="${escapeAttr(hit.url)}">${verb}<span class="rs-palette__title">${escapeHtml(hit.title)}</span>${snip}</button>`;
+  };
+
+  const paint = (query: string, hits: Hit[]): void => {
+    const q = query.trim();
     let html = "";
-    if (q) {
-      html += `<button class="rs-palette__row is-ask" data-ask="1"><span class="rs-palette__ic">💬</span>Ask AI: “${escapeHtml(
-        q,
-      )}”<span class="rs-palette__sub">SSE</span></button>`;
+    if (q && caps.askAi) {
+      html += `<button class="rs-palette__row is-ask" data-ask="1"><span class="rs-palette__ic">${SPARKLE}</span><span class="rs-palette__title">Ask AI<span class="rs-palette__q"> &mdash; &ldquo;${escapeHtml(q)}&rdquo;</span></span><span class="rs-palette__arrow">&rarr;</span></button>`;
     }
-    if (matches.length > 0) {
-      html += '<div class="rs-palette__group">Pages</div>';
-      for (const hit of matches) {
-        const verb = hit.method
-          ? `<span class="rs-method rs-method--sm rs-method--${escapeAttr(
-              hit.methodClass ?? "",
-            )}">${escapeHtml(hit.method)}</span>`
-          : "";
-        html += `<button class="rs-palette__row" data-url="${escapeAttr(
-          hit.url,
-        )}">${verb}<span class="rs-palette__title">${escapeHtml(hit.title)}</span></button>`;
-      }
+    if (hits.length > 0) {
+      html += `<div class="rs-palette__group">${caps.search ? "Results" : "Pages"}</div>${hits.map(rowHtml).join("")}`;
+    } else if (q) {
+      html += `<div class="rs-palette__empty">No matches${caps.askAi ? " &mdash; try Ask AI" : ""}.</div>`;
     }
     results.innerHTML = html;
     rows = [...results.querySelectorAll<HTMLElement>(".rs-palette__row")];
@@ -175,22 +222,85 @@ function initPalette(root: ParentNode): void {
     paintCursor();
   };
 
+  const staticMatches = (query: string): Hit[] => {
+    const q = query.trim().toLowerCase();
+    return index.filter((hit) => !q || hit.title.toLowerCase().includes(q));
+  };
+
+  const mapHits = (raw: unknown): Hit[] => {
+    if (!Array.isArray(raw)) return [];
+    return raw.map((h: Record<string, unknown>) => {
+      const method = typeof h.method === "string" ? h.method : undefined;
+      return {
+        title: String(h.title ?? ""),
+        url: String(h.url ?? "#"),
+        ...(method ? { method, methodClass: method.toLowerCase() } : {}),
+        ...(typeof h.snippet === "string" ? { snippet: h.snippet } : {}),
+      };
+    });
+  };
+
+  const run = (query: string): void => {
+    if (!caps.search) {
+      paint(query, staticMatches(query));
+      return;
+    }
+    const q = query.trim();
+    if (!q) {
+      paint(query, []);
+      return;
+    }
+    paint(query, []); // keep the Ask row responsive while the request is in flight
+    const mine = ++seq;
+    clearTimeout(debounce);
+    debounce = setTimeout(async () => {
+      searchAbort?.abort();
+      const controller = new AbortController();
+      searchAbort = controller;
+      try {
+        const res = await fetch("/api/search", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ query: q }),
+          signal: controller.signal,
+        });
+        if (mine !== seq) return;
+        const hits = res.ok ? mapHits(((await res.json()) as { hits?: unknown }).hits) : [];
+        if (mine === seq) paint(query, hits);
+      } catch (err) {
+        if ((err as Error).name !== "AbortError" && mine === seq) {
+          paint(query, staticMatches(query));
+        }
+      }
+    }, 160);
+  };
+
+  const escalate = (query: string): void => {
+    const q = query.trim();
+    if (!q || !caps.askAi) return;
+    close();
+    dispatchEvent(new CustomEvent("rs:ask", { detail: { query: q } }));
+  };
+
   const open = (): void => {
     lastFocus = document.activeElement as HTMLElement;
     palette.hidden = false;
     input.value = "";
-    render("");
     input.focus();
+    paint("", []);
+    void getCaps().then((c) => {
+      caps = c;
+      run(input.value);
+    });
   };
   const close = (): void => {
     palette.hidden = true;
-    input.placeholder = "Search docs, or ask a question";
     lastFocus?.focus();
   };
   const activate = (row: HTMLElement | undefined): void => {
     if (!row) return;
     if (row.dataset.ask) {
-      input.placeholder = "Streaming a cited answer here (demo)";
+      escalate(input.value);
       return;
     }
     if (row.dataset.url) location.assign(row.dataset.url);
@@ -198,7 +308,7 @@ function initPalette(root: ParentNode): void {
   };
 
   opener?.addEventListener("click", open);
-  input.addEventListener("input", () => render(input.value));
+  input.addEventListener("input", () => run(input.value));
   results.addEventListener("click", (event) => {
     const row = (event.target as HTMLElement).closest<HTMLElement>(".rs-palette__row");
     if (row) activate(row);
@@ -228,7 +338,8 @@ function initPalette(root: ParentNode): void {
       rows[cursor]?.scrollIntoView({ block: "nearest" });
     } else if (event.key === "Enter") {
       event.preventDefault();
-      activate(rows[cursor]);
+      if (event.altKey) escalate(input.value);
+      else activate(rows[cursor]);
     }
   });
 }
@@ -301,6 +412,334 @@ async function writeClipboard(text: string): Promise<void> {
   } catch {
     // clipboard may be unavailable
   }
+}
+
+/** The Ask-AI console: a dark instrument docked right, streamed + cited answers. */
+function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
+  const panel = root.querySelector<HTMLElement>("[data-rs-ask]");
+  const scroll = panel?.querySelector<HTMLElement>("[data-rs-ask-scroll]");
+  const form = panel?.querySelector<HTMLFormElement>("[data-rs-ask-form]");
+  const input = panel?.querySelector<HTMLTextAreaElement>("[data-rs-ask-input]");
+  if (!panel || !scroll || !form || !input) return;
+
+  const openBtn = root.querySelector<HTMLElement>("[data-rs-ask-open]");
+  const body = document.body;
+  let streaming = false;
+  let caps: Capabilities = { search: false, askAi: false };
+
+  const scrollDown = (): void => {
+    scroll.scrollTop = scroll.scrollHeight;
+  };
+
+  const suggestions = (): string => {
+    const titles = [...root.querySelectorAll<HTMLElement>(".rs-nav__link")]
+      .map((a) => (a.querySelector(".rs-apinav__label") ?? a).textContent?.trim() ?? "")
+      .filter((t, i, all) => t.length > 2 && all.indexOf(t) === i)
+      .slice(0, 3);
+    if (titles.length === 0) return "";
+    return `<div class="rs-ask__chips">${titles
+      .map(
+        (t) =>
+          `<button class="rs-ask__chip" type="button" data-ask-suggest="Tell me about ${escapeAttr(t)}">${escapeHtml(t)}</button>`,
+      )
+      .join("")}</div>`;
+  };
+
+  const resetView = (): void => {
+    scroll.innerHTML = caps.askAi
+      ? `<div class="rs-ask__empty"><span class="rs-ask__mark">${SPARKLE}</span><h2>Ask the docs.</h2><p>Answers are drawn only from these docs and cite their sources.</p>${suggestions()}</div>`
+      : `<div class="rs-ask__empty"><span class="rs-ask__mark">${SPARKLE}</span><h2>Ask AI isn&rsquo;t enabled.</h2><p>The maintainer can add an AI provider key to turn on cited answers over these docs.</p></div>`;
+  };
+
+  const submit = async (query: string): Promise<void> => {
+    const q = query.trim();
+    if (!q || streaming || !caps.askAi) return;
+    scroll.querySelector(".rs-ask__empty")?.remove();
+    const turn = document.createElement("div");
+    turn.className = "rs-ask__turn";
+    turn.innerHTML = `<div class="rs-ask__q">${escapeHtml(q)}</div><div class="rs-ask__a" data-ask-answer></div>`;
+    scroll.appendChild(turn);
+    const answer = turn.querySelector<HTMLElement>("[data-ask-answer]");
+    if (!answer) return;
+    input.value = "";
+    autoGrow(input);
+    streaming = true;
+    scrollDown();
+
+    let raw = "";
+    let sources: AskSource[] = [];
+    let queryId: string | null = null;
+    const paint = (): void => {
+      answer.innerHTML =
+        renderMarkdown(raw, sources) + (streaming ? '<span class="rs-ask__caret"></span>' : "");
+      scrollDown();
+    };
+    paint();
+
+    try {
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query: q }),
+      });
+      if (!res.ok || !res.body) throw new Error("unavailable");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        for (;;) {
+          const nl = buffer.indexOf("\n\n");
+          if (nl < 0) break;
+          const payload = buffer.slice(0, nl).replace(/^data:\s?/, "");
+          buffer = buffer.slice(nl + 2);
+          if (!payload) continue;
+          let evt: { type?: string; delta?: string; sources?: AskSource[]; id?: string };
+          try {
+            evt = JSON.parse(payload);
+          } catch {
+            continue;
+          }
+          if (evt.type === "text" && evt.delta) {
+            raw += evt.delta;
+            paint();
+          } else if (evt.type === "sources") {
+            sources = evt.sources ?? [];
+          } else if (evt.type === "done") {
+            queryId = evt.id ?? null;
+          } else if (evt.type === "error" && !raw) {
+            raw = "Sorry, I could not complete that answer.";
+          }
+        }
+      }
+    } catch {
+      if (!raw) raw = "Ask AI is not available right now. Please try again.";
+    }
+    streaming = false;
+    paint();
+    if (sources.length > 0) answer.insertAdjacentHTML("afterend", renderSources(sources));
+    if (queryId) answer.insertAdjacentHTML("afterend", renderFeedback(queryId));
+    scrollDown();
+  };
+
+  const openPanel = (query?: string): void => {
+    panel.hidden = false;
+    body.classList.add("is-asking");
+    if (!scroll.innerHTML.trim()) scroll.innerHTML = '<div class="rs-ask__empty"></div>';
+    input.focus();
+    void getCaps().then((c) => {
+      caps = c;
+      if (!scroll.querySelector(".rs-ask__turn")) resetView();
+      if (query && c.askAi) void submit(query);
+    });
+  };
+  const closePanel = (): void => {
+    panel.hidden = true;
+    body.classList.remove("is-asking");
+    openBtn?.focus();
+  };
+
+  openBtn?.addEventListener("click", () => openPanel());
+  addEventListener("rs:ask", (event) => {
+    if (!panel.isConnected) return; // ignore a listener left over from a stale mount
+    openPanel((event as CustomEvent<{ query: string }>).detail?.query);
+  });
+  panel.querySelector("[data-rs-ask-close]")?.addEventListener("click", closePanel);
+  panel.querySelector("[data-rs-ask-new]")?.addEventListener("click", () => {
+    if (!streaming) resetView();
+  });
+  panel.querySelector("[data-rs-ask-expand]")?.addEventListener("click", () => {
+    body.classList.toggle("is-asking-wide");
+  });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void submit(input.value);
+  });
+  input.addEventListener("input", () => autoGrow(input));
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void submit(input.value);
+    }
+  });
+  scroll.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+    const chip = target.closest<HTMLElement>("[data-ask-suggest]");
+    if (chip) {
+      void submit(chip.dataset.askSuggest ?? "");
+      return;
+    }
+    const fb = target.closest<HTMLElement>("[data-fb]");
+    const wrap = fb?.closest<HTMLElement>("[data-ask-fb]");
+    if (fb && wrap?.dataset.askFb) {
+      void fetch("/api/ai/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: wrap.dataset.askFb, value: Number(fb.dataset.fb) }),
+      }).catch(() => {});
+      for (const b of wrap.querySelectorAll("button")) b.classList.remove("is-on");
+      fb.classList.add("is-on");
+    }
+  });
+  addEventListener("keydown", (event) => {
+    if (!panel.isConnected) return;
+    if (event.key === "Escape" && !panel.hidden && !streaming) closePanel();
+  });
+  initAskResize(panel, body);
+}
+
+function autoGrow(el: HTMLTextAreaElement): void {
+  el.style.height = "auto";
+  el.style.height = `${Math.min(el.scrollHeight, 168)}px`;
+}
+
+function renderSources(sources: AskSource[]): string {
+  return `<div class="rs-ask__sources"><span class="rs-ask__srchead">Sources</span>${sources
+    .map(
+      (s) =>
+        `<a class="rs-ask__src" id="src-${s.ref}" href="${escapeAttr(safeUrl(s.url))}"><span class="rs-ask__stamp">${HALLMARK}</span><span class="rs-ask__srctitle">${escapeHtml(s.title)}</span></a>`,
+    )
+    .join("")}</div>`;
+}
+
+function renderFeedback(id: string): string {
+  return `<div class="rs-ask__fb" data-ask-fb="${escapeAttr(id)}"><span>Was this helpful?</span><button type="button" data-fb="1" aria-label="Helpful">&#128077;</button><button type="button" data-fb="-1" aria-label="Not helpful">&#128078;</button></div>`;
+}
+
+/** Allow only http(s), root-relative, in-page, and mailto links; reject the rest. */
+function safeUrl(url: string): string {
+  const u = url.trim();
+  if (/["'<>\s]/.test(u)) return "#";
+  return /^(https?:\/\/|\/|#|mailto:)/i.test(u) ? u : "#";
+}
+
+/**
+ * A minimal, sanitizing Markdown renderer (SEC-6): everything is HTML-escaped
+ * first, then a safe subset is re-applied, so no raw HTML, script, or unsafe
+ * link can survive a model answer. Citations [n] map to the cited sources.
+ */
+function renderMarkdown(md: string, sources: AskSource[]): string {
+  const blocks: string[] = [];
+  let text = md.replace(/```(\w*)\n?([\s\S]*?)```/g, (_m, _lang, code: string) => {
+    blocks.push(
+      `<pre class="rs-ask__pre"><code>${escapeHtml(code.replace(/\n$/, ""))}</code></pre>`,
+    );
+    return `@@RSB${blocks.length - 1}@@`;
+  });
+  text = escapeHtml(text);
+  text = text.replace(/`([^`\n]+)`/g, (_m, c: string) => `<code>${c}</code>`);
+  text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  text = text.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label: string, url: string) => {
+    const safe = safeUrl(url);
+    return safe === "#" ? label : `<a href="${safe}" rel="noopener" target="_blank">${label}</a>`;
+  });
+  const refs = new Set(sources.map((s) => s.ref));
+  text = text.replace(/\[(\d+)\]/g, (_m, n: string) =>
+    refs.has(Number(n))
+      ? `<sup class="rs-cite"><a href="#src-${Number(n)}">${n}</a></sup>`
+      : `[${n}]`,
+  );
+  const html = blockify(text);
+  return html.replace(/@@RSB(\d+)@@/g, (_m, i: string) => blocks[Number(i)] ?? "");
+}
+
+function blockify(text: string): string {
+  const out: string[] = [];
+  let para: string[] = [];
+  let list: string[] = [];
+  let listType: "ul" | "ol" | null = null;
+  const flushPara = (): void => {
+    if (para.length > 0) out.push(`<p>${para.join("<br>")}</p>`);
+    para = [];
+  };
+  const flushList = (): void => {
+    if (list.length > 0 && listType) {
+      out.push(`<${listType}>${list.map((li) => `<li>${li}</li>`).join("")}</${listType}>`);
+    }
+    list = [];
+    listType = null;
+  };
+  for (const line of text.split("\n")) {
+    if (line.includes("@@RSB")) {
+      flushPara();
+      flushList();
+      out.push(line);
+      continue;
+    }
+    const t = line.trim();
+    if (t === "") {
+      flushPara();
+      flushList();
+      continue;
+    }
+    const heading = /^(#{1,6})\s+(.*)$/.exec(t);
+    if (heading) {
+      flushPara();
+      flushList();
+      const level = Math.min((heading[1] ?? "").length + 2, 5);
+      out.push(`<h${level}>${heading[2] ?? ""}</h${level}>`);
+      continue;
+    }
+    const ul = /^[-*]\s+(.*)$/.exec(t);
+    const ol = /^\d+\.\s+(.*)$/.exec(t);
+    if (ul) {
+      flushPara();
+      if (listType !== "ul") flushList();
+      listType = "ul";
+      list.push(ul[1] ?? "");
+      continue;
+    }
+    if (ol) {
+      flushPara();
+      if (listType !== "ol") flushList();
+      listType = "ol";
+      list.push(ol[1] ?? "");
+      continue;
+    }
+    flushList();
+    para.push(t);
+  }
+  flushPara();
+  flushList();
+  return out.join("");
+}
+
+function initAskResize(panel: HTMLElement, body: HTMLElement): void {
+  const handle = panel.querySelector<HTMLElement>("[data-rs-ask-resize]");
+  if (!handle) return;
+  const KEY = "rs-ask-width";
+  try {
+    const saved = localStorage.getItem(KEY);
+    if (saved) body.style.setProperty("--rs-ask-width", `${saved}px`);
+  } catch {
+    // ignore
+  }
+  const clamp = (px: number): number => Math.max(320, Math.min(px, Math.round(innerWidth * 0.6)));
+  let active = false;
+  const move = (event: PointerEvent): void => {
+    if (active) body.style.setProperty("--rs-ask-width", `${clamp(innerWidth - event.clientX)}px`);
+  };
+  const up = (): void => {
+    if (!active) return;
+    active = false;
+    removeEventListener("pointermove", move);
+    removeEventListener("pointerup", up);
+    try {
+      const w = Number.parseInt(getComputedStyle(body).getPropertyValue("--rs-ask-width"), 10);
+      if (w) localStorage.setItem(KEY, String(w));
+    } catch {
+      // ignore
+    }
+  };
+  handle.addEventListener("pointerdown", (event) => {
+    active = true;
+    event.preventDefault();
+    addEventListener("pointermove", move);
+    addEventListener("pointerup", up);
+  });
 }
 
 function escapeHtml(value: string): string {

@@ -59,6 +59,19 @@ describe("createApiApp: health", () => {
   });
 });
 
+describe("createApiApp: capabilities", () => {
+  it("reports all-off when AI is unconfigured", async () => {
+    const res = await createApiApp({ db: okDb, ai: null }).request("/api/ai/capabilities");
+    expect(await res.json()).toEqual({ search: false, vectorSearch: false, askAi: false });
+  });
+
+  it("reflects the injected capabilities", async () => {
+    const ai = mockAi({ capabilities: { search: true, vectorSearch: false, askAi: false } });
+    const res = await createApiApp({ db: okDb, ai }).request("/api/ai/capabilities");
+    expect(await res.json()).toEqual({ search: true, vectorSearch: false, askAi: false });
+  });
+});
+
 describe("createApiApp: search", () => {
   it("returns hits when search is available", async () => {
     const res = await post(createApiApp({ db: okDb, ai: mockAi() }), "/api/search", { query: "x" });

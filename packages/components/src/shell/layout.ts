@@ -78,7 +78,34 @@ ${tabbar(site)}
   </main>
   ${renderToc(page.toc)}
 </div>
-${palette(site)}`;
+${palette(site)}
+${askConsole(site)}`;
+}
+
+/**
+ * The Ask-AI console: a dark instrument docked on the right, populated by the
+ * island. Always in the DOM (hidden) so the island can wire it; shown only when
+ * the chat capability is present.
+ */
+export function askConsole(site: ShellSite): string {
+  return `<aside class="rs-ask" data-rs-ask aria-label="Ask AI" hidden>
+  <div class="rs-ask__resize" data-rs-ask-resize role="separator" aria-label="Resize the panel" tabindex="0"></div>
+  <header class="rs-ask__head">
+    <span class="rs-ask__brand">${ICONS.sparkle}<span>Ask AI</span></span>
+    <div class="rs-ask__tools">
+      <button class="rs-ask__tool" data-rs-ask-new type="button" aria-label="New conversation" title="New conversation">${ICONS.plus}</button>
+      <button class="rs-ask__tool" data-rs-ask-expand type="button" aria-label="Expand" title="Expand">${ICONS.expand}</button>
+      <button class="rs-ask__tool" data-rs-ask-close type="button" aria-label="Close" title="Close">${ICONS.close}</button>
+    </div>
+  </header>
+  <div class="rs-ask__scroll" data-rs-ask-scroll></div>
+  <form class="rs-ask__composer" data-rs-ask-form>
+    <textarea class="rs-ask__input" data-rs-ask-input rows="1" placeholder="Ask about these docs&hellip;" aria-label="Ask about ${esc(
+      site.name,
+    )}"></textarea>
+    <button class="rs-ask__send" type="submit" aria-label="Send">${ICONS.arrowUp}</button>
+  </form>
+</aside>`;
 }
 
 /** A complete, servable HTML document wrapping the shell body. */
@@ -117,6 +144,7 @@ export function header(site: ShellSite): string {
     .map((link) => `<a class="rs-headerlink" href="${esc(link.href)}">${esc(link.label)}</a>`)
     .join("")}
   <span class="rs-header__spacer"></span>
+  <button class="rs-headerlink rs-headerlink--ask" data-rs-ask-open aria-label="Ask AI">${ICONS.sparkle}<span>Ask AI</span></button>
   <button class="rs-search" data-rs-palette-open aria-label="Search or ask AI">${ICONS.search}<span>Search or ask AI</span><kbd class="rs-kbd">⌘K</kbd></button>
   ${site.github ? `<a class="rs-icon-btn" href="${esc(site.github)}" aria-label="GitHub repository" rel="noopener">${ICONS.github}</a>` : ""}
   <button class="rs-icon-btn" data-rs-theme-toggle aria-label="Toggle light and dark">${ICONS.theme}</button>
@@ -207,7 +235,7 @@ export function palette(site: ShellSite): string {
   <div class="rs-palette__box">
     <div class="rs-palette__input">${ICONS.search}<input type="text" data-rs-palette-input placeholder="Search docs, or ask a question" autocomplete="off" aria-label="Search"><kbd class="rs-kbd">Esc</kbd></div>
     <div class="rs-palette__results" data-rs-palette-results></div>
-    <div class="rs-palette__foot"><span>&#8593;&#8595; to navigate</span><span>&#8629; to open</span><span>Esc to close</span></div>
+    <div class="rs-palette__foot"><span><kbd class="rs-kbd">&#8593;&#8595;</kbd> navigate</span><span><kbd class="rs-kbd">&#8629;</kbd> open</span><span><kbd class="rs-kbd">&#8997;&#8629;</kbd> ask</span></div>
   </div>
 </div>`;
 }

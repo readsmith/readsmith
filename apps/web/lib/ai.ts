@@ -189,25 +189,53 @@ async function build(): Promise<AiServices | null> {
         { provider, search, siteName: site.name, bounds: aiConfig?.askAi, topK },
         { siteId: SITE_ID, query: input.query, filters },
       );
-      completion
-        .then((c) =>
-          insertAiQuery(db, {
-            id: globalThis.crypto.randomUUID(),
-            siteId: SITE_ID,
-            query: input.query,
-            filters,
-            retrievedChunkIds: c.retrievedIds,
-            answer: c.answer,
-            citedIds: c.citedIds,
-            model: { chat: aiConfig?.chat, embedding: aiConfig?.embedding },
-            inputTokens: c.usage.inputTokens,
-            outputTokens: c.usage.outputTokens,
-            costEstimate: null,
-            latencyMs: null,
-          }),
-        )
-        .catch((err) => console.warn("[readsmith] ai_queries log failed:", err));
-      return result.toUIMessageStreamResponse();
+
+      // A minimal SSE the vanilla reading-shell island consumes: text deltas as
+      // they stream, then the cited sources, then done (carrying the query id for
+      // feedback). Logging happens once the answer resolves (never blocks the
+      // stream).
+      const queryId = globalThis.crypto.randomUUID();
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const send = (event: unknown) =>
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+          try {
+            for await (const delta of result.textStream) send({ type: "text", delta });
+          } catch {
+            send({ type: "error", message: "The answer could not be completed." });
+          }
+          try {
+            const c = await completion;
+            send({ type: "sources", sources: c.sources });
+            insertAiQuery(db, {
+              id: queryId,
+              siteId: SITE_ID,
+              query: input.query,
+              filters,
+              retrievedChunkIds: c.retrievedIds,
+              answer: c.answer,
+              citedIds: c.citedIds,
+              model: { chat: aiConfig?.chat, embedding: aiConfig?.embedding },
+              inputTokens: c.usage.inputTokens,
+              outputTokens: c.usage.outputTokens,
+              costEstimate: null,
+              latencyMs: null,
+            }).catch((err) => console.warn("[readsmith] ai_queries log failed:", err));
+          } catch {
+            /* completion failed; the client already has the text or an error */
+          }
+          send({ type: "done", id: queryId });
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "content-type": "text/event-stream; charset=utf-8",
+          "cache-control": "no-cache, no-transform",
+        },
+      });
     },
     async feedback(input) {
       await setAiQueryFeedback(db, { id: input.id, feedback: input.value });

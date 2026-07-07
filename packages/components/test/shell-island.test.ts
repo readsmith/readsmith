@@ -37,20 +37,141 @@ describe("theme toggle", () => {
   });
 });
 
-describe("command palette", () => {
-  it("opens, filters nav entries, and offers Ask AI", () => {
-    document.querySelector<HTMLElement>("[data-rs-palette-open]")?.click();
-    const palette = document.querySelector<HTMLElement>("[data-rs-palette]");
-    expect(palette?.hidden).toBe(false);
+function typeQuery(value: string): HTMLElement | null {
+  const input = document.querySelector<HTMLInputElement>("[data-rs-palette-input]");
+  if (input) {
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  return document.querySelector<HTMLElement>("[data-rs-palette-results]");
+}
 
-    const input = document.querySelector<HTMLInputElement>("[data-rs-palette-input]");
-    if (input) {
-      input.value = "setup";
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-    const results = document.querySelector<HTMLElement>("[data-rs-palette-results]");
-    expect(results?.textContent).toContain("Setup guide");
+describe("command palette", () => {
+  it("loads capabilities, searches the server, and offers Ask AI", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/api/ai/capabilities")) {
+        return { ok: true, json: async () => ({ search: true, askAi: true }) } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          hits: [
+            { title: "Setup guide", url: "/setup", snippet: "how to set up", method: null },
+            { title: "List pets", url: "/api-reference#listPets", method: "GET" },
+          ],
+        }),
+      } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    document.querySelector<HTMLElement>("[data-rs-palette-open]")?.click();
+    const results = typeQuery("pets");
+    await vi.waitFor(() => expect(results?.textContent).toContain("List pets"));
     expect(results?.querySelector(".is-ask")).toBeTruthy();
+    expect(results?.querySelector(".rs-method")?.textContent).toBe("GET");
+
+    const asked = vi.fn();
+    addEventListener("rs:ask", asked as EventListener);
+    results?.querySelector<HTMLElement>(".is-ask")?.click();
+    expect(asked).toHaveBeenCalled();
+    removeEventListener("rs:ask", asked as EventListener);
+    vi.unstubAllGlobals();
+  });
+
+  it("falls back to the static nav filter when search is unavailable", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    document.querySelector<HTMLElement>("[data-rs-palette-open]")?.click();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const results = typeQuery("setup");
+    await vi.waitFor(() => expect(results?.textContent).toContain("Setup guide"));
+    expect(results?.querySelector(".is-ask")).toBeFalsy(); // no Ask row without the capability
+    vi.unstubAllGlobals();
+  });
+});
+
+function sseResponse(events: unknown[]): Response {
+  const enc = new TextEncoder();
+  const chunks = events.map((e) => enc.encode(`data: ${JSON.stringify(e)}\n\n`));
+  let i = 0;
+  return {
+    ok: true,
+    body: {
+      getReader: () => ({
+        read: async () =>
+          i < chunks.length
+            ? { done: false, value: chunks[i++] }
+            : { done: true, value: undefined },
+      }),
+    },
+  } as unknown as Response;
+}
+
+describe("Ask-AI console", () => {
+  it("streams a cited answer and records feedback", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/api/ai/capabilities")) {
+        return { ok: true, json: async () => ({ search: true, askAi: true }) } as Response;
+      }
+      if (url.includes("/api/ask")) {
+        return sseResponse([
+          { type: "text", delta: "Use a bearer token" },
+          { type: "text", delta: " in the header [1]." },
+          {
+            type: "sources",
+            sources: [{ ref: 1, id: "s1", title: "Authentication", url: "/g#auth" }],
+          },
+          { type: "done", id: "q-123" },
+        ]);
+      }
+      return { ok: true, json: async () => ({ ok: true }) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    dispatchEvent(new CustomEvent("rs:ask", { detail: { query: "how do I auth?" } }));
+    const scroll = document.querySelector<HTMLElement>("[data-rs-ask-scroll]");
+    await vi.waitFor(() => expect(scroll?.querySelector(".rs-ask__src")).toBeTruthy());
+
+    expect(scroll?.textContent).toContain("Use a bearer token");
+    expect(scroll?.querySelector(".rs-cite a")?.getAttribute("href")).toBe("#src-1");
+    expect(scroll?.querySelector(".rs-ask__src")?.textContent).toContain("Authentication");
+    expect(document.body.classList.contains("is-asking")).toBe(true);
+
+    scroll?.querySelector<HTMLElement>('[data-fb="1"]')?.click();
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ai/feedback",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("renders model markdown safely (no raw HTML or script)", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/api/ai/capabilities")) {
+        return { ok: true, json: async () => ({ search: false, askAi: true }) } as Response;
+      }
+      return sseResponse([
+        { type: "text", delta: "Safe **bold** but <script>alert(1)</script> and " },
+        { type: "text", delta: "[link](javascript:alert(2))." },
+        { type: "done", id: "q-2" },
+      ]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    dispatchEvent(new CustomEvent("rs:ask", { detail: { query: "xss?" } }));
+    const scroll = document.querySelector<HTMLElement>("[data-rs-ask-scroll]");
+    await vi.waitFor(() => expect(scroll?.textContent).toContain("alert(1)"));
+
+    expect(scroll?.querySelector("script")).toBeNull(); // escaped, not executed
+    expect(scroll?.querySelector(".rs-ask__a strong")?.textContent).toBe("bold");
+    // javascript: link is neutralised to plain text, no anchor with that href
+    expect(scroll?.innerHTML).not.toContain("javascript:");
+    vi.unstubAllGlobals();
   });
 });
 
