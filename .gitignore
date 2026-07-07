@@ -26,3 +26,6 @@ test-results/
 # os / editor
 .DS_Store
 *.log
+
+# generated content bundle (prebuild artifact)
+apps/web/.readsmith/

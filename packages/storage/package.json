@@ -1,0 +1,24 @@
+{
+  "name": "@readsmith/storage",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Artifact storage: the BundleStore port and its local filesystem driver.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "zod": "^4.0.5"
+  }
+}

@@ -17,6 +17,7 @@ const nextConfig = {
     "@readsmith/config",
     "@readsmith/model",
     "@readsmith/api",
+    "@readsmith/storage",
   ],
   // Server-only packages stay external, loaded by Node at runtime rather than
   // bundled by the compiler. @readsmith/db must be external so its runtime
