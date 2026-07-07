@@ -199,12 +199,14 @@ export async function deleteChunksNotIn(
 export async function insertAiQuery(db: Db, input: NewAiQuery): Promise<AiQueryRow> {
   const row = await db.one(sql`
     INSERT INTO app.ai_queries
-      (id, site_id, query, filters, retrieved_chunk_ids, answer, cited_ids, model, latency_ms)
+      (id, site_id, query, filters, retrieved_chunk_ids, answer, cited_ids, model,
+       input_tokens, output_tokens, cost_estimate, latency_ms)
     VALUES (${input.id}, ${input.siteId}, ${input.query}, ${JSON.stringify(input.filters)}::jsonb,
       ${input.retrievedChunkIds}, ${input.answer}, ${input.citedIds},
-      ${JSON.stringify(input.model)}::jsonb, ${input.latencyMs})
+      ${JSON.stringify(input.model)}::jsonb, ${input.inputTokens}, ${input.outputTokens},
+      ${input.costEstimate}, ${input.latencyMs})
     RETURNING id, site_id, query, filters, retrieved_chunk_ids, answer, cited_ids, model,
-              latency_ms, feedback, created_at`);
+              input_tokens, output_tokens, cost_estimate, latency_ms, feedback, created_at`);
   return aiQueryRowSchema.parse(row);
 }
 

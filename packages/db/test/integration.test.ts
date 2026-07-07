@@ -322,10 +322,16 @@ describe.skipIf(!DATABASE_URL)("persistence backbone (integration)", () => {
       answer: "Do X then Y.",
       citedIds: ["dc1"],
       model: { chat: "mock:chat", embedding: "mock:embed" },
+      inputTokens: 1500,
+      outputTokens: 300,
+      costEstimate: 0.004,
       latencyMs: 120,
     });
     expect(q.cited_ids).toEqual(["dc1"]);
     expect(q.model).toEqual({ chat: "mock:chat", embedding: "mock:embed" });
+    expect(q.input_tokens).toBe(1500);
+    expect(q.output_tokens).toBe(300);
+    expect(q.cost_estimate).toBeCloseTo(0.004);
     expect(q.feedback).toBeNull();
 
     await setAiQueryFeedback(db, { id: "q1", feedback: 1 });

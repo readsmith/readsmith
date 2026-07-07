@@ -95,7 +95,11 @@ export interface NewDocChunk {
   embedding: number[] | null;
 }
 
-/** An Ask-AI query-log row (M3). Never holds a key, headers, or reader identity. */
+/**
+ * An Ask-AI query-log row (M3). Never holds a key, headers, or reader identity.
+ * Usage columns (`input_tokens`/`output_tokens`/`cost_estimate`) are observed for
+ * BYOK spend visibility; they are logged, never enforced.
+ */
 export const aiQueryRowSchema = z.object({
   id: z.string(),
   site_id: z.string(),
@@ -105,6 +109,9 @@ export const aiQueryRowSchema = z.object({
   answer: z.string().nullable(),
   cited_ids: z.array(z.string()),
   model: z.record(z.string(), z.unknown()),
+  input_tokens: z.number().int().nullable(),
+  output_tokens: z.number().int().nullable(),
+  cost_estimate: z.number().nullable(),
   latency_ms: z.number().int().nullable(),
   feedback: z.number().int().nullable(),
   created_at: z.date(),
@@ -121,5 +128,8 @@ export interface NewAiQuery {
   answer: string | null;
   citedIds: string[];
   model: Record<string, unknown>;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  costEstimate: number | null;
   latencyMs: number | null;
 }

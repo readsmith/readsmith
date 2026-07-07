@@ -35,10 +35,12 @@ CREATE INDEX doc_chunks_search_tsv ON app.doc_chunks USING GIN (search_tsv);
 CREATE INDEX doc_chunks_filter ON app.doc_chunks (site_id, version_id, locale, kind);
 CREATE INDEX doc_chunks_content_hash ON app.doc_chunks (site_id, content_hash);
 
--- Ask-AI query log: search-gap analytics, eval, and "what readers ask" at once.
--- No key, no headers, no reader identity: only the query text and derived
--- analytics. Retention is enforced by a purge job (default 90 days); the
--- operator is the data controller.
+-- Ask-AI query log: search-gap analytics, eval, "what readers ask", and usage
+-- observability at once. No key, no headers, no reader identity: only the query
+-- text and derived analytics. Token counts are the durable usage truth;
+-- cost_estimate is best-effort and nullable. Usage is LOGGED, never enforced
+-- (no quotas/metering in the OSS). Retention is enforced by a purge job (default
+-- 90 days); the operator is the data controller.
 CREATE TABLE app.ai_queries (
   id                  text PRIMARY KEY,
   site_id             text NOT NULL REFERENCES app.sites (id),
@@ -48,6 +50,9 @@ CREATE TABLE app.ai_queries (
   answer              text,
   cited_ids           text[] NOT NULL DEFAULT '{}',
   model               jsonb NOT NULL DEFAULT '{}'::jsonb,
+  input_tokens        integer,
+  output_tokens       integer,
+  cost_estimate       double precision,
   latency_ms          integer,
   feedback            smallint,
   created_at          timestamptz NOT NULL DEFAULT now()

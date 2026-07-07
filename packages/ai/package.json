@@ -1,0 +1,29 @@
+{
+  "name": "@readsmith/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Search, Ask-AI (RAG), and MCP over the doc index, with BYOK on the AI SDK.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.8",
+    "@ai-sdk/google": "^4.0.8",
+    "@ai-sdk/openai": "^4.0.8",
+    "@readsmith/model": "workspace:*",
+    "ai": "^7.0.16",
+    "zod": "^4.0.5"
+  }
+}

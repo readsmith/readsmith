@@ -159,11 +159,16 @@ describe("ai index rows", () => {
       answer: "do x",
       cited_ids: ["c1"],
       model: { chat: "openai:gpt" },
+      input_tokens: 1200,
+      output_tokens: 240,
+      cost_estimate: 0.0031,
       latency_ms: 42,
       feedback: null,
       created_at: new Date(),
     });
     expect(q.cited_ids).toEqual(["c1"]);
     expect(q.model).toEqual({ chat: "openai:gpt" });
+    expect(q.input_tokens).toBe(1200);
+    expect(q.cost_estimate).toBeCloseTo(0.0031);
   });
 });
