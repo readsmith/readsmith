@@ -10,6 +10,8 @@
     "prebuild": "node scripts/copy-assets.mjs && node scripts/build-content.mjs",
     "build": "next build",
     "start": "next start -p 4321",
+    "ai:index": "node scripts/ai-index.mjs",
+    "ai:reindex": "node scripts/ai-index.mjs --reindex",
     "typecheck": "tsc --noEmit",
     "lint": "biome check ."
   },
