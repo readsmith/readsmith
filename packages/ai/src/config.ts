@@ -7,10 +7,13 @@ import { z } from "zod";
  * is deliberately not configurable.
  */
 
-/** Chat providers this build can construct (v1). */
-export const chatProviders = ["openai", "anthropic", "google"] as const;
-/** Embedding providers (v1). Anthropic has no first-party embeddings, so it is absent. */
-export const embeddingProviders = ["openai", "google"] as const;
+/**
+ * Chat providers this build can construct. `gateway` is the Vercel AI Gateway
+ * (one key, many models); its model ids are namespaced `provider/model`.
+ */
+export const chatProviders = ["openai", "anthropic", "google", "gateway"] as const;
+/** Embedding providers. Anthropic has no first-party embeddings, so it is absent. */
+export const embeddingProviders = ["openai", "google", "gateway"] as const;
 
 export type ChatProvider = (typeof chatProviders)[number];
 export type EmbeddingProvider = (typeof embeddingProviders)[number];

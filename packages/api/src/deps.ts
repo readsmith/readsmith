@@ -17,13 +17,19 @@ export interface ApiDatabase {
   }): Promise<T[]>;
 }
 
-import type { SearchHit } from "@readsmith/model";
+import type { SearchResult } from "@readsmith/model";
+import type { RateLimiter } from "./rate-limit.js";
 
-/** Which rungs of the AI degradation ladder are live (host-computed from DB + keys). */
+/**
+ * Which rungs of the AI degradation ladder are live (host-computed from DB + keys).
+ * These are resolved at config time. Runtime health is a separate signal: a site
+ * with `vectorSearch: true` still degrades when the provider fails, which the
+ * search response reports as `degraded`.
+ */
 export interface AiCapabilities {
   /** Search API available (DB present). */
   search: boolean;
-  /** Vector arm live (embedding key present); false = FTS-only. */
+  /** Vector arm configured (embedding key present); false = FTS-only by design. */
   vectorSearch: boolean;
   /** Ask-AI available (chat key present + enabled). */
   askAi: boolean;
@@ -37,8 +43,8 @@ export interface AiCapabilities {
  */
 export interface AiServices {
   capabilities: AiCapabilities;
-  /** Hybrid search for the command palette (no LLM). */
-  search(input: { query: string; version?: string; locale?: string }): Promise<SearchHit[]>;
+  /** Hybrid search for the command palette (no LLM). Never rejects on provider loss. */
+  search(input: { query: string; version?: string; locale?: string }): Promise<SearchResult>;
   /** Start an Ask-AI turn: a streamed (SSE) Response; logs to ai_queries on finish. */
   ask(input: { query: string; version?: string; locale?: string }): Promise<Response>;
   /** Record a reader's thumbs signal on a logged query. */
@@ -53,4 +59,12 @@ export interface ApiDeps {
   db: ApiDatabase | null;
   /** The AI services, or null when AI is not configured (docs-only / FTS handled inside). */
   ai: AiServices | null;
+  /** Abuse protection. Null disables it, for a host that limits at its own edge. */
+  rateLimit?: RateLimiter | null;
+  /**
+   * The caller's socket address, when the host can supply one. Used only when no
+   * trusted proxy header is configured. Next.js does not expose a remote address,
+   * so a Next host behind a proxy should configure `trustedHeader` instead.
+   */
+  clientAddress?: (request: Request) => string | undefined;
 }

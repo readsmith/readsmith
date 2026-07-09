@@ -41,3 +41,17 @@ export const searchHitSchema = z.object({
   score: z.number(),
 });
 export type SearchHit = z.infer<typeof searchHitSchema>;
+
+/**
+ * A search response. `degraded` is true when the vector arm was expected to
+ * contribute (an embedding key is configured) but failed at request time, so
+ * these hits are keyword-only. It reports *runtime* health, which a config-time
+ * capability flag cannot: a site with a working key still degrades when the
+ * provider is down, rate-limited, or past its spend cap. The UI uses it to say so
+ * rather than silently serving worse results.
+ */
+export const searchResultSchema = z.object({
+  hits: z.array(searchHitSchema),
+  degraded: z.boolean(),
+});
+export type SearchResult = z.infer<typeof searchResultSchema>;

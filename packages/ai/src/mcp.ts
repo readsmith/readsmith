@@ -41,7 +41,7 @@ export function createMcpServer(deps: McpDeps): McpServer {
       },
     },
     async ({ query, version, locale }) => {
-      const hits = await hybridSearch(deps.search, {
+      const { hits } = await hybridSearch(deps.search, {
         siteId: deps.siteId,
         query,
         filters: {

@@ -128,7 +128,7 @@ export function askDocs(deps: AskDeps, input: AskInput): AskResult {
       query: z.string().describe("A focused search query derived from the question."),
     }),
     execute: async ({ query }) => {
-      const hits = await hybridSearch(deps.search, {
+      const { hits } = await hybridSearch(deps.search, {
         siteId: input.siteId,
         query,
         filters: input.filters,

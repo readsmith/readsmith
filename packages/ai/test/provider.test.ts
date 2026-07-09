@@ -34,6 +34,12 @@ describe("BYOK key resolution", () => {
     expect(envKeySource({}).resolve("openai", "chat")).toBeNull();
   });
 
+  it("resolves the gateway key from AI_GATEWAY_API_KEY", () => {
+    const src = envKeySource({ AI_GATEWAY_API_KEY: "gw-key" });
+    expect(src.resolve("gateway", "chat")).toBe("gw-key");
+    expect(src.resolve("gateway", "embedding")).toBe("gw-key");
+  });
+
   it("chains sources, first non-null wins (site key over env)", () => {
     const site = { resolve: (p: string) => (p === "openai" ? "site-key" : null) } as never;
     const chained = chainKeySources(site, envKeySource({ OPENAI_API_KEY: "env-key" }));

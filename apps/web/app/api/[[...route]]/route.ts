@@ -1,5 +1,6 @@
 import { getAiServices } from "@/lib/ai";
 import { getDb } from "@/lib/db";
+import { getRateLimiter } from "@/lib/rate-limit";
 import { createApiApp } from "@readsmith/api";
 
 // The API surface runs on the Node.js runtime (it talks to Postgres and the AI
@@ -13,7 +14,11 @@ let appPromise: Promise<ReturnType<typeof createApiApp>> | undefined;
 
 function getApp(): Promise<ReturnType<typeof createApiApp>> {
   if (!appPromise) {
-    appPromise = getAiServices().then((ai) => createApiApp({ db: getDb(), ai }));
+    appPromise = Promise.all([getAiServices(), getRateLimiter()]).then(([ai, rateLimit]) =>
+      // Next.js exposes no socket address, so the limiter identifies callers by the
+      // operator's configured trusted proxy header (READSMITH_TRUSTED_IP_HEADER).
+      createApiApp({ db: getDb(), ai, rateLimit }),
+    );
   }
   return appPromise;
 }

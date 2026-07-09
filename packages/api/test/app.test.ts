@@ -26,7 +26,7 @@ const hit: SearchHit = {
 function mockAi(over: Partial<AiServices> = {}): AiServices {
   return {
     capabilities: { search: true, vectorSearch: true, askAi: true },
-    search: async () => [hit],
+    search: async () => ({ hits: [hit], degraded: false }),
     ask: async () =>
       new Response("data: hi\n\n", { headers: { "content-type": "text/event-stream" } }),
     feedback: async () => {},
@@ -76,8 +76,20 @@ describe("createApiApp: search", () => {
   it("returns hits when search is available", async () => {
     const res = await post(createApiApp({ db: okDb, ai: mockAi() }), "/api/search", { query: "x" });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { hits: SearchHit[] };
+    const body = (await res.json()) as { hits: SearchHit[]; degraded: boolean };
     expect(body.hits).toHaveLength(1);
+    expect(body.degraded).toBe(false);
+  });
+
+  // AC-1.5: a failing embedding provider must not take the endpoint down. The
+  // service degrades below us; the route's job is to pass the flag through.
+  it("AC-1.5: returns 200 with keyword hits and degraded=true, never 500", async () => {
+    const ai = mockAi({ search: async () => ({ hits: [hit], degraded: true }) });
+    const res = await post(createApiApp({ db: okDb, ai }), "/api/search", { query: "x" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { hits: SearchHit[]; degraded: boolean };
+    expect(body.hits).toHaveLength(1);
+    expect(body.degraded).toBe(true);
   });
 
   it("503s when AI is unconfigured, and when the search capability is off", async () => {

@@ -1,7 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
-import { type LanguageModel, embedMany } from "ai";
+import { type LanguageModel, createGateway, embedMany } from "ai";
 import { type AiConfig, EMBEDDING_DIMENSIONS, type EmbeddingProvider } from "./config.js";
 import { MissingKeyError, ModelNotConfiguredError } from "./errors.js";
 import type { KeySource } from "./keys.js";
@@ -24,15 +24,23 @@ export interface ModelProvider {
   chat(): LanguageModel;
 }
 
-/** Per-provider option to force the 1024-dim output (Matryoshka truncation). */
+/**
+ * Per-provider option to force the 1024-dim output (Matryoshka truncation). For
+ * the gateway, the option is namespaced by the underlying provider (parsed from
+ * the `provider/model` id), which the gateway forwards.
+ */
 function embeddingProviderOptions(
   provider: EmbeddingProvider,
+  model: string,
 ): Record<string, Record<string, number>> {
-  switch (provider) {
+  const underlying = provider === "gateway" ? (model.split("/")[0] ?? "") : provider;
+  switch (underlying) {
     case "openai":
       return { openai: { dimensions: EMBEDDING_DIMENSIONS } };
     case "google":
       return { google: { outputDimensionality: EMBEDDING_DIMENSIONS } };
+    default:
+      return {};
   }
 }
 
@@ -54,11 +62,13 @@ export function createModelProvider(config: AiConfig, keys: KeySource): ModelPro
       const model =
         ref.provider === "openai"
           ? createOpenAI({ apiKey }).textEmbeddingModel(ref.model)
-          : createGoogleGenerativeAI({ apiKey }).textEmbeddingModel(ref.model);
+          : ref.provider === "google"
+            ? createGoogleGenerativeAI({ apiKey }).textEmbeddingModel(ref.model)
+            : createGateway({ apiKey }).textEmbeddingModel(ref.model);
       const { embeddings } = await embedMany({
         model,
         values: [...texts],
-        providerOptions: embeddingProviderOptions(ref.provider),
+        providerOptions: embeddingProviderOptions(ref.provider, ref.model),
         maxRetries: 3,
       });
       return embeddings;
@@ -75,6 +85,8 @@ export function createModelProvider(config: AiConfig, keys: KeySource): ModelPro
           return createAnthropic({ apiKey }).languageModel(ref.model);
         case "google":
           return createGoogleGenerativeAI({ apiKey }).languageModel(ref.model);
+        case "gateway":
+          return createGateway({ apiKey }).languageModel(ref.model);
       }
     },
   };

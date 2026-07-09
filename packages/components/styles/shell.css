@@ -688,6 +688,14 @@
   color: var(--rs-ink-faint);
 }
 
+/* Runtime degradation, stated once and quietly: it informs, it does not alarm. */
+.rs-palette__notice {
+  padding: 9px 12px;
+  border-top: 1px solid var(--rs-rule);
+  font-size: 0.78rem;
+  color: var(--rs-ink-faint);
+}
+
 /* responsive */
 @media (max-width: 1080px) {
   .rs-shell {

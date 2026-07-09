@@ -1,9 +1,9 @@
 {
-  "name": "@readsmith/ai",
+  "name": "@readsmith/cache",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Search, Ask-AI (RAG), and MCP over the doc index, with BYOK on the AI SDK.",
+  "description": "A small cache port with an in-memory LRU/TTL driver (Redis behind the same interface later).",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -19,13 +19,6 @@
     "lint": "biome check ."
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.8",
-    "@ai-sdk/google": "^4.0.8",
-    "@ai-sdk/openai": "^4.0.8",
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "@readsmith/cache": "workspace:*",
-    "@readsmith/model": "workspace:*",
-    "ai": "^7.0.16",
     "zod": "^4.0.5"
   }
 }

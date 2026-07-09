@@ -11,6 +11,7 @@ import {
   resolveAiConfig,
 } from "@readsmith/ai";
 import type { AiCapabilities, AiServices } from "@readsmith/api";
+import { createCache, resolveCacheConfig } from "@readsmith/cache";
 import {
   type Db,
   type SearchChunkRow,
@@ -21,15 +22,8 @@ import {
 } from "@readsmith/db";
 import type { NormalizedSpec, SearchFilters } from "@readsmith/model";
 
-/** The subset of the MCP transport interface our one-shot bridge implements. */
-interface OneShotTransport {
-  start(): Promise<void>;
-  send(message: unknown): Promise<void>;
-  close(): Promise<void>;
-  onmessage?: (message: unknown) => void;
-  onclose?: () => void;
-  onerror?: (error: Error) => void;
-}
+import { InMemoryEventStore } from "@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { getDb } from "./db";
 import { getApiReference, getSite } from "./site";
 
@@ -93,46 +87,6 @@ function retrievalStore(db: Db): RetrievalStore {
   };
 }
 
-/** A minimal stateless bridge: dispatch one JSON-RPC message through a fresh server. */
-function handleMcp(
-  makeSpec: () => NormalizedSpec | null,
-  search: SearchDeps,
-): (request: Request) => Promise<Response> {
-  return async (request: Request) => {
-    let message: unknown;
-    try {
-      message = await request.json();
-    } catch {
-      return new Response(null, { status: 400 });
-    }
-    const server = createMcpServer({
-      search,
-      siteId: SITE_ID,
-      filters: DEFAULT_FILTERS,
-      spec: makeSpec(),
-    });
-    const isRequest =
-      typeof message === "object" &&
-      message !== null &&
-      "id" in message &&
-      (message as { id: unknown }).id !== undefined;
-
-    const responsePromise = new Promise<unknown>((resolve) => {
-      const transport: OneShotTransport = {
-        start: async () => {},
-        send: async (msg) => resolve(msg),
-        close: async () => {},
-      };
-      server
-        .connect(transport as Parameters<typeof server.connect>[0])
-        .then(() => transport.onmessage?.(message));
-    });
-
-    if (!isRequest) return new Response(null, { status: 202 }); // notification: ack
-    return Response.json(await responsePromise);
-  };
-}
-
 async function build(): Promise<AiServices | null> {
   const db = getDb();
   if (!db) return null; // docs-only: no server search/ask.
@@ -157,6 +111,16 @@ async function build(): Promise<AiServices | null> {
     baseUrl: site.url ?? "",
     apiBasePath: site.apiReference?.path ?? "/api-reference",
     rrfK: aiConfig?.search.rrfK,
+    // Query-embedding cache (RT-5): repeats within the TTL skip the provider.
+    // In-memory by default; swap CACHE_DRIVER to a shared store when hosted.
+    cache: createCache(resolveCacheConfig(process.env)),
+    queryEmbedTtlMs: 60_000,
+    // A failing embedding provider degrades search to keyword-only rather than
+    // taking it down. Say so in the log, once per query, so an operator can see
+    // a dead key or an exhausted spend cap without reading the client.
+    logger: {
+      warn: (message, fields) => console.warn(`[readsmith] ${message}`, fields ?? ""),
+    },
   };
   const topK = aiConfig?.search.topK ?? 8;
 
@@ -171,7 +135,40 @@ async function build(): Promise<AiServices | null> {
     locale: input.locale ?? DEFAULT_FILTERS.locale,
   });
 
-  const mcp = handleMcp(() => apiRef?.spec ?? null, search);
+  // MCP over the SDK's web-standard Streamable-HTTP transport, read-only. A
+  // session is created on the initialize request and routed by the mcp-session-id
+  // header thereafter; the event store backs the client's resumption GET stream.
+  // In-process is correct for single-instance self-host; the hosted phase backs
+  // these with a shared store so any instance serves any session.
+  const mcpSpec = apiRef?.spec ?? null;
+  const sessions = new Map<string, WebStandardStreamableHTTPServerTransport>();
+  const mcp = async (request: Request): Promise<Response> => {
+    const sessionId = request.headers.get("mcp-session-id") ?? undefined;
+    const existing = sessionId ? sessions.get(sessionId) : undefined;
+    if (existing) return existing.handleRequest(request);
+
+    const server = createMcpServer({
+      search,
+      siteId: SITE_ID,
+      filters: DEFAULT_FILTERS,
+      spec: mcpSpec,
+    });
+    const transport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: () => globalThis.crypto.randomUUID(),
+      eventStore: new InMemoryEventStore(),
+      onsessioninitialized: (id) => {
+        sessions.set(id, transport);
+      },
+      onsessionclosed: (id) => {
+        sessions.delete(id);
+      },
+    });
+    transport.onclose = () => {
+      if (transport.sessionId) sessions.delete(transport.sessionId);
+    };
+    await server.connect(transport);
+    return transport.handleRequest(request);
+  };
 
   return {
     capabilities,

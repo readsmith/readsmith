@@ -27,6 +27,7 @@ const nextConfig = {
     "pg-boss",
     "@readsmith/db",
     "@readsmith/ai",
+    "@readsmith/cache",
     "@readsmith/api-reference",
     "@apidevtools/swagger-parser",
     "ai",

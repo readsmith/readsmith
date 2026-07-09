@@ -156,6 +156,17 @@ interface AskSource {
   url: string;
 }
 
+/**
+ * Runtime degradation, told plainly. `degraded` means the site has an embedding
+ * key but the provider failed this request, so these are keyword hits. A 429 is
+ * our own limiter, which the reader should be told apart from an outage: one asks
+ * them to wait, the other asks them to give up.
+ */
+const SEARCH_DEGRADED = "Showing keyword results. Semantic search is unavailable.";
+const SEARCH_THROTTLED = "You are searching too quickly. Showing page matches.";
+const ASK_THROTTLED = "You are asking too quickly. Try again in a moment.";
+const ASK_UNAVAILABLE = "Ask AI is not available right now. Please try again.";
+
 function initPalette(root: ParentNode, getCaps: GetCapabilities): void {
   const palette = root.querySelector<HTMLElement>("[data-rs-palette]");
   const opener = root.querySelector<HTMLElement>("[data-rs-palette-open]");
@@ -205,7 +216,7 @@ function initPalette(root: ParentNode, getCaps: GetCapabilities): void {
     return `<button class="rs-palette__row" data-url="${escapeAttr(hit.url)}">${verb}<span class="rs-palette__title">${escapeHtml(hit.title)}</span>${snip}</button>`;
   };
 
-  const paint = (query: string, hits: Hit[]): void => {
+  const paint = (query: string, hits: Hit[], notice: string | null = null): void => {
     const q = query.trim();
     let html = "";
     if (q && caps.askAi) {
@@ -216,6 +227,9 @@ function initPalette(root: ParentNode, getCaps: GetCapabilities): void {
     } else if (q) {
       html += `<div class="rs-palette__empty">No matches${caps.askAi ? " &mdash; try Ask AI" : ""}.</div>`;
     }
+    // Say when the results are worse than usual. Silently serving keyword hits from
+    // a site that advertises semantic search erodes trust more than one honest line.
+    if (notice) html += `<div class="rs-palette__notice">${escapeHtml(notice)}</div>`;
     results.innerHTML = html;
     rows = [...results.querySelectorAll<HTMLElement>(".rs-palette__row")];
     cursor = 0;
@@ -265,8 +279,17 @@ function initPalette(root: ParentNode, getCaps: GetCapabilities): void {
           signal: controller.signal,
         });
         if (mine !== seq) return;
-        const hits = res.ok ? mapHits(((await res.json()) as { hits?: unknown }).hits) : [];
-        if (mine === seq) paint(query, hits);
+        if (res.status === 429) {
+          paint(query, staticMatches(query), SEARCH_THROTTLED);
+          return;
+        }
+        if (!res.ok) {
+          paint(query, staticMatches(query));
+          return;
+        }
+        const body = (await res.json()) as { hits?: unknown; degraded?: unknown };
+        const hits = mapHits(body.hits);
+        if (mine === seq) paint(query, hits, body.degraded === true ? SEARCH_DEGRADED : null);
       } catch (err) {
         if ((err as Error).name !== "AbortError" && mine === seq) {
           paint(query, staticMatches(query));
@@ -469,6 +492,7 @@ function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
     let raw = "";
     let sources: AskSource[] = [];
     let queryId: string | null = null;
+    let throttled = false;
     const paint = (): void => {
       answer.innerHTML =
         renderMarkdown(raw, sources) + (streaming ? '<span class="rs-ask__caret"></span>' : "");
@@ -482,6 +506,10 @@ function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ query: q }),
       });
+      if (res.status === 429) {
+        throttled = true;
+        throw new Error("throttled");
+      }
       if (!res.ok || !res.body) throw new Error("unavailable");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -515,7 +543,7 @@ function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
         }
       }
     } catch {
-      if (!raw) raw = "Ask AI is not available right now. Please try again.";
+      if (!raw) raw = throttled ? ASK_THROTTLED : ASK_UNAVAILABLE;
     }
     streaming = false;
     paint();

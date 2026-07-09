@@ -19,9 +19,11 @@
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/ibm-plex-sans": "^5.2.8",
     "@fontsource/spectral": "^5.2.8",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@readsmith/ai": "workspace:*",
     "@readsmith/api": "workspace:*",
     "@readsmith/api-reference": "workspace:*",
+    "@readsmith/cache": "workspace:*",
     "@readsmith/components": "workspace:*",
     "@readsmith/config": "workspace:*",
     "@readsmith/db": "workspace:*",
@@ -31,7 +33,8 @@
     "hono": "^4.12.28",
     "next": "^16.2.10",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "zod": "^4.0.5"
   },
   "devDependencies": {
     "@types/react": "^19",

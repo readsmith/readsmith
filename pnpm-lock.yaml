@@ -41,6 +41,9 @@ importers:
       '@fontsource/spectral':
         specifier: ^5.2.8
         version: 5.2.8
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.29.0
+        version: 1.29.0(zod@4.4.3)
       '@readsmith/ai':
         specifier: workspace:*
         version: link:../../packages/ai
@@ -50,6 +53,9 @@ importers:
       '@readsmith/api-reference':
         specifier: workspace:*
         version: link:../../packages/api-reference
+      '@readsmith/cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@readsmith/components':
         specifier: workspace:*
         version: link:../../packages/components
@@ -80,6 +86,9 @@ importers:
       react-dom:
         specifier: ^19.2.7
         version: 19.2.7(react@19.2.7)
+      zod:
+        specifier: ^4.0.5
+        version: 4.4.3
     devDependencies:
       '@types/react':
         specifier: ^19
@@ -102,6 +111,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)
+      '@readsmith/cache':
+        specifier: workspace:*
+        version: link:../cache
       '@readsmith/model':
         specifier: workspace:*
         version: link:../model
@@ -123,6 +135,10 @@ importers:
       zod:
         specifier: ^4.0.5
         version: 4.4.3
+    devDependencies:
+      '@readsmith/cache':
+        specifier: workspace:^
+        version: link:../cache
 
   packages/api-reference:
     dependencies:
@@ -138,6 +154,12 @@ importers:
       yaml:
         specifier: ^2.6.1
         version: 2.9.0
+      zod:
+        specifier: ^4.0.5
+        version: 4.4.3
+
+  packages/cache:
+    dependencies:
       zod:
         specifier: ^4.0.5
         version: 4.4.3

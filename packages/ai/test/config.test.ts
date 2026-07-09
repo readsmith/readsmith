@@ -19,6 +19,15 @@ describe("ai config", () => {
     expect(cfg?.rerank).toBeUndefined();
   });
 
+  it("accepts the gateway provider with a namespaced model id", () => {
+    const cfg = resolveAiConfig({
+      chat: { provider: "gateway", model: "anthropic/claude-sonnet-5" },
+      embedding: { provider: "gateway", model: "openai/text-embedding-3-small" },
+    });
+    expect(cfg?.chat?.provider).toBe("gateway");
+    expect(cfg?.embedding?.model).toBe("openai/text-embedding-3-small");
+  });
+
   it("allows chat=anthropic with embedding=openai (independent providers)", () => {
     const cfg = resolveAiConfig({
       chat: { provider: "anthropic", model: "claude-sonnet-5" },

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { ApiDeps } from "./deps.js";
+import { rateLimitMiddleware } from "./rate-limit.js";
 
 const scopedQuery = z.object({
   query: z.string().min(1),
@@ -21,10 +22,17 @@ async function parseJson(request: Request): Promise<unknown> {
  *
  * M3 adds search, Ask-AI, and feedback; each fails closed with a keyless message
  * when its capability is off (the degradation ladder). MCP is served by the host
- * at `/mcp` via `deps.ai.mcp` (outside this `/api` base path).
+ * at `/mcp` via `deps.ai.mcp` (outside this `/api` base path), and the host
+ * enforces the `mcp` bucket there with the same limiter.
+ *
+ * The rate limiter runs ahead of the capability check so that every priced route
+ * is guarded uniformly, including the paths that fail closed.
  */
 export function createApiApp(deps: ApiDeps): Hono {
   const app = new Hono().basePath("/api");
+  const limiter = deps.rateLimit ?? null;
+  const limit = (bucket: "ask" | "search") =>
+    rateLimitMiddleware(limiter, bucket, deps.clientAddress);
 
   app.get("/health", async (c) => {
     if (!deps.db) return c.json({ status: "ok", database: "disabled" });
@@ -42,19 +50,21 @@ export function createApiApp(deps: ApiDeps): Hono {
     return c.json(deps.ai?.capabilities ?? { search: false, vectorSearch: false, askAi: false });
   });
 
-  // Hybrid search for the command palette. No LLM.
-  app.post("/search", async (c) => {
+  // Hybrid search for the command palette. No LLM. Returns `degraded: true` when
+  // the vector arm was expected but the provider failed, so the UI can say the
+  // results are keyword-only instead of silently serving worse ones.
+  app.post("/search", limit("search"), async (c) => {
     if (!deps.ai?.capabilities.search) {
       return c.json({ error: "Search is not available on this site." }, 503);
     }
     const body = scopedQuery.safeParse(await parseJson(c.req.raw));
     if (!body.success) return c.json({ error: "A non-empty query is required." }, 400);
-    const hits = await deps.ai.search(body.data);
-    return c.json({ hits });
+    const result = await deps.ai.search(body.data);
+    return c.json(result);
   });
 
   // Ask-AI: a streamed answer (SSE UI message stream from the host).
-  app.post("/ask", async (c) => {
+  app.post("/ask", limit("ask"), async (c) => {
     if (!deps.ai?.capabilities.askAi) {
       return c.json({ error: "Ask-AI is not available on this site." }, 503);
     }

@@ -18,6 +18,7 @@ describe("json-schema export", () => {
       "normalizedSpec",
       "position",
       "searchHit",
+      "searchResult",
     ]);
   });
 });

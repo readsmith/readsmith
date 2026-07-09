@@ -7,6 +7,7 @@ import {
   migrationsDir,
   runMigrations,
 } from "@readsmith/db";
+import { embedIndexJob, indexBundle } from "./indexing";
 
 /**
  * One-time backbone boot: run pending migrations, then start the job worker.
@@ -28,9 +29,16 @@ export async function boot(): Promise<void> {
 
     const runner = createJobRunner({ config, logger: log });
     await runner.start();
-    log.info("job runner started", { concurrency: config.workerConcurrency });
-    // Job handlers (api.ingest) register when the ingest module lands; the runner
-    // idles until then. Hold a reference so it is not garbage-collected.
+    // Re-index the compiled bundle on demand (the M2 GitHub App enqueues this on
+    // publish; `pnpm ai:index` is the inline path for v1 self-host).
+    await runner.work(embedIndexJob, async () => {
+      await indexBundle(db);
+    });
+    log.info("job runner started", {
+      concurrency: config.workerConcurrency,
+      jobs: ["embed.index"],
+    });
+    // Hold a reference so the runner is not garbage-collected.
     (globalThis as { __rsJobRunner?: unknown }).__rsJobRunner = runner;
   } catch (err) {
     log.error("database boot failed; serving docs-only", { err: String(err) });
