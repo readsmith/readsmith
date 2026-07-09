@@ -152,8 +152,11 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
       description: input?.site.description,
       logo: input?.site.logo,
       favicon: input?.site.favicon,
+      author: input?.site.author,
+      publisher: input?.site.publisher,
       theme: input?.site.theme ?? {},
     },
+    security: { csp: input?.security?.csp ?? {} },
     content: { root: contentRel, include, exclude },
     assets,
     links: {

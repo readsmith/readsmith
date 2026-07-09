@@ -83,20 +83,16 @@ export default async function DocPage({ params }: { params: Promise<Params> }) {
   const site: ShellSite = { name, nav, tabs: bar, poweredBy: branding, url, logo, links };
   const html = renderShellBody(site, page);
 
-  const base = url ? url.replace(/\/+$/, "") : "";
-  const ldJson = JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "TechArticle",
-    headline: page.title,
-    description: page.description,
-    url: base ? base + page.url : page.url,
-    isPartOf: { "@type": "WebSite", name },
-  });
-
   return (
     <>
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted JSON-LD structured data */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson }} />
+      {/* The payload is script-escaped at build time by serializeJsonLd: `<`, `>`,
+          and `&` become their JSON unicode forms, so an author-controlled title
+          cannot close this element. The CSP allows inline scripts, so that escape
+          is the only line of defense here. */}
+      {page.jsonLd ? (
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: escaped by serializeJsonLd at build time
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: page.jsonLd }} />
+      ) : null}
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted prebuilt page HTML from the P1-P7 pipeline */}
       <div dangerouslySetInnerHTML={{ __html: html }} />
       <HydrateClient />

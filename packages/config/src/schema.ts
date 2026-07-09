@@ -1,5 +1,6 @@
 import type { Diagnostic } from "@readsmith/model";
 import { z } from "zod";
+import type { CspExtensions } from "./security.js";
 
 /**
  * A navigation item in the user-authored config: either a page reference (a
@@ -69,8 +70,26 @@ export const configInputSchema = z.object({
     logo: z.string().optional(),
     /** Favicon URL (served from content). Wired into page metadata. */
     favicon: z.string().optional(),
+    /** Emitted as the JSON-LD `author`, when set. */
+    author: z.object({ name: z.string().min(1), url: z.string().optional() }).optional(),
+    /** Emitted as the JSON-LD `publisher`, when set. */
+    publisher: z.object({ name: z.string().min(1), url: z.string().optional() }).optional(),
     theme: z.record(z.string(), z.unknown()).optional(),
   }),
+  /** Content-Security-Policy sources this site needs beyond `'self'`. */
+  security: z
+    .object({
+      csp: z
+        .object({
+          imgSrc: z.array(z.string()).optional(),
+          connectSrc: z.array(z.string()).optional(),
+          fontSrc: z.array(z.string()).optional(),
+          frameSrc: z.array(z.string()).optional(),
+          frameAncestors: z.array(z.string()).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   content: z
     .object({
       root: z.string().optional(),
@@ -137,8 +156,12 @@ export interface ResolvedConfig {
     description?: string;
     logo?: string;
     favicon?: string;
+    author?: { name: string; url?: string };
+    publisher?: { name: string; url?: string };
     theme: Record<string, unknown>;
   };
+  /** Resolved CSP extensions (always present, possibly empty). */
+  security: { csp: CspExtensions };
   content: { root: string; include: string[]; exclude: string[] };
   /** Validated asset mounts. `from` is content-root-relative POSIX, normalized. */
   assets: AssetMount[];

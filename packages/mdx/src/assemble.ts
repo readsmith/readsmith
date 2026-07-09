@@ -13,6 +13,7 @@ import {
   render,
 } from "./render.js";
 import { expandSnippetsAndVariables } from "./snippets.js";
+import { buildJsonLd } from "./structured-data.js";
 import { transform } from "./transform.js";
 
 /**
@@ -46,7 +47,14 @@ export interface NavTab {
 
 /** The subset of a resolved config that assembly consumes. */
 export interface SiteConfig {
-  site: { name: string; url?: string; description?: string; theme?: Record<string, unknown> };
+  site: {
+    name: string;
+    url?: string;
+    description?: string;
+    author?: { name: string; url?: string };
+    publisher?: { name: string; url?: string };
+    theme?: Record<string, unknown>;
+  };
   variables?: Record<string, unknown>;
   pages: SitePage[];
   nav: NavNode[];
@@ -104,6 +112,12 @@ export interface PageModel {
   hidden: boolean;
   /** Emits a robots noindex meta and drops the page from the sitemap. */
   noindex: boolean;
+  /**
+   * The escaped `application/ld+json` payload, ready to inject verbatim, or null
+   * for a hidden page. Escaped here rather than at the injection site: the CSP
+   * allows inline scripts, so the serializer is the only line of defense.
+   */
+  jsonLd: string | null;
   html: string;
   toc: TocNode[];
   rawMd: string;
@@ -239,6 +253,20 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
   // in addition to `hidden`. The feeds and the AI index track `hidden` alone.
   const indexable = visible.filter((m) => !m.noindex);
   const base = (input.baseUrl ?? config.site.url ?? "").replace(/\/+$/, "");
+
+  // Structured data needs the canonical base, which is only known here. Hidden
+  // pages emit none: they are unlisted everywhere else, and a search engine has
+  // no business being handed a description of one.
+  const jsonLdSite = {
+    name: config.site.name,
+    url: config.site.url,
+    author: config.site.author,
+    publisher: config.site.publisher,
+  };
+  for (const model of models) {
+    model.jsonLd = buildJsonLd(jsonLdSite, model, base);
+  }
+
   const sitemap = buildSitemap(indexable, base);
   const rss = buildRss(config, visible, base);
   const llmsTxt = buildLlmsTxt(config, visible, base);
@@ -259,6 +287,7 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
         html: m.html,
         hidden: m.hidden,
         noindex: m.noindex,
+        jsonLd: m.jsonLd,
       })),
     nav,
     tabs: tabs ?? null,
@@ -386,6 +415,7 @@ async function buildPage(
     frontmatter,
     hidden,
     noindex,
+    jsonLd: null, // assigned in assembleSite, which knows the canonical base
     html: renderResult.html,
     toc: projections.toc,
     rawMd: projections.rawMd,
@@ -414,6 +444,7 @@ function errorPage(page: SitePage, message: string): BuiltPage {
       frontmatter: {},
       hidden: false,
       noindex: false,
+      jsonLd: null,
       html: "",
       toc: [],
       rawMd: "",
