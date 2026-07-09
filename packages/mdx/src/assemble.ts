@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import { type Diagnostic, contentHash } from "@readsmith/model";
 import type { Root } from "mdast";
 import { toString as mdastToString } from "mdast-util-to-string";
@@ -51,6 +52,12 @@ export interface SiteConfig {
   nav: NavNode[];
   /** Top-level tabs, when configured. Each scopes its own sidebar navigation. */
   tabs?: NavTab[];
+  /** Where the content root sits relative to the repository root ("." or "docs"). */
+  content?: { root: string };
+  /** Asset mounts, `from` content-root-relative POSIX (may start with ".."). */
+  assets?: { from: string; to: string }[];
+  /** Where links that leave the docs point. */
+  links?: { repo?: string; branch?: string };
 }
 
 export interface AssembleInput {
@@ -89,9 +96,14 @@ export interface PageModel {
   slug: string;
   url: string;
   title: string;
+  /** Short label for the nav, when the page title is too long for a sidebar. */
+  sidebarTitle?: string;
   description?: string;
   frontmatter: Record<string, unknown>;
+  /** Unlisted: served at its URL, absent from nav, sitemap, feeds, and the AI index. */
   hidden: boolean;
+  /** Emits a robots noindex meta and drops the page from the sitemap. */
+  noindex: boolean;
   html: string;
   toc: TocNode[];
   rawMd: string;
@@ -135,14 +147,65 @@ export interface SiteBuild {
   rebuilt: string[];
 }
 
+/**
+ * Map a relative image target onto the URL its file is served at.
+ *
+ * A declared mount wins, because a mount may point inside the content root too.
+ * Otherwise a path that stays inside the content root is copied verbatim into
+ * `public/`, so its URL mirrors its path. A path that escapes the content root
+ * with no mount is unresolvable: refusing to guess is what keeps undeclared
+ * directories unpublished.
+ */
+export function makeResolveAsset(
+  assets: { from: string; to: string }[],
+): (target: string) => string | null {
+  return (target) => {
+    for (const mount of assets) {
+      if (target === mount.from) return `/${mount.to}`;
+      if (target.startsWith(`${mount.from}/`)) {
+        return `/${mount.to}/${target.slice(mount.from.length + 1)}`;
+      }
+    }
+    if (target.startsWith("..")) return null;
+    return `/${target}`;
+  };
+}
+
+/**
+ * Map a `.md` link that matched no page onto its file on the forge.
+ *
+ * Only paths that escape the content root qualify. An unresolved link *inside*
+ * the content root is a genuine broken link and must keep warning: it usually
+ * means a typo or a deleted page, and silently pointing it at the repository
+ * would bury that.
+ */
+export function makeResolveOutsidePage(
+  links: { repo?: string; branch?: string } | undefined,
+  contentRel: string,
+): ((target: string) => string | null) | undefined {
+  const repo = links?.repo?.replace(/\/+$/, "");
+  if (!repo) return undefined;
+  const branch = links?.branch ?? "main";
+  return (target) => {
+    if (!target.startsWith("..")) return null;
+    const repoRelative = posix.normalize(posix.join(contentRel, target));
+    if (repoRelative.startsWith("..")) return null; // escapes the repository too
+    return `${repo}/blob/${branch}/${repoRelative}`;
+  };
+}
+
 /** Run the full site build: per-page pipeline, then site-level assembly. */
 export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
   const { config } = input;
   const trust = input.trust ?? "owner";
   const resolvePage = makeResolvePage(config.pages);
+  const resolveAsset = makeResolveAsset(config.assets ?? []);
+  const resolveOutsidePage = makeResolveOutsidePage(config.links, config.content?.root ?? ".");
 
   const built = await Promise.all(
-    config.pages.map((page) => buildPage(page, input, trust, resolvePage)),
+    config.pages.map((page) =>
+      buildPage(page, input, trust, resolvePage, resolveAsset, resolveOutsidePage),
+    ),
   );
 
   const models = built.map((b) => b.model);
@@ -172,8 +235,11 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
   }
 
   const visible = models.filter((m) => !m.hidden);
+  // The sitemap is the one output that invites a crawler, so it honors `noindex`
+  // in addition to `hidden`. The feeds and the AI index track `hidden` alone.
+  const indexable = visible.filter((m) => !m.noindex);
   const base = (input.baseUrl ?? config.site.url ?? "").replace(/\/+$/, "");
-  const sitemap = buildSitemap(visible, base);
+  const sitemap = buildSitemap(indexable, base);
   const rss = buildRss(config, visible, base);
   const llmsTxt = buildLlmsTxt(config, visible, base);
   const llmsFullTxt = buildLlmsFullTxt(config, visible, base);
@@ -187,7 +253,13 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
     site: config.site.name,
     pages: [...models]
       .sort((a, b) => a.slug.localeCompare(b.slug))
-      .map((m) => ({ slug: m.slug, title: m.title, html: m.html, hidden: m.hidden })),
+      .map((m) => ({
+        slug: m.slug,
+        title: m.title,
+        html: m.html,
+        hidden: m.hidden,
+        noindex: m.noindex,
+      })),
     nav,
     tabs: tabs ?? null,
     sitemap,
@@ -230,6 +302,8 @@ async function buildPage(
   input: AssembleInput,
   trust: "owner" | "contributor" | "preview",
   resolvePage: (targetPathNoExt: string) => string | null,
+  resolveAsset: (target: string) => string | null,
+  resolveOutsidePage: ((target: string) => string | null) | undefined,
 ): Promise<BuiltPage> {
   const { config } = input;
   const globals = config.variables ?? {};
@@ -252,13 +326,25 @@ async function buildPage(
     resolveSnippet: makeSnippetResolver(input.snippets ?? {}, usedSnippets),
   });
 
-  const transformed = transform(expanded.body, { path: page.path, resolvePage });
+  const transformed = transform(expanded.body, {
+    path: page.path,
+    resolvePage,
+    resolveAsset,
+    resolveOutsidePage,
+  });
   const projections = project(transformed.body, { path: page.path });
   const anchors = collectAnchors(transformed.body);
   const links = collectLinks(transformed.body);
 
   const hidden = frontmatter.hidden === true;
+  // A page deliberately dropped from the nav, the sitemap, the feeds, and the AI
+  // index almost certainly should not be in Google either. Explicit wins.
+  const noindex = frontmatter.noindex === true || (hidden && frontmatter.noindex !== false);
   const title = pickTitle(frontmatter, transformed.body, page.slug, config.site.name);
+  const sidebarTitle =
+    typeof frontmatter.sidebarTitle === "string" && frontmatter.sidebarTitle.trim()
+      ? frontmatter.sidebarTitle
+      : undefined;
   const description =
     typeof frontmatter.description === "string" ? frontmatter.description : undefined;
 
@@ -295,9 +381,11 @@ async function buildPage(
     slug: page.slug,
     url: slugToUrl(page.slug),
     title,
+    sidebarTitle,
     description,
     frontmatter,
     hidden,
+    noindex,
     html: renderResult.html,
     toc: projections.toc,
     rawMd: projections.rawMd,
@@ -325,6 +413,7 @@ function errorPage(page: SitePage, message: string): BuiltPage {
       title: page.slug || "Untitled",
       frontmatter: {},
       hidden: false,
+      noindex: false,
       html: "",
       toc: [],
       rawMd: "",
@@ -433,6 +522,11 @@ function validateLinks(
   }
 }
 
+/** The label a page carries in navigation chrome: sidebar, breadcrumbs, prev/next. */
+function navTitle(model: PageModel): string {
+  return model.sidebarTitle ?? model.title;
+}
+
 /** Attach titles and drop hidden pages and empty groups from the nav tree. */
 function finalizeNav(nav: NavNode[], bySlug: Map<string, PageModel>): FinalNavNode[] {
   const out: FinalNavNode[] = [];
@@ -440,7 +534,7 @@ function finalizeNav(nav: NavNode[], bySlug: Map<string, PageModel>): FinalNavNo
     if (node.type === "page") {
       const model = bySlug.get(node.slug);
       if (!model || model.hidden) continue;
-      out.push({ type: "page", slug: model.slug, url: model.url, title: model.title });
+      out.push({ type: "page", slug: model.slug, url: model.url, title: navTitle(model) });
     } else {
       const children = finalizeNav(node.children, bySlug);
       if (children.length > 0) out.push({ type: "group", label: node.label, children });
@@ -491,7 +585,7 @@ function applyNavRelations(nav: FinalNavNode[], bySlug: Map<string, PageModel>):
 
 function navLink(model: PageModel | undefined): NavLink | undefined {
   if (!model) return undefined;
-  return { slug: model.slug, url: model.url, title: model.title };
+  return { slug: model.slug, url: model.url, title: navTitle(model) };
 }
 
 /** Prepend the canonical base to a root-relative URL, when a base is configured. */

@@ -9,7 +9,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { normalizeDocument, parseAndBundle } from "@readsmith/api-reference";
 import { createRegistry } from "@readsmith/components";
-import { resolveConfig } from "@readsmith/config";
+import { contentRootOf, resolveConfig } from "@readsmith/config";
 import { assembleSite } from "@readsmith/mdx";
 import { contentHash, normalizedSpecSchema } from "@readsmith/model";
 import { createBundleStore, resolveStorageConfig } from "@readsmith/storage";
@@ -68,7 +68,8 @@ async function buildApiReference(config, contentRoot) {
 
 async function main() {
   const config = await resolveConfig(CONTENT_DIR);
-  const contentRoot = join(CONTENT_DIR, config.content.root);
+  // Shared with copy-assets: both must resolve the same content root.
+  const contentRoot = contentRootOf(CONTENT_DIR, config);
   const build = await assembleSite({
     config,
     readPage: (path) => readFile(join(contentRoot, path), "utf8"),

@@ -64,6 +64,9 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
     description: desc,
     icons,
     alternates: { canonical: page.url },
+    // Dropping a page from the sitemap does not stop a crawler that finds it via
+    // an inbound link. Only the robots meta does.
+    ...(page.noindex ? { robots: { index: false, follow: false } } : {}),
     openGraph: { title, description: desc, siteName: name, type: "article", url: page.url },
     twitter: { card: "summary_large_image", title, description: desc },
   };

@@ -1,0 +1,6 @@
+site:
+  name: merge
+content:
+  root: "."
+  exclude:
+    - SECURITY.md

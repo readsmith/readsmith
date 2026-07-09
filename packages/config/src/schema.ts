@@ -29,6 +29,30 @@ const navTabInputSchema = z.object({
 });
 
 /**
+ * An asset directory mounted into the site. `from` is relative to the content
+ * root and may escape it (real repos keep images beside the code, not beside the
+ * prose); it may never escape the repository root. `to` is the URL path it is
+ * served at. Declaring a mount is what makes an out-of-root directory public:
+ * nothing outside the content root is ever copied by accident.
+ */
+export const assetMountSchema = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+});
+export type AssetMount = z.infer<typeof assetMountSchema>;
+
+/**
+ * How to treat links that leave the docs. A relative `.md` link that resolves to
+ * no page and escapes the content root (`../SECURITY.md`) points at a real file
+ * that is not a docs page; with `repo` set we send the reader to it on the forge
+ * instead of emitting a dead href.
+ */
+export const linksSchema = z.object({
+  repo: z.string().min(1).optional(),
+  branch: z.string().min(1).optional(),
+});
+
+/**
  * The user-authored site config (our `docs.yaml` shape). Everything except
  * `site.name` is optional. When `navigation` is omitted the site auto-discovers
  * all content files and builds navigation from the file tree.
@@ -51,9 +75,14 @@ export const configInputSchema = z.object({
     .object({
       root: z.string().optional(),
       include: z.array(z.string()).optional(),
+      /** Merged with the built-in defaults, never replacing them. */
       exclude: z.array(z.string()).optional(),
     })
     .optional(),
+  /** Asset directories to publish, which may live outside the content root. */
+  assets: z.array(assetMountSchema).optional(),
+  /** Where links that leave the docs should point. */
+  links: linksSchema.optional(),
   navigation: z.array(navItemInputSchema).optional(),
   /** Top-level navigation tabs. When set, the sidebar is scoped to the active tab. */
   tabs: z.array(navTabInputSchema).optional(),
@@ -111,6 +140,10 @@ export interface ResolvedConfig {
     theme: Record<string, unknown>;
   };
   content: { root: string; include: string[]; exclude: string[] };
+  /** Validated asset mounts. `from` is content-root-relative POSIX, normalized. */
+  assets: AssetMount[];
+  /** Resolved link policy. `branch` defaults to "main" once `repo` is set. */
+  links: { repo?: string; branch: string };
   variables: Record<string, unknown>;
   pages: PageRef[];
   nav: NavNode[];
@@ -126,4 +159,14 @@ export interface ResolvedConfig {
 }
 
 export const DEFAULT_INCLUDE = ["**/*.md", "**/*.mdx"];
-export const DEFAULT_EXCLUDE = ["**/node_modules/**"];
+
+/**
+ * Always excluded. A user's `content.exclude` is merged on top of these, never
+ * substituted for them: writing `exclude: ["SECURITY.md"]` must not silently
+ * re-enable a walk of `node_modules`.
+ */
+export const DEFAULT_EXCLUDE = ["**/node_modules/**", "**/.git/**"];
+
+/** Files never copied as assets: they are content, or they are the config itself. */
+export const ASSET_SKIP_EXT = new Set([".md", ".mdx"]);
+export const ASSET_SKIP_FILES = new Set(["docs.yaml", "docs.yml", "docs.json"]);

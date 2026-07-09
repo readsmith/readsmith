@@ -14,6 +14,19 @@ export interface TransformContext {
    * left untouched.
    */
   resolvePage?: (targetPathNoExt: string) => string | null;
+  /**
+   * Resolve a relative image target to its served URL. Receives a normalized
+   * content-root-relative path, which may escape the root (`../media/a.gif`)
+   * because real repos keep images beside the code. Returns null when nothing
+   * publishes that path. When omitted, images are left untouched.
+   */
+  resolveAsset?: (targetPath: string) => string | null;
+  /**
+   * Last resort for a relative `.md` link that matches no page. Receives the same
+   * normalized path (extension intact). Returns a URL, typically on the forge, or
+   * null to let it be reported as broken. When omitted, unresolved links warn.
+   */
+  resolveOutsidePage?: (targetPath: string) => string | null;
 }
 
 export interface TransformResult {
@@ -22,13 +35,14 @@ export interface TransformResult {
 }
 
 /**
- * P2 Transforms: assign heading slugs, then resolve internal links. Runs in a
- * defined order (slugs before links) and mutates the tree in place.
+ * P2 Transforms: assign heading slugs, then resolve internal links and images.
+ * Runs in a defined order (slugs before links) and mutates the tree in place.
  */
 export function transform(body: Root, ctx: TransformContext): TransformResult {
   const diagnostics: Diagnostic[] = [];
   assignHeadingSlugs(body);
   resolveLinks(body, ctx, diagnostics);
+  resolveImages(body, ctx, diagnostics);
   return { body, diagnostics };
 }
 
@@ -50,8 +64,12 @@ export function assignHeadingSlugs(body: Root): void {
 
 /**
  * Resolve relative internal links to canonical page URLs. External links,
- * absolute paths, mailto/tel, and pure anchors are left untouched. A relative
- * link that resolves to no known page produces a diagnostic and is left as is.
+ * absolute paths, mailto/tel, and pure anchors are left untouched.
+ *
+ * A relative link matching no page gets one more chance through
+ * `resolveOutsidePage`, which handles the common case of a docs page pointing at
+ * a real repository file that is not a docs page (`../SECURITY.md`). Failing
+ * that, it produces a diagnostic and is left as is.
  */
 export function resolveLinks(body: Root, ctx: TransformContext, diagnostics: Diagnostic[]): void {
   const resolve = ctx.resolvePage;
@@ -72,6 +90,11 @@ export function resolveLinks(body: Root, ctx: TransformContext, diagnostics: Dia
     const slug = resolve(noExt);
 
     if (slug === null) {
+      const outside = ctx.resolveOutsidePage?.(joined);
+      if (outside) {
+        node.url = outside + anchor;
+        return;
+      }
       diagnostics.push({
         severity: "warning",
         code: "broken-link",
@@ -82,6 +105,38 @@ export function resolveLinks(body: Root, ctx: TransformContext, diagnostics: Dia
       return;
     }
     node.url = pageUrl(slug) + anchor;
+  });
+}
+
+/**
+ * Rewrite relative image URLs to the URLs their files are actually served at.
+ * Without this, `![x](../media/a.gif)` is handed to the browser verbatim and
+ * resolves against the *page* URL, which is not where the asset lives.
+ *
+ * Absolute paths and anything with a scheme (a shields.io badge) are untouched.
+ */
+export function resolveImages(body: Root, ctx: TransformContext, diagnostics: Diagnostic[]): void {
+  const resolve = ctx.resolveAsset;
+  if (!resolve) return;
+  const dir = posix.dirname(ctx.path);
+
+  visit(body, "image", (node) => {
+    const url = node.url;
+    if (!isRelativeFileLink(url) || url === "") return;
+
+    const joined = posix.normalize(posix.join(dir, url));
+    const resolved = resolve(joined);
+    if (resolved === null) {
+      diagnostics.push({
+        severity: "warning",
+        code: "broken-asset",
+        message: `Image "${url}" is outside the content root and no asset mount publishes it.`,
+        pos: nodePosition(node),
+        source: ctx.path,
+      });
+      return;
+    }
+    node.url = resolved;
   });
 }
 

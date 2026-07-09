@@ -1,0 +1,10 @@
+site:
+  name: widget
+content:
+  root: docs
+assets:
+  - from: ../media
+    to: media
+links:
+  repo: https://github.com/acme/widget/
+  branch: main

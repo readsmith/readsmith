@@ -1,0 +1,167 @@
+import type { Diagnostic } from "@readsmith/model";
+import { describe, expect, it } from "vitest";
+import { makeResolveAsset, makeResolveOutsidePage } from "../src/assemble.js";
+import { parse } from "../src/parse.js";
+import { transform } from "../src/transform.js";
+
+/**
+ * Item 6 (FR-4). Relative image URLs used to pass through untouched and resolve
+ * against the page URL, which is not where the asset lives. Relative `.md` links
+ * that escaped the content root died as warnings, even when they pointed at a
+ * real repository file.
+ */
+
+const MOUNTS = [{ from: "../media", to: "media" }];
+
+/** Transform one page and hand back its rewritten urls plus diagnostics. */
+function run(
+  path: string,
+  source: string,
+  opts: { assets?: { from: string; to: string }[]; repo?: string; contentRel?: string } = {},
+) {
+  const parsed = parse({ path, raw: source });
+  const diagnostics: Diagnostic[] = [];
+  const result = transform(parsed.body, {
+    path,
+    resolvePage: (target) => (target === "policy" ? "policy" : null),
+    resolveAsset: makeResolveAsset(opts.assets ?? []),
+    resolveOutsidePage: makeResolveOutsidePage(
+      opts.repo ? { repo: opts.repo, branch: "main" } : undefined,
+      opts.contentRel ?? ".",
+    ),
+  });
+  diagnostics.push(...result.diagnostics);
+
+  const images: string[] = [];
+  const links: string[] = [];
+  const walk = (node: { type: string; url?: string; children?: unknown[] }): void => {
+    if (node.type === "image" && node.url) images.push(node.url);
+    if (node.type === "link" && node.url) links.push(node.url);
+    for (const child of (node.children ?? []) as (typeof node)[]) walk(child);
+  };
+  walk(result.body as unknown as { type: string; children?: unknown[] });
+  return { images, links, diagnostics };
+}
+
+describe("resolveImages", () => {
+  // AC-6.1
+  it("AC-6.1: a co-located image resolves to its public URL", () => {
+    const { images, diagnostics } = run("guide/setup.md", "![x](./img/a.gif)");
+    expect(images).toEqual(["/guide/img/a.gif"]);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("resolves an image beside the page without a ./ prefix", () => {
+    const { images } = run("guide/setup.md", "![x](a.png)");
+    expect(images).toEqual(["/guide/a.png"]);
+  });
+
+  // AC-6.2: an image kept beside the code, not beside the prose.
+  it("AC-6.2: an out-of-root image resolves through its declared mount", () => {
+    const { images, diagnostics } = run("cli.md", "![shot](../media/screenshot.gif)", {
+      assets: MOUNTS,
+    });
+    expect(images).toEqual(["/media/screenshot.gif"]);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("resolves a nested path inside a mount", () => {
+    const { images } = run("cli.md", "![x](../media/nested/b.gif)", { assets: MOUNTS });
+    expect(images).toEqual(["/media/nested/b.gif"]);
+  });
+
+  // AC-6.3
+  it("AC-6.3: an absolute URL is left untouched", () => {
+    const badge = "https://img.shields.io/badge/license-Apache%202.0-blue";
+    const { images, diagnostics } = run("index.md", `![License](${badge})`);
+    expect(images).toEqual([badge]);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("leaves a root-absolute path untouched", () => {
+    const { images } = run("index.md", "![logo](/logo.svg)");
+    expect(images).toEqual(["/logo.svg"]);
+  });
+
+  it("warns, and does not guess, when an out-of-root image has no mount", () => {
+    const { images, diagnostics } = run("cli.md", "![shot](../media/screenshot.gif)"); // no mounts
+    expect(images).toEqual(["../media/screenshot.gif"]); // untouched
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("broken-asset");
+    expect(diagnostics[0]?.severity).toBe("warning");
+  });
+});
+
+describe("resolveLinks: links that leave the docs", () => {
+  const REPO = "https://github.com/acme/widget";
+
+  it("still resolves a link to a real page", () => {
+    const { links, diagnostics } = run("cli.md", "[policy](policy.md)", { repo: REPO });
+    expect(links).toEqual(["/policy"]);
+    expect(diagnostics).toEqual([]);
+  });
+
+  // AC-6.4
+  it("AC-6.4: an out-of-root .md link becomes a repo blob URL, with no warning", () => {
+    const { links, diagnostics } = run("cli.md", "[sec](../SECURITY.md)", {
+      repo: REPO,
+      contentRel: "docs",
+    });
+    expect(links).toEqual([`${REPO}/blob/main/SECURITY.md`]);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("preserves the anchor on a rewritten repo link", () => {
+    const { links } = run("cli.md", "[sec](../SECURITY.md#reporting)", {
+      repo: REPO,
+      contentRel: "docs",
+    });
+    expect(links).toEqual([`${REPO}/blob/main/SECURITY.md#reporting`]);
+  });
+
+  it("uses the configured branch", () => {
+    const outside = makeResolveOutsidePage({ repo: REPO, branch: "trunk" }, "docs");
+    expect(outside?.("../SECURITY.md")).toBe(`${REPO}/blob/trunk/SECURITY.md`);
+  });
+
+  // AC-6.5
+  it("AC-6.5: without links.repo, behavior is unchanged: warn and leave the href", () => {
+    const { links, diagnostics } = run("cli.md", "[sec](../SECURITY.md)", { contentRel: "docs" });
+    expect(links).toEqual(["../SECURITY.md"]);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("broken-link");
+  });
+
+  // AC-6.6: a typo inside the docs must stay loud. Pointing it at the repository
+  // would bury a genuine broken link.
+  it("AC-6.6: an unresolved link inside the content root still warns", () => {
+    const { links, diagnostics } = run("cli.md", "[gone](./missing.md)", {
+      repo: REPO,
+      contentRel: "docs",
+    });
+    expect(links).toEqual(["./missing.md"]);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("broken-link");
+  });
+
+  it("does not rewrite a link that escapes the repository itself", () => {
+    // Content root IS the repo root, so `../x.md` is outside the checkout.
+    const outside = makeResolveOutsidePage({ repo: REPO, branch: "main" }, ".");
+    expect(outside?.("../x.md")).toBeNull();
+  });
+});
+
+describe("makeResolveAsset", () => {
+  it("prefers a declared mount over the co-located rule", () => {
+    const resolve = makeResolveAsset([{ from: "images", to: "static/img" }]);
+    expect(resolve("images/a.png")).toBe("/static/img/a.png");
+  });
+
+  it("maps the mount root itself", () => {
+    expect(makeResolveAsset(MOUNTS)("../media")).toBe("/media");
+  });
+
+  it("refuses to publish an undeclared out-of-root path", () => {
+    expect(makeResolveAsset([])("../secrets/key.png")).toBeNull();
+  });
+});

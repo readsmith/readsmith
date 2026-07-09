@@ -1,0 +1,9 @@
+site:
+  name: escape
+content:
+  root: docs
+assets:
+  - from: ../../elsewhere
+    to: stolen
+  - from: ../media
+    to: media
