@@ -1,6 +1,8 @@
 /* SchemaViewer (view mode): reference documentation for a NormalizedSchema.
- * Nesting reads as indented, rule-separated rows; refs and composition are
- * called out with the accent; constraints are quiet chips. Themed via tokens. */
+ * Nesting reads as indented, rule-separated rows. Property keys are the loud
+ * element (ink, semibold); types, refs, and composition markers are muted gray
+ * (they are metadata, not links); constraints are quiet chips. Themed via
+ * tokens; the only red is REQUIRED and Deprecated. */
 
 .rs-schema {
   font-family: var(--rs-font-sans);
@@ -20,7 +22,7 @@
 .rs-schema__t {
   font-family: var(--rs-font-mono);
   font-size: 0.82rem;
-  color: var(--rs-accent);
+  color: var(--rs-ink-muted);
 }
 .rs-schema__any {
   font-style: italic;
@@ -34,7 +36,7 @@
 .rs-schema__comp {
   font-family: var(--rs-font-mono);
   font-size: 0.82rem;
-  color: var(--rs-accent);
+  color: var(--rs-ink-muted);
   font-weight: 500;
 }
 
@@ -91,8 +93,8 @@ details.rs-schema__prop--nested[open] > summary::before {
   font-size: 0.66rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--rs-hallmark-ink);
-  background: var(--rs-hallmark-wash);
+  color: var(--rs-danger);
+  background: color-mix(in srgb, var(--rs-danger) 10%, transparent);
   padding: 1px 6px;
   border-radius: var(--rs-radius-sm);
 }
@@ -110,8 +112,8 @@ details.rs-schema__prop--nested[open] > summary::before {
   border-color: var(--rs-danger);
 }
 .rs-schema__flag--recursive {
-  color: var(--rs-accent);
-  border-color: var(--rs-accent);
+  color: var(--rs-ink-muted);
+  border-color: var(--rs-rule-strong);
 }
 
 /* constraint chips */
@@ -165,7 +167,7 @@ details.rs-schema__prop--nested[open] > summary::before {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--rs-accent);
+  color: var(--rs-ink-muted);
   font-weight: 600;
 }
 .rs-schema__disc {

@@ -31,15 +31,28 @@ function baseUrl(url: string | undefined): URL | undefined {
 export default async function ApiReferencePage() {
   const ref = await getApiReference();
   if (!ref) notFound();
-  const { name, url, logo, favicon, branding } = await getSite();
+  const { build, name, url, logo, branding } = await getSite();
 
+  // Mirror the docs pages' tab bar with the reference tab active, so the
+  // reference reads as a section of one product, not a side page. A tabless
+  // site falls back to a plain "Docs" header link.
+  const contentTabs = (build.tabs ?? []).map((tab) => ({
+    label: tab.label,
+    url: tab.url,
+    active: false,
+  }));
+  const tabs =
+    contentTabs.length > 0
+      ? [...contentTabs, { label: ref.label, url: ref.path, active: true }]
+      : undefined;
   const site: ShellSite = {
     name,
     nav: [],
     url,
     logo,
     poweredBy: branding,
-    links: [{ label: "Docs", href: "/" }],
+    tabs,
+    links: tabs ? undefined : [{ label: "Docs", href: "/" }],
   };
   const html = renderReferenceBody(site, ref.spec, { basePath: ref.path });
 

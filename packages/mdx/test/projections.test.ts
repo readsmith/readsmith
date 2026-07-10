@@ -81,3 +81,45 @@ describe("determinism", () => {
     expect(a).toEqual(b);
   });
 });
+
+/**
+ * Search deep-links are `baseUrl + chunk.path + #anchor`, so `path` must be the
+ * page URL. It used to be the source file path, which produced links like
+ * `example.com../README.md#perf` once a home page lived above the content root.
+ */
+describe("chunk.path is a URL, not a source path", () => {
+  it("uses the supplied url and keeps the source path as page_id", () => {
+    const body = parse({ path: "../README.md", raw: "# Home\n\nText.\n" }).body;
+    const { chunks } = project(body, { path: "../README.md", url: "/" });
+    expect(chunks[0]?.path).toBe("/");
+    expect(chunks[0]?.page_id).toBe("../README.md");
+  });
+
+  it("falls back to the source path when no url is given", () => {
+    const body = parse({ path: "a.md", raw: "# A\n\nText.\n" }).body;
+    expect(project(body, { path: "a.md" }).chunks[0]?.path).toBe("a.md");
+  });
+});
+
+/**
+ * A heading and the paragraph under it must not fuse. Flattening a whole chunk at
+ * once produced "Quick startcrucible is a Linux daemon", which corrupts the
+ * embedding and reads as a typo to any model.
+ */
+describe("chunk text keeps blocks apart", () => {
+  it("separates a heading from its body", () => {
+    const body = parse({ path: "a.md", raw: "## Quick start\n\ncrucible is a daemon.\n" }).body;
+    assignHeadingSlugs(body);
+    const { chunks } = project(body, { path: "a.md", url: "/a" });
+    expect(chunks[0]?.text).toBe("Quick start\n\ncrucible is a daemon.");
+    expect(chunks[0]?.text).not.toContain("startcrucible");
+  });
+
+  it("separates consecutive blocks, including code", () => {
+    const raw = "## Install\n\nRun it:\n\n```bash\ncurl x | sh\n```\n";
+    const body = parse({ path: "a.md", raw }).body;
+    assignHeadingSlugs(body);
+    const text = project(body, { path: "a.md", url: "/a" }).chunks[0]?.text ?? "";
+    expect(text.split("\n\n")).toEqual(["Install", "Run it:", "curl x | sh"]);
+  });
+});

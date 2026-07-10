@@ -27,8 +27,8 @@
   place-items: center;
   border-radius: 50%;
   background: var(--rs-surface);
-  border: 1px solid var(--rs-rule-strong);
-  color: var(--rs-accent);
+  border: 1px solid var(--rs-rule);
+  color: var(--rs-ink-muted);
   font-family: var(--rs-font-mono);
   font-size: 0.8rem;
   font-weight: 500;

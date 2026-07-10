@@ -35,8 +35,8 @@
 }
 .rs-prose h2 {
   font-size: var(--rs-text-h2);
-  font-weight: 600;
-  margin: var(--rs-space-7) 0 var(--rs-space-4);
+  font-weight: 500;
+  margin: var(--rs-space-7) 0 var(--rs-space-3);
 }
 .rs-prose h3 {
   font-size: var(--rs-text-h3);
@@ -54,13 +54,19 @@
   margin: 0 0 var(--rs-space-4);
 }
 
+/* Links are the one place the accent is allowed in chrome-adjacent styling:
+ * color carries "this is clickable prose". The underline sits at 45% strength
+ * and completes on hover, so link-dense paragraphs stay calm. */
 .rs-prose a {
   color: var(--rs-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
 }
 .rs-prose a:hover {
   color: var(--rs-accent-hover);
+  text-decoration-color: currentColor;
 }
 
 .rs-prose strong {
@@ -121,12 +127,10 @@
 }
 .rs-prose thead th {
   text-align: left;
-  font-family: var(--rs-font-mono);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--rs-ink-faint);
-  font-weight: 500;
+  font-family: var(--rs-font-sans);
+  font-size: 0.75rem;
+  color: var(--rs-ink-muted);
+  font-weight: 600;
   padding: 11px 16px;
   background: var(--rs-surface);
   border-bottom: 1px solid var(--rs-rule);

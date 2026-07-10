@@ -11,7 +11,7 @@
   margin: var(--rs-space-5) 0;
   border: 1px solid var(--rs-rule);
   border-radius: var(--rs-radius);
-  background: var(--rs-surface);
+  background: var(--rs-code-bg);
   overflow: hidden;
 }
 
@@ -67,9 +67,10 @@
 .rs-code .shiki .line {
   padding: 0 18px;
 }
+/* Highlighted lines carry the hallmark, not the accent: marked by the assayer. */
 .rs-code .shiki .line.highlighted {
-  background: var(--rs-accent-wash);
-  box-shadow: inset 2px 0 var(--rs-accent);
+  background: var(--rs-hallmark-wash);
+  box-shadow: inset 2px 0 var(--rs-hallmark);
 }
 
 /* Shiki dual theme: swap token colors to the dark set under the dark theme */
@@ -89,8 +90,8 @@
   font-family: var(--rs-font-mono);
   font-size: 0.7rem;
   color: var(--rs-ink-muted);
-  background: var(--rs-surface);
-  border: 1px solid var(--rs-rule-strong);
+  background: var(--rs-code-bg);
+  border: 1px solid var(--rs-rule);
   border-radius: var(--rs-radius-sm);
   padding: 3px 9px;
   cursor: pointer;
@@ -99,11 +100,12 @@
 }
 .rs-code__copy:hover {
   color: var(--rs-ink);
-  border-color: var(--rs-ink-faint);
+  border-color: var(--rs-rule-strong);
 }
 .rs-code__copy.is-done {
-  color: var(--rs-accent);
-  border-color: var(--rs-accent);
+  color: var(--rs-ink);
+  border-color: var(--rs-rule-strong);
+  background: var(--rs-active-wash);
 }
 .rs-code__bar .rs-code__copy {
   margin-left: 8px;

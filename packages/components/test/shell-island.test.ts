@@ -141,9 +141,10 @@ describe("Ask-AI console", () => {
     expect(document.body.classList.contains("is-asking")).toBe(true);
 
     scroll?.querySelector<HTMLElement>('[data-fb="1"]')?.click();
+    // The JSON API is mounted under /_readsmith so a docs page may own /api.
     await vi.waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
-        "/api/ai/feedback",
+        "/_readsmith/api/ai/feedback",
         expect.objectContaining({ method: "POST" }),
       ),
     );

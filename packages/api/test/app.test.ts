@@ -1,6 +1,6 @@
 import type { SearchHit } from "@readsmith/model";
 import { describe, expect, it } from "vitest";
-import { createApiApp } from "../src/app.js";
+import { API_BASE_PATH, createApiApp } from "../src/app.js";
 import type { AiServices, ApiDatabase } from "../src/deps.js";
 
 const okDb: ApiDatabase = { query: async () => [] };
@@ -44,37 +44,41 @@ const post = (app: ReturnType<typeof createApiApp>, path: string, body: unknown)
 
 describe("createApiApp: health", () => {
   it("reports the database disabled when none is injected", async () => {
-    const res = await createApiApp({ db: null, ai: null }).request("/api/health");
+    const res = await createApiApp({ db: null, ai: null }).request(`${API_BASE_PATH}/health`);
     expect(await res.json()).toEqual({ status: "ok", database: "disabled" });
   });
 
   it("reports up when the database answers", async () => {
-    const res = await createApiApp({ db: okDb, ai: null }).request("/api/health");
+    const res = await createApiApp({ db: okDb, ai: null }).request(`${API_BASE_PATH}/health`);
     expect(await res.json()).toEqual({ status: "ok", database: "up" });
   });
 
   it("reports degraded (503) when the database errors", async () => {
-    const res = await createApiApp({ db: failDb, ai: null }).request("/api/health");
+    const res = await createApiApp({ db: failDb, ai: null }).request(`${API_BASE_PATH}/health`);
     expect(res.status).toBe(503);
   });
 });
 
 describe("createApiApp: capabilities", () => {
   it("reports all-off when AI is unconfigured", async () => {
-    const res = await createApiApp({ db: okDb, ai: null }).request("/api/ai/capabilities");
+    const res = await createApiApp({ db: okDb, ai: null }).request(
+      `${API_BASE_PATH}/ai/capabilities`,
+    );
     expect(await res.json()).toEqual({ search: false, vectorSearch: false, askAi: false });
   });
 
   it("reflects the injected capabilities", async () => {
     const ai = mockAi({ capabilities: { search: true, vectorSearch: false, askAi: false } });
-    const res = await createApiApp({ db: okDb, ai }).request("/api/ai/capabilities");
+    const res = await createApiApp({ db: okDb, ai }).request(`${API_BASE_PATH}/ai/capabilities`);
     expect(await res.json()).toEqual({ search: true, vectorSearch: false, askAi: false });
   });
 });
 
 describe("createApiApp: search", () => {
   it("returns hits when search is available", async () => {
-    const res = await post(createApiApp({ db: okDb, ai: mockAi() }), "/api/search", { query: "x" });
+    const res = await post(createApiApp({ db: okDb, ai: mockAi() }), `${API_BASE_PATH}/search`, {
+      query: "x",
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { hits: SearchHit[]; degraded: boolean };
     expect(body.hits).toHaveLength(1);
@@ -85,7 +89,9 @@ describe("createApiApp: search", () => {
   // service degrades below us; the route's job is to pass the flag through.
   it("AC-1.5: returns 200 with keyword hits and degraded=true, never 500", async () => {
     const ai = mockAi({ search: async () => ({ hits: [hit], degraded: true }) });
-    const res = await post(createApiApp({ db: okDb, ai }), "/api/search", { query: "x" });
+    const res = await post(createApiApp({ db: okDb, ai }), `${API_BASE_PATH}/search`, {
+      query: "x",
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { hits: SearchHit[]; degraded: boolean };
     expect(body.hits).toHaveLength(1);
@@ -93,29 +99,39 @@ describe("createApiApp: search", () => {
   });
 
   it("503s when AI is unconfigured, and when the search capability is off", async () => {
-    const off = await post(createApiApp({ db: okDb, ai: null }), "/api/search", { query: "x" });
+    const off = await post(createApiApp({ db: okDb, ai: null }), `${API_BASE_PATH}/search`, {
+      query: "x",
+    });
     expect(off.status).toBe(503);
     const noSearch = mockAi({ capabilities: { search: false, vectorSearch: false, askAi: false } });
-    const res = await post(createApiApp({ db: okDb, ai: noSearch }), "/api/search", { query: "x" });
+    const res = await post(createApiApp({ db: okDb, ai: noSearch }), `${API_BASE_PATH}/search`, {
+      query: "x",
+    });
     expect(res.status).toBe(503);
   });
 
   it("400s on an empty query", async () => {
-    const res = await post(createApiApp({ db: okDb, ai: mockAi() }), "/api/search", { query: "" });
+    const res = await post(createApiApp({ db: okDb, ai: mockAi() }), `${API_BASE_PATH}/search`, {
+      query: "",
+    });
     expect(res.status).toBe(400);
   });
 });
 
 describe("createApiApp: ask", () => {
   it("streams when Ask-AI is available", async () => {
-    const res = await post(createApiApp({ db: okDb, ai: mockAi() }), "/api/ask", { query: "how?" });
+    const res = await post(createApiApp({ db: okDb, ai: mockAi() }), `${API_BASE_PATH}/ask`, {
+      query: "how?",
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/event-stream");
   });
 
   it("503s when the chat capability is off", async () => {
     const noChat = mockAi({ capabilities: { search: true, vectorSearch: true, askAi: false } });
-    const res = await post(createApiApp({ db: okDb, ai: noChat }), "/api/ask", { query: "how?" });
+    const res = await post(createApiApp({ db: okDb, ai: noChat }), `${API_BASE_PATH}/ask`, {
+      query: "how?",
+    });
     expect(res.status).toBe(503);
   });
 });
@@ -128,7 +144,7 @@ describe("createApiApp: feedback", () => {
         captured = input;
       },
     });
-    const res = await post(createApiApp({ db: okDb, ai }), "/api/ai/feedback", {
+    const res = await post(createApiApp({ db: okDb, ai }), `${API_BASE_PATH}/ai/feedback`, {
       id: "q1",
       value: 1,
     });
@@ -137,9 +153,13 @@ describe("createApiApp: feedback", () => {
   });
 
   it("400s without id/value", async () => {
-    const res = await post(createApiApp({ db: okDb, ai: mockAi() }), "/api/ai/feedback", {
-      id: "q1",
-    });
+    const res = await post(
+      createApiApp({ db: okDb, ai: mockAi() }),
+      `${API_BASE_PATH}/ai/feedback`,
+      {
+        id: "q1",
+      },
+    );
     expect(res.status).toBe(400);
   });
 });

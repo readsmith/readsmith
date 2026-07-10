@@ -29,19 +29,24 @@
   background: var(--rs-surface);
   color: inherit;
   text-decoration: none;
-  transition: border-color var(--rs-dur) var(--rs-ease), transform var(--rs-dur) var(--rs-ease),
-    box-shadow var(--rs-dur) var(--rs-ease);
+  transition: border-color var(--rs-dur) var(--rs-ease), background var(--rs-dur) var(--rs-ease);
+}
+/* Cards are chrome, not prose links: no accent, no lift, just a border swap.
+ * The prose-link rule also matches `a.rs-card`, so undo it explicitly. */
+.rs-prose a.rs-card {
+  color: inherit;
+  text-decoration: none;
 }
 a.rs-card:hover {
-  border-color: var(--rs-accent);
-  transform: translateY(-2px);
-  box-shadow: 0 0 0 1px var(--rs-accent), 0 14px 30px -14px var(--rs-accent-wash);
+  border-color: var(--rs-rule-strong);
+  background: var(--rs-surface-2);
 }
 
 .rs-card__title {
   margin: 0 0 var(--rs-space-1);
   font-weight: 600;
   font-size: 1rem;
+  color: var(--rs-ink);
 }
 .rs-card__body {
   color: var(--rs-ink-muted);
@@ -57,8 +62,5 @@ a.rs-card:hover {
 @media (prefers-reduced-motion: reduce) {
   .rs-card {
     transition: none;
-  }
-  a.rs-card:hover {
-    transform: none;
   }
 }

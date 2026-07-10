@@ -357,11 +357,15 @@ async function buildPage(
 
   const transformed = transform(expanded.body, {
     path: page.path,
+    contentRel: config.content?.root ?? ".",
     resolvePage,
     resolveAsset,
     resolveOutsidePage,
   });
-  const projections = project(transformed.body, { path: page.path });
+  const projections = project(transformed.body, {
+    path: page.path,
+    url: slugToUrl(page.slug),
+  });
   const anchors = collectAnchors(transformed.body);
   const links = collectLinks(transformed.body);
 

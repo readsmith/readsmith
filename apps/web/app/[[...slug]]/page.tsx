@@ -73,14 +73,21 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
 }
 
 export default async function DocPage({ params }: { params: Promise<Params> }) {
-  const { build, name, branding, url, logo, apiReference } = await getSite();
+  const { build, name, branding, url, logo, apiReference, footer } = await getSite();
   const slug = ((await params).slug ?? []).join("/");
   const page = build.pages.find((p) => p.slug === slug);
   if (!page) notFound();
 
   const { nav, bar } = resolveTabs(build.tabs, build.nav, slug);
-  const links = apiReference ? [{ label: apiReference.label, href: apiReference.path }] : undefined;
-  const site: ShellSite = { name, nav, tabs: bar, poweredBy: branding, url, logo, links };
+  // The API reference joins the tab bar when one exists (the Mintlify pattern:
+  // one product, one row); a tabless site keeps the header cross-link instead.
+  const tabs =
+    bar && apiReference
+      ? [...bar, { label: apiReference.label, url: apiReference.path, active: false }]
+      : bar;
+  const links =
+    !bar && apiReference ? [{ label: apiReference.label, href: apiReference.path }] : undefined;
+  const site: ShellSite = { name, nav, tabs, poweredBy: branding, url, logo, links, footer };
   const html = renderShellBody(site, page);
 
   return (

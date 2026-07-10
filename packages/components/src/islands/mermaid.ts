@@ -55,7 +55,11 @@ export async function initMermaid(root: ParentNode = document): Promise<void> {
   const renderAll = async (): Promise<void> => {
     mermaid.initialize({
       startOnLoad: false,
-      theme: isDark() ? "dark" : "default",
+      // The "base" theme takes every color from us, so diagrams are set in the
+      // page's own tokens (and re-render on toggle) instead of Mermaid's
+      // default palette clashing with the design system.
+      theme: "base",
+      themeVariables: themeVariables(),
       securityLevel: "strict",
     });
     for (const node of nodes) await renderNode(node);
@@ -218,4 +222,44 @@ function isDark(): boolean {
   const theme = document.documentElement.getAttribute("data-theme");
   if (theme) return theme === "dark";
   return matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+/**
+ * Derive Mermaid's palette from the live design tokens. Read at render time so
+ * per-site themes and the light/dark toggle are both honored. Alpha values from
+ * the tokens are fine: SVG fills composite them over the paper behind. Note
+ * surfaces carry the hallmark (marking), never the accent.
+ */
+function themeVariables(): Record<string, string | boolean> {
+  const css = getComputedStyle(document.documentElement);
+  const v = (name: string, fallback: string): string =>
+    css.getPropertyValue(name).trim() || fallback;
+  const ink = v("--rs-ink", "#16181d");
+  const surface = v("--rs-surface-2", "rgba(22, 24, 29, 0.07)");
+  const rule = v("--rs-rule-strong", "rgba(22, 24, 29, 0.17)");
+  return {
+    darkMode: isDark(),
+    background: v("--rs-paper", "#fafaf8"),
+    fontFamily: v("--rs-font-sans", "system-ui, sans-serif"),
+    fontSize: "14px",
+    textColor: ink,
+    titleColor: ink,
+    primaryColor: surface,
+    primaryTextColor: ink,
+    primaryBorderColor: rule,
+    secondaryColor: v("--rs-surface", "rgba(22, 24, 29, 0.04)"),
+    secondaryBorderColor: rule,
+    tertiaryColor: v("--rs-surface", "rgba(22, 24, 29, 0.04)"),
+    tertiaryBorderColor: v("--rs-rule", "rgba(22, 24, 29, 0.1)"),
+    lineColor: v("--rs-ink-faint", "#767c84"),
+    clusterBkg: v("--rs-surface", "rgba(22, 24, 29, 0.04)"),
+    clusterBorder: v("--rs-rule", "rgba(22, 24, 29, 0.1)"),
+    edgeLabelBackground: v("--rs-paper", "#fafaf8"),
+    noteBkgColor: v("--rs-hallmark-wash", "rgba(184, 135, 58, 0.1)"),
+    noteBorderColor: v("--rs-hallmark", "#b8873a"),
+    noteTextColor: ink,
+    actorBkg: surface,
+    actorBorder: rule,
+    actorTextColor: ink,
+  };
 }

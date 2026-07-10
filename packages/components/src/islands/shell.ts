@@ -5,13 +5,20 @@
  * the same runtime serves a bare page and a full shell. All motion is CSS and
  * respects reduced-motion; nothing here blocks reading.
  */
+
+/**
+ * Where the JSON API is mounted. Mirrors `API_BASE_PATH` in `@readsmith/api`.
+ * Not `/api`: that would shadow a docs page called `api.md`, which a
+ * documentation site is unusually likely to have.
+ */
+const API = "/_readsmith/api";
+
 export function initShell(root: ParentNode = document): void {
   // One lazy capabilities probe per hydrate, shared by the palette and console.
   // Lazy (fetched on first open) so it always reads the live rung and never
   // fires on a page nobody searches.
   const getCaps = makeCapabilities();
   initTheme(root);
-  initProgress(root);
   initMobileNav(root);
   initScrollSpy(root);
   initPalette(root, getCaps);
@@ -26,7 +33,7 @@ function makeCapabilities(): GetCapabilities {
   let pending: Promise<Capabilities> | null = null;
   return () => {
     if (!pending) {
-      pending = fetch("/api/ai/capabilities")
+      pending = fetch(`${API}/ai/capabilities`)
         .then((r) =>
           r.ok ? (r.json() as Promise<Partial<Capabilities>>) : ({} as Partial<Capabilities>),
         )
@@ -35,18 +42,6 @@ function makeCapabilities(): GetCapabilities {
     }
     return pending;
   };
-}
-
-function initProgress(root: ParentNode): void {
-  const bar = root.querySelector<HTMLElement>("[data-rs-progress]");
-  if (!bar) return;
-  const update = (): void => {
-    const el = document.documentElement;
-    const max = el.scrollHeight - el.clientHeight;
-    bar.style.setProperty("--rs-p", (max > 0 ? el.scrollTop / max : 0).toFixed(4));
-  };
-  addEventListener("scroll", update, { passive: true });
-  update();
 }
 
 function initTheme(root: ParentNode): void {
@@ -272,7 +267,7 @@ function initPalette(root: ParentNode, getCaps: GetCapabilities): void {
       const controller = new AbortController();
       searchAbort = controller;
       try {
-        const res = await fetch("/api/search", {
+        const res = await fetch(`${API}/search`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ query: q }),
@@ -501,7 +496,7 @@ function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
     paint();
 
     try {
-      const res = await fetch("/api/ask", {
+      const res = await fetch(`${API}/ask`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ query: q }),
@@ -602,7 +597,7 @@ function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
     const fb = target.closest<HTMLElement>("[data-fb]");
     const wrap = fb?.closest<HTMLElement>("[data-ask-fb]");
     if (fb && wrap?.dataset.askFb) {
-      void fetch("/api/ai/feedback", {
+      void fetch(`${API}/ai/feedback`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id: wrap.dataset.askFb, value: Number(fb.dataset.fb) }),

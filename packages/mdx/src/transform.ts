@@ -27,6 +27,24 @@ export interface TransformContext {
    * null to let it be reported as broken. When omitted, unresolved links warn.
    */
   resolveOutsidePage?: (targetPath: string) => string | null;
+  /**
+   * Where the content root sits relative to the repository root ("." or "docs").
+   * Needed because the home page may live above the content root, in which case
+   * its relative links are repository-root relative while every other page's are
+   * content-root relative. Both are canonicalized to the latter.
+   */
+  contentRel?: string;
+}
+
+/**
+ * Express a path resolved from a page's directory in content-root-relative terms.
+ * A no-op for pages inside the content root; for `../README.md` it rewrites
+ * `../docs/cli.md` to `cli.md`, and leaves `../SECURITY.md` escaping (as it should).
+ */
+function toContentRelative(target: string, contentRel: string | undefined): string {
+  if (!contentRel || contentRel === ".") return target;
+  const repoRelative = posix.normalize(posix.join(contentRel, target));
+  return posix.relative(contentRel, repoRelative);
 }
 
 export interface TransformResult {
@@ -85,7 +103,7 @@ export function resolveLinks(body: Root, ctx: TransformContext, diagnostics: Dia
     const anchor = hashIndex === -1 ? "" : url.slice(hashIndex);
     if (pathPart === "") return;
 
-    const joined = posix.normalize(posix.join(dir, pathPart));
+    const joined = toContentRelative(posix.normalize(posix.join(dir, pathPart)), ctx.contentRel);
     const noExt = joined.replace(/\.(md|mdx)$/i, "");
     const slug = resolve(noExt);
 
@@ -124,7 +142,7 @@ export function resolveImages(body: Root, ctx: TransformContext, diagnostics: Di
     const url = node.url;
     if (!isRelativeFileLink(url) || url === "") return;
 
-    const joined = posix.normalize(posix.join(dir, url));
+    const joined = toContentRelative(posix.normalize(posix.join(dir, url)), ctx.contentRel);
     const resolved = resolve(joined);
     if (resolved === null) {
       diagnostics.push({

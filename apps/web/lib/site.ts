@@ -20,8 +20,12 @@ export interface Site {
   description?: string;
   logo?: string;
   favicon?: string;
+  /** Precompiled per-site brand theme CSS (see @readsmith/components themeToCss). */
+  themeCss?: string;
   /** The API-reference config from docs.yaml, when set (for the header cross-link). */
   apiReference?: { spec: string; path: string; label: string };
+  /** Content footer: social links by platform. */
+  footer?: { socials?: Record<string, string> };
   /** Opaque AI config block from docs.yaml (validated at runtime by @readsmith/ai). */
   ai?: unknown;
 }

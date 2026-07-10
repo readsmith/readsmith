@@ -1,11 +1,14 @@
 /*
- * Callouts (note / info / tip / warning / danger / check). A tinted surface with
- * a semantic left rule and an icon. Text stays --rs-ink; only the rule and icon
- * carry the hue, so a callout guides without shouting. Color is never the sole
- * signal: the icon and (optional) title carry meaning too.
+ * Callouts (note / info / tip / warning / danger / check). Each semantic variant
+ * tints its own surface from its hue (bg at 7%, outer border at 24%, the left
+ * rule and icon solid); the default note stays neutral. Text stays --rs-ink, so
+ * a callout guides without shouting, and color is never the sole signal: the
+ * icon and (optional) title carry meaning too. The hue tokens flip per theme,
+ * so one formula serves both modes.
  */
 
 .rs-callout {
+  --rs-callout-hue: var(--rs-ink-faint);
   display: flex;
   gap: var(--rs-space-3);
   margin: var(--rs-space-5) 0;
@@ -14,6 +17,22 @@
   border-left: 3px solid var(--rs-rule-strong);
   border-radius: var(--rs-radius);
   background: var(--rs-surface);
+}
+.rs-callout--info,
+.rs-callout--tip,
+.rs-callout--warning,
+.rs-callout--danger,
+.rs-callout--check {
+  border-color: color-mix(in srgb, var(--rs-callout-hue) 24%, transparent);
+  border-left-color: var(--rs-callout-hue);
+  background: color-mix(in srgb, var(--rs-callout-hue) 7%, transparent);
+}
+.rs-callout--info .rs-callout__icon,
+.rs-callout--tip .rs-callout__icon,
+.rs-callout--warning .rs-callout__icon,
+.rs-callout--danger .rs-callout__icon,
+.rs-callout--check .rs-callout__icon {
+  color: var(--rs-callout-hue);
 }
 
 .rs-callout__icon {
@@ -41,37 +60,17 @@
 }
 
 .rs-callout--info {
-  border-left-color: var(--rs-info);
-  background: var(--rs-accent-wash);
+  --rs-callout-hue: var(--rs-info);
 }
-.rs-callout--info .rs-callout__icon {
-  color: var(--rs-info);
-}
-
 .rs-callout--tip {
-  border-left-color: var(--rs-tip);
+  --rs-callout-hue: var(--rs-tip);
 }
-.rs-callout--tip .rs-callout__icon {
-  color: var(--rs-tip);
-}
-
 .rs-callout--warning {
-  border-left-color: var(--rs-warning);
+  --rs-callout-hue: var(--rs-warning);
 }
-.rs-callout--warning .rs-callout__icon {
-  color: var(--rs-warning);
-}
-
 .rs-callout--danger {
-  border-left-color: var(--rs-danger);
+  --rs-callout-hue: var(--rs-danger);
 }
-.rs-callout--danger .rs-callout__icon {
-  color: var(--rs-danger);
-}
-
 .rs-callout--check {
-  border-left-color: var(--rs-tip);
-}
-.rs-callout--check .rs-callout__icon {
-  color: var(--rs-tip);
+  --rs-callout-hue: var(--rs-tip);
 }

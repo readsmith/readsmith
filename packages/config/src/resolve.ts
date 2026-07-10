@@ -1,14 +1,17 @@
+import { existsSync } from "node:fs";
 import { isAbsolute, join, posix, relative, resolve as resolvePath, sep } from "node:path";
 import type { Diagnostic } from "@readsmith/model";
 import { discoverPages } from "./discover.js";
 import { defaultSiteName, loadConfig } from "./load.js";
 import { buildAutoNav, buildExplicitNav } from "./nav.js";
+import { reservedPathConflicts } from "./reserved.js";
 import {
   ASSET_SKIP_EXT,
   ASSET_SKIP_FILES,
   type AssetMount,
   DEFAULT_EXCLUDE,
   DEFAULT_INCLUDE,
+  type PageRef,
   type ResolvedConfig,
 } from "./schema.js";
 
@@ -103,6 +106,69 @@ function resolveAssets(
   return out;
 }
 
+/**
+ * Promote one file to the site's home page (slug ""). The slug rules already map
+ * an `index` or `readme` file to its directory; this exists so that file may live
+ * above the content root, which is where every repository keeps its README.
+ *
+ * Its relative links and images are repository-root relative rather than
+ * content-root relative. The MDX transform canonicalizes both against the content
+ * root, so `docs/cli.md` in a README resolves to the same page as `cli.md` does
+ * from inside `docs/`.
+ */
+function resolveHome(
+  root: string,
+  contentRoot: string,
+  home: string | undefined,
+  pages: PageRef[],
+  diagnostics: Diagnostic[],
+): PageRef[] {
+  if (!home) return pages;
+
+  if (!/\.(md|mdx)$/i.test(home)) {
+    diagnostics.push({
+      severity: "error",
+      code: "content-home",
+      message: `content.home must be a Markdown file, got "${home}".`,
+      source: "docs.yaml",
+    });
+    return pages;
+  }
+
+  const abs = resolvePath(contentRoot, home);
+  if (!isInside(root, abs)) {
+    diagnostics.push({
+      severity: "error",
+      code: "content-home",
+      message: `content.home "${home}" escapes the repository root and was ignored.`,
+      source: "docs.yaml",
+    });
+    return pages;
+  }
+  if (!existsSync(abs)) {
+    diagnostics.push({
+      severity: "warning",
+      code: "content-home",
+      message: `content.home "${home}" does not exist and was ignored.`,
+      source: "docs.yaml",
+    });
+    return pages;
+  }
+
+  const path = normalizeFrom(home);
+  const existing = pages.find((p) => p.slug === "");
+  if (existing?.path === path) return pages; // already discovered, nothing to do
+  if (existing) {
+    diagnostics.push({
+      severity: "warning",
+      code: "content-home",
+      message: `content.home "${path}" replaces "${existing.path}" as the site root.`,
+      source: "docs.yaml",
+    });
+  }
+  return [{ path, slug: "" }, ...pages.filter((p) => p.slug !== "")];
+}
+
 export async function resolveConfig(root: string): Promise<ResolvedConfig> {
   const diagnostics: Diagnostic[] = [];
 
@@ -116,7 +182,11 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
   // Merged, not replaced: a user's exclude adds to the defaults.
   const exclude = [...DEFAULT_EXCLUDE, ...(input?.content?.exclude ?? [])];
 
-  const pages = await discoverPages(contentRoot, include, exclude);
+  const discovered = await discoverPages(contentRoot, include, exclude);
+  const pages = resolveHome(root, contentRoot, input?.content?.home, discovered, diagnostics);
+  // A page that lands on a path the app serves is unreachable, and in Next the
+  // collision breaks the route it shadows too. Say so at build time.
+  diagnostics.push(...reservedPathConflicts(pages));
   const assets = resolveAssets(root, contentRoot, input?.assets, diagnostics);
 
   let nav: ResolvedConfig["nav"];
@@ -157,17 +227,19 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
       theme: input?.site.theme ?? {},
     },
     security: { csp: input?.security?.csp ?? {} },
-    content: { root: contentRel, include, exclude },
+    content: { root: contentRel, include, exclude, home: input?.content?.home },
     assets,
     links: {
       repo: input?.links?.repo?.replace(/\/+$/, ""),
       branch: input?.links?.branch ?? "main",
     },
+    mcp: { path: input?.mcp?.path },
     variables: input?.variables ?? {},
     pages,
     nav,
     tabs,
     apiReference,
+    footer: input?.footer,
     branding: input?.branding ?? true,
     ai: input?.ai,
     diagnostics,

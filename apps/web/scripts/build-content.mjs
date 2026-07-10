@@ -8,7 +8,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { normalizeDocument, parseAndBundle } from "@readsmith/api-reference";
-import { createRegistry } from "@readsmith/components";
+import { createRegistry, themeToCss } from "@readsmith/components";
 import { contentRootOf, resolveConfig } from "@readsmith/config";
 import { assembleSite } from "@readsmith/mdx";
 import { contentHash, normalizedSpecSchema } from "@readsmith/model";
@@ -77,6 +77,12 @@ async function main() {
     baseUrl: config.site.url,
   });
 
+  // Config diagnostics (reserved paths, asset mounts, home page) matter as much as
+  // build ones: a page that collides with a served route breaks that route too.
+  for (const d of config.diagnostics) {
+    console.warn(`[readsmith] ${d.severity} ${d.code} (${d.source}): ${d.message}`);
+  }
+
   const errors = build.diagnostics.filter((d) => d.severity === "error").length;
   const warnings = build.diagnostics.filter((d) => d.severity === "warning").length;
   if (errors > 0 || warnings > 0) {
@@ -94,7 +100,10 @@ async function main() {
     description: config.site.description,
     logo: config.site.logo,
     favicon: config.site.favicon,
+    // Precompiled per-site brand theme, injected into <head> by the shell.
+    themeCss: themeToCss(config.site.theme),
     apiReference: config.apiReference,
+    footer: config.footer,
     ai: config.ai ?? null,
   };
   const apiReference = await buildApiReference(config, contentRoot);

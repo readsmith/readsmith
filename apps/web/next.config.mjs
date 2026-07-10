@@ -1,6 +1,12 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mergeCspFromEnv, resolveConfig, securityHeaders } from "@readsmith/config";
+import {
+  MCP_CANONICAL_PATH,
+  mcpAlias,
+  mergeCspFromEnv,
+  resolveConfig,
+  securityHeaders,
+} from "@readsmith/config";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CONTENT_DIR = process.env.READSMITH_CONTENT ?? join(here, "content");
@@ -21,8 +27,32 @@ async function cspExtensions() {
   }
 }
 
+/**
+ * The MCP server lives at `/_readsmith/mcp`, and is aliased to `/mcp` (the path
+ * clients expect) whenever no docs page claims that URL. A repository with a
+ * `docs/mcp.md` keeps its page; the endpoint stays reachable at its canonical
+ * path, and the build warns so nobody has to discover that by curl.
+ */
+async function mcpRewrites() {
+  try {
+    const config = await resolveConfig(CONTENT_DIR);
+    const alias = mcpAlias(config.pages, config.mcp.path);
+    if (!alias) {
+      console.warn(`[readsmith] a docs page claims /mcp; MCP serves ${MCP_CANONICAL_PATH}`);
+      return [];
+    }
+    return alias === MCP_CANONICAL_PATH ? [] : [{ source: alias, destination: MCP_CANONICAL_PATH }];
+  } catch {
+    return [{ source: "/mcp", destination: MCP_CANONICAL_PATH }];
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async rewrites() {
+    // `beforeFiles` so the alias resolves ahead of the static docs pages.
+    return { beforeFiles: await mcpRewrites(), afterFiles: [], fallback: [] };
+  },
   async headers() {
     const headers = securityHeaders({
       csp: await cspExtensions(),

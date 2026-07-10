@@ -1,7 +1,7 @@
 import type { Breadcrumb, FinalNavNode, NavLink, TocNode } from "@readsmith/mdx";
 import { renderNav } from "./nav.js";
 import { renderToc } from "./toc.js";
-import { HALLMARK_SVG, ICONS, esc } from "./util.js";
+import { HALLMARK_SVG, ICONS, esc, socialIcon } from "./util.js";
 
 export interface ShellSite {
   name: string;
@@ -19,6 +19,8 @@ export interface ShellSite {
   links?: { label: string; href: string }[];
   /** Show the "Powered by Readsmith" badge. Defaults to true; false white-labels. */
   poweredBy?: boolean;
+  /** Content footer: social links by platform (Mintlify-compatible `footer.socials`). */
+  footer?: { socials?: Record<string, string> };
 }
 
 export interface ShellTab {
@@ -62,19 +64,17 @@ const THEME_INIT =
  */
 export function renderShellBody(site: ShellSite, page: ShellPage): string {
   return `<a class="rs-skip" href="#rs-content">Skip to content</a>
-<div class="rs-progress" data-rs-progress aria-hidden="true"></div>
 ${header(site)}
 ${tabbar(site)}
 <div class="rs-scrim" data-rs-scrim hidden></div>
 <div class="rs-shell">
-  <div class="rs-nav-col" data-rs-navcol>${renderNav(site.nav, page.slug)}${
-    site.poweredBy === false ? "" : poweredBy()
-  }</div>
+  <div class="rs-nav-col" data-rs-navcol>${renderNav(site.nav, page.slug)}</div>
   <main class="rs-main" id="rs-content" tabindex="-1">
     ${topbar(site, page)}
     <article class="rs-prose">${page.html}</article>
     ${pager(page)}
     ${pagefoot()}
+    ${footer(site)}
   </main>
   ${renderToc(page.toc)}
 </div>
@@ -98,6 +98,7 @@ export function askConsole(site: ShellSite): string {
       <button class="rs-ask__tool" data-rs-ask-close type="button" aria-label="Close" title="Close">${ICONS.close}</button>
     </div>
   </header>
+  <p class="rs-ask__disclaimer">Answers are generated from these docs and may contain mistakes.</p>
   <div class="rs-ask__scroll" data-rs-ask-scroll></div>
   <form class="rs-ask__composer" data-rs-ask-form>
     <textarea class="rs-ask__input" data-rs-ask-input rows="1" placeholder="Ask about these docs&hellip;" aria-label="Ask about ${esc(
@@ -151,7 +152,7 @@ export function header(site: ShellSite): string {
 </header>`;
 }
 
-function tabbar(site: ShellSite): string {
+export function tabbar(site: ShellSite): string {
   if (!site.tabs || site.tabs.length === 0) return "";
   const tabs = site.tabs
     .map(
@@ -201,17 +202,23 @@ function breadcrumbs(items: Breadcrumb[]): string {
   )}</nav>`;
 }
 
+const CHEV_LEFT =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m14 6-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHEV_RIGHT =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m10 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+/* Prev/next as quiet chevroned text links; direction lives in the aria-label. */
 function pager(page: ShellPage): string {
   if (!page.prev && !page.next) return "";
   const prev = page.prev
-    ? `<a class="rs-pager__link rs-pager__prev" href="${esc(page.prev.url)}"><span class="rs-pager__dir">Previous</span><span class="rs-pager__title">${esc(
+    ? `<a class="rs-pager__link rs-pager__prev" href="${esc(page.prev.url)}" aria-label="Previous: ${esc(
         page.prev.title,
-      )}</span></a>`
+      )}">${CHEV_LEFT}<span class="rs-pager__title">${esc(page.prev.title)}</span></a>`
     : "<span></span>";
   const next = page.next
-    ? `<a class="rs-pager__link rs-pager__next" href="${esc(page.next.url)}"><span class="rs-pager__dir">Next</span><span class="rs-pager__title">${esc(
+    ? `<a class="rs-pager__link rs-pager__next" href="${esc(page.next.url)}" aria-label="Next: ${esc(
         page.next.title,
-      )}</span></a>`
+      )}"><span class="rs-pager__title">${esc(page.next.title)}</span>${CHEV_RIGHT}</a>`
     : "<span></span>";
   return `<nav class="rs-pager" aria-label="Pagination">${prev}${next}</nav>`;
 }
@@ -224,8 +231,27 @@ function pagefoot(): string {
 </footer>`;
 }
 
-function poweredBy(): string {
-  return `<a class="rs-poweredby" href="${READSMITH_URL}" target="_blank" rel="noopener">${HALLMARK_SVG}<span>Powered by <strong>Readsmith</strong></span></a>`;
+/**
+ * The content footer: socials left, powered-by right. Renders only when it has
+ * content (socials configured, or branding on). The powered-by badge lives here
+ * (one placement), not in the nav sidebar.
+ */
+function footer(site: ShellSite): string {
+  const socials = Object.entries(site.footer?.socials ?? {})
+    .map(
+      ([platform, url]) =>
+        `<a class="rs-footer__social" href="${esc(url)}" aria-label="${esc(platform)}" rel="noopener" target="_blank">${socialIcon(platform)}</a>`,
+    )
+    .join("");
+  const powered =
+    site.poweredBy === false
+      ? ""
+      : `<a class="rs-footer__powered" href="${READSMITH_URL}" target="_blank" rel="noopener">${HALLMARK_SVG}<span>Powered by <strong>Readsmith</strong></span></a>`;
+  if (!socials && !powered) return "";
+  return `<footer class="rs-footer">
+  <div class="rs-footer__socials">${socials}</div>
+  ${powered}
+</footer>`;
 }
 
 export function palette(site: ShellSite): string {

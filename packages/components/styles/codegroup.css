@@ -34,15 +34,19 @@
 }
 .rs-codegroup__tab[aria-selected="true"] {
   color: var(--rs-ink);
-  border-bottom-color: var(--rs-accent);
+  border-bottom-color: var(--rs-ink);
 }
 
-/* the switcher owns the frame, so the inner code blocks sit flush and drop
- * their own title bar (the filename is the tab) */
+/* The switcher owns the frame; each code block floats as its own panel inside
+ * a 4px gutter (nested radii: 10 outer = 6 inner + 4 gutter) and drops its
+ * title bar (the filename is the tab). */
+.rs-codegroup__panels {
+  padding: 4px;
+}
 .rs-codegroup__panels .rs-code {
   margin: 0;
-  border: none;
-  border-radius: 0;
+  border: 1px solid var(--rs-rule);
+  border-radius: var(--rs-radius-sm);
 }
 .rs-codegroup__panels .rs-code__bar {
   display: none;

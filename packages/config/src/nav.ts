@@ -33,9 +33,9 @@ function emptyDir(): TreeDir {
 export function buildAutoNav(pages: PageRef[]): NavNode[] {
   const root = emptyDir();
   for (const page of pages) {
-    const segments = page.path.split("/");
-    const fileName = segments.pop();
-    if (fileName === undefined) continue;
+    // The home page may live above the content root (`../README.md`). It belongs
+    // at the top of the tree, not inside a group named "..".
+    const segments = page.slug === "" ? [] : page.path.split("/").slice(0, -1);
     let dir = root;
     for (const seg of segments) {
       let next = dir.dirs.get(seg);

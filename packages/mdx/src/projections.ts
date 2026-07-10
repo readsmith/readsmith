@@ -19,7 +19,13 @@ export interface TocNode {
 
 export interface Chunk {
   id: string;
+  /** The source file this chunk came from, for incremental re-indexing. */
   page_id: string;
+  /**
+   * The page's URL path, for example "/guide/setup". Search deep-links are built
+   * as `baseUrl + path + #anchor`, so this must be a URL and not a source path:
+   * a source path yields links like `example.com../README.md#x`.
+   */
   path: string;
   header_path: string[];
   anchor: string;
@@ -27,7 +33,10 @@ export interface Chunk {
 }
 
 export interface ProjectContext {
+  /** Source file path, used for chunk identity and incremental re-indexing. */
   path: string;
+  /** The page's URL path. Defaults to `path` only to keep older callers working. */
+  url?: string;
 }
 
 export interface Projections {
@@ -110,12 +119,18 @@ export function buildChunks(body: Root, ctx: ProjectContext): Chunk[] {
     const nodes = section.heading ? [section.heading, ...section.nodes] : section.nodes;
 
     for (const piece of splitBySize(nodes)) {
-      const text = mdastToString({ type: "root", children: piece }).trim();
+      // Join block by block. Flattening the whole piece at once fuses a heading
+      // into the paragraph beneath it ("Quick startcrucible is a Linux daemon"),
+      // which both corrupts the embedding and reads badly to a model.
+      const text = piece
+        .map((node) => mdastToString(node).trim())
+        .filter(Boolean)
+        .join("\n\n");
       if (!text) continue;
       chunks.push({
         id: contentHash({ path: ctx.path, ord }),
         page_id: ctx.path,
-        path: ctx.path,
+        path: ctx.url ?? ctx.path,
         header_path: headerPath,
         anchor,
         text,

@@ -54,6 +54,48 @@ export const linksSchema = z.object({
 });
 
 /**
+ * Per-site brand theme. Each token is a color that overrides the corresponding
+ * `--rs-*` design token, either as a single value (both light and dark) or a
+ * `{ light, dark }` pair — because a good accent is one hue at two values, not
+ * one hex: bright on the dark ground, deeper on the light one. The serving shell
+ * turns this into a small `<style>` layered over the base tokens, so a site
+ * reskins itself from `docs.json` without forking the stylesheet. Values are
+ * sanitized before they reach CSS. Unset tokens fall through to the defaults.
+ */
+const themeColor = z
+  .union([
+    z.string().trim().min(1).max(64),
+    z.object({
+      light: z.string().trim().min(1).max(64).optional(),
+      dark: z.string().trim().min(1).max(64).optional(),
+    }),
+  ])
+  .optional();
+
+const themeFont = z.string().trim().min(1).max(200).optional();
+
+export const themeSchema = z.object({
+  accent: themeColor,
+  accentHover: themeColor,
+  accentWash: themeColor,
+  paper: themeColor,
+  surface: themeColor,
+  surface2: themeColor,
+  ink: themeColor,
+  inkMuted: themeColor,
+  inkFaint: themeColor,
+  rule: themeColor,
+  ruleStrong: themeColor,
+  /* Font stacks (theme-agnostic). Point these at faces the shell already loads. */
+  fontSans: themeFont,
+  fontHeading: themeFont,
+  fontMono: themeFont,
+  fontWordmark: themeFont,
+});
+
+export type SiteTheme = z.infer<typeof themeSchema>;
+
+/**
  * The user-authored site config (our `docs.yaml` shape). Everything except
  * `site.name` is optional. When `navigation` is omitted the site auto-discovers
  * all content files and builds navigation from the file tree.
@@ -74,7 +116,7 @@ export const configInputSchema = z.object({
     author: z.object({ name: z.string().min(1), url: z.string().optional() }).optional(),
     /** Emitted as the JSON-LD `publisher`, when set. */
     publisher: z.object({ name: z.string().min(1), url: z.string().optional() }).optional(),
-    theme: z.record(z.string(), z.unknown()).optional(),
+    theme: themeSchema.optional(),
   }),
   /** Content-Security-Policy sources this site needs beyond `'self'`. */
   security: z
@@ -96,12 +138,20 @@ export const configInputSchema = z.object({
       include: z.array(z.string()).optional(),
       /** Merged with the built-in defaults, never replacing them. */
       exclude: z.array(z.string()).optional(),
+      /**
+       * The page served at `/`. May escape the content root (`../README.md`), which
+       * is how a repository's README becomes its documentation home without moving
+       * or duplicating the file. Never escapes the repository root.
+       */
+      home: z.string().optional(),
     })
     .optional(),
   /** Asset directories to publish, which may live outside the content root. */
   assets: z.array(assetMountSchema).optional(),
   /** Where links that leave the docs should point. */
   links: linksSchema.optional(),
+  /** The MCP endpoint alias. Defaults to "/mcp" when no docs page claims it. */
+  mcp: z.object({ path: z.string().min(1).optional() }).optional(),
   navigation: z.array(navItemInputSchema).optional(),
   /** Top-level navigation tabs. When set, the sidebar is scoped to the active tab. */
   tabs: z.array(navTabInputSchema).optional(),
@@ -117,6 +167,9 @@ export const configInputSchema = z.object({
     })
     .optional(),
   variables: z.record(z.string(), z.unknown()).optional(),
+  /** Content footer. `socials` maps platform to URL (Mintlify-compatible shape),
+   * e.g. { github: "https://github.com/acme", x: "https://x.com/acme" }. */
+  footer: z.object({ socials: z.record(z.string(), z.string()).optional() }).optional(),
   /** Show the "Powered by Readsmith" badge. Defaults to true; set false to white-label. */
   branding: z.boolean().optional(),
   /**
@@ -158,15 +211,17 @@ export interface ResolvedConfig {
     favicon?: string;
     author?: { name: string; url?: string };
     publisher?: { name: string; url?: string };
-    theme: Record<string, unknown>;
+    theme: SiteTheme;
   };
   /** Resolved CSP extensions (always present, possibly empty). */
   security: { csp: CspExtensions };
-  content: { root: string; include: string[]; exclude: string[] };
+  content: { root: string; include: string[]; exclude: string[]; home?: string };
   /** Validated asset mounts. `from` is content-root-relative POSIX, normalized. */
   assets: AssetMount[];
   /** Resolved link policy. `branch` defaults to "main" once `repo` is set. */
   links: { repo?: string; branch: string };
+  /** MCP alias override from `docs.yaml`. */
+  mcp: { path?: string };
   variables: Record<string, unknown>;
   pages: PageRef[];
   nav: NavNode[];
@@ -174,6 +229,8 @@ export interface ResolvedConfig {
   tabs?: NavTab[];
   /** A read-only API reference from an OpenAPI spec, when configured. */
   apiReference?: { spec: string; path: string; label: string };
+  /** Content footer: social links by platform (Mintlify-compatible shape). */
+  footer?: { socials?: Record<string, string> };
   /** Whether to show the "Powered by Readsmith" badge (white-label when false). */
   branding: boolean;
   /** Opaque AI config block, validated downstream by `@readsmith/ai`. */

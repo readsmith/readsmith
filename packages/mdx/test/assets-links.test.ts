@@ -151,6 +151,63 @@ describe("resolveLinks: links that leave the docs", () => {
   });
 });
 
+/**
+ * A home page promoted from above the content root (`content.home: ../README.md`)
+ * writes its links relative to the repository root, not to `docs/`. Both must land
+ * on the same pages and the same assets.
+ */
+describe("a home page above the content root", () => {
+  const REPO = "https://github.com/acme/widget";
+  const home = (source: string) => {
+    const parsed = parse({ path: "../README.md", raw: source });
+    const result = transform(parsed.body, {
+      path: "../README.md",
+      contentRel: "docs",
+      resolvePage: (t) => (t === "cli" ? "cli" : null),
+      resolveAsset: makeResolveAsset(MOUNTS),
+      resolveOutsidePage: makeResolveOutsidePage({ repo: REPO, branch: "main" }, "docs"),
+    });
+    const urls: string[] = [];
+    const walk = (n: { type: string; url?: string; children?: unknown[] }): void => {
+      if (n.url) urls.push(n.url);
+      for (const c of (n.children ?? []) as (typeof n)[]) walk(c);
+    };
+    walk(result.body as unknown as { type: string; children?: unknown[] });
+    return { urls, diagnostics: result.diagnostics };
+  };
+
+  it("resolves a link down into the content root", () => {
+    const { urls, diagnostics } = home("[cli](docs/cli.md)");
+    expect(urls).toEqual(["/cli"]); // the same page a sibling reaches via cli.md
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("resolves an image that sits beside the content root", () => {
+    const { urls, diagnostics } = home("![shot](media/screenshot.gif)");
+    expect(urls).toEqual(["/media/screenshot.gif"]);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("sends a repository file that is not a docs page to the forge", () => {
+    const { urls, diagnostics } = home("[sec](SECURITY.md)");
+    expect(urls).toEqual([`${REPO}/blob/main/SECURITY.md`]);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("canonicalization is a no-op for a page inside the content root", () => {
+    const parsed = parse({ path: "guide/setup.md", raw: "[usage](usage.md)" });
+    const result = transform(parsed.body, {
+      path: "guide/setup.md",
+      contentRel: "docs",
+      resolvePage: (t) => (t === "guide/usage" ? "guide/usage" : null),
+      resolveAsset: makeResolveAsset([]),
+    });
+    const para = result.body.children[0] as { children: { url?: string }[] };
+    expect(para.children[0]?.url).toBe("/guide/usage");
+    expect(result.diagnostics).toEqual([]);
+  });
+});
+
 describe("makeResolveAsset", () => {
   it("prefers a declared mount over the co-located rule", () => {
     const resolve = makeResolveAsset([{ from: "images", to: "static/img" }]);

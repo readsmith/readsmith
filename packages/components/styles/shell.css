@@ -20,27 +20,13 @@
   left: 12px;
   z-index: 100;
   padding: 8px 14px;
-  background: var(--rs-accent);
-  color: #fff;
+  background: var(--rs-ink);
+  color: var(--rs-paper);
   border-radius: var(--rs-radius-sm);
   transition: top var(--rs-dur) var(--rs-ease);
 }
 .rs-skip:focus {
   top: 12px;
-}
-
-/* reading-progress gauge: sits along the bottom edge of the sticky header, so it
- * reads as the header underline filling with teal as you scroll. */
-.rs-progress {
-  position: fixed;
-  top: calc(var(--rs-chrome-height) - 2px);
-  left: 0;
-  height: 2px;
-  width: 100%;
-  z-index: 45;
-  background: linear-gradient(90deg, var(--rs-accent), var(--rs-hallmark));
-  transform: scaleX(var(--rs-p, 0));
-  transform-origin: 0 50%;
 }
 
 /* header */
@@ -70,7 +56,7 @@
   color: var(--rs-ink);
 }
 .rs-wordmark {
-  font-family: var(--rs-font-serif);
+  font-family: var(--rs-font-wordmark);
   font-weight: 500;
   font-size: 1.15rem;
 }
@@ -127,7 +113,9 @@
   color: var(--rs-ink);
 }
 .rs-tab.is-active {
-  color: var(--rs-accent);
+  color: var(--rs-ink);
+  /* faux-bold: activation never reflows the label */
+  text-shadow: -0.2px 0 currentColor, 0.2px 0 currentColor;
 }
 .rs-tab.is-active::after {
   content: "";
@@ -136,7 +124,7 @@
   right: 12px;
   bottom: -1px;
   height: 2px;
-  background: var(--rs-accent);
+  background: var(--rs-ink);
   border-radius: 2px 2px 0 0;
 }
 /* scoped so it beats `.rs-icon-btn { display: grid }` regardless of source order */
@@ -151,14 +139,15 @@
   place-items: center;
   cursor: pointer;
   color: var(--rs-ink-muted);
-  background: var(--rs-surface);
-  border: 1px solid var(--rs-rule-strong);
+  background: none;
+  border: 1px solid var(--rs-rule);
   border-radius: 8px;
   text-decoration: none;
 }
 .rs-icon-btn:hover {
   color: var(--rs-ink);
-  border-color: var(--rs-ink-faint);
+  background: var(--rs-surface);
+  border-color: var(--rs-rule-strong);
 }
 
 .rs-search {
@@ -171,43 +160,42 @@
   font-family: var(--rs-font-sans);
   font-size: 0.85rem;
   background: var(--rs-surface);
-  border: 1px solid var(--rs-rule-strong);
+  border: 1px solid var(--rs-rule);
   border-radius: 8px;
   cursor: pointer;
   min-width: 200px;
+}
+.rs-search:hover {
+  border-color: var(--rs-rule-strong);
 }
 .rs-search span {
   margin-right: auto;
 }
 
+/* The Ask-AI entry: a quiet hairline pill; the gold sparkle is the only note. */
+.rs-headerlink--ask {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  color: var(--rs-ink);
+  font-size: 0.85rem;
+  background: none;
+  border: 1px solid var(--rs-rule);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.rs-headerlink--ask:hover {
+  background: var(--rs-surface);
+  border-color: var(--rs-rule-strong);
+}
+
 /* Reading layout: nav pinned left, TOC pinned right, content fills the middle.
- * The reading measure widens at breakpoints (see below) so the content column
- * grows with the screen instead of staying narrow. */
+ * The measure is fixed (tokens.css); big screens gain margins, not line length. */
 .rs-shell {
   display: grid;
   grid-template-columns: 288px minmax(0, 1fr) 256px;
-}
-
-/* Widen the reading measure as the viewport grows, so big screens use more width. */
-@media (min-width: 1280px) {
-  :root {
-    --rs-measure: 78ch;
-  }
-}
-@media (min-width: 1536px) {
-  :root {
-    --rs-measure: 90ch;
-  }
-}
-@media (min-width: 1792px) {
-  :root {
-    --rs-measure: 102ch;
-  }
-}
-@media (min-width: 2200px) {
-  :root {
-    --rs-measure: 118ch;
-  }
 }
 
 .rs-nav-col {
@@ -226,35 +214,6 @@
   padding: 22px 16px 24px;
 }
 
-/* "Powered by Readsmith" badge, pinned to the bottom of the nav sidebar */
-.rs-poweredby {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 18px;
-  border-top: 1px solid var(--rs-rule);
-  color: var(--rs-ink-muted);
-  font-size: 0.8rem;
-  text-decoration: none;
-  transition: color var(--rs-dur) var(--rs-ease);
-}
-.rs-poweredby:hover {
-  color: var(--rs-ink);
-}
-.rs-poweredby .rs-mark {
-  width: 16px;
-  height: 16px;
-  color: var(--rs-hallmark);
-  flex: 0 0 16px;
-}
-.rs-poweredby strong {
-  color: var(--rs-ink);
-  font-weight: 600;
-}
-.rs-poweredby:hover strong {
-  color: var(--rs-accent);
-}
 .rs-nav__group {
   margin-bottom: 6px;
 }
@@ -305,10 +264,10 @@
   background: var(--rs-surface);
 }
 .rs-nav__link.is-active {
-  color: var(--rs-accent);
-  background: var(--rs-accent-wash);
-  font-weight: 500;
-  box-shadow: inset 2px 0 var(--rs-accent);
+  color: var(--rs-ink);
+  background: var(--rs-active-wash);
+  /* faux-bold: activation never reflows the label */
+  text-shadow: -0.2px 0 currentColor, 0.2px 0 currentColor;
 }
 
 /* content column */
@@ -413,42 +372,38 @@
   background: var(--rs-rule);
 }
 
-/* pager + feedback */
+/* pager + feedback: prev/next are quiet chevroned text links, not cards */
 .rs-pager {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 14px;
   width: 100%;
   max-width: var(--rs-measure);
   margin: 56px 0 0;
 }
 .rs-pager__link {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 16px 18px;
-  border: 1px solid var(--rs-rule);
-  border-radius: var(--rs-radius);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 0;
+  color: var(--rs-ink-muted);
   text-decoration: none;
-  color: inherit;
-  transition: border-color var(--rs-dur) var(--rs-ease);
+  transition: color var(--rs-dur) var(--rs-ease);
 }
 .rs-pager__link:hover {
-  border-color: var(--rs-accent);
+  color: var(--rs-ink);
 }
-.rs-pager__next {
-  text-align: right;
-}
-.rs-pager__dir {
-  font-family: var(--rs-font-mono);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+.rs-pager__link svg {
+  flex: 0 0 auto;
   color: var(--rs-ink-faint);
+}
+.rs-pager__link:hover svg {
+  color: var(--rs-ink);
 }
 .rs-pager__title {
   font-weight: 600;
-  color: var(--rs-accent);
+  font-size: 0.95rem;
 }
 .rs-pagefoot {
   display: flex;
@@ -468,19 +423,76 @@
   font-family: var(--rs-font-sans);
   font-size: 0.85rem;
   color: var(--rs-ink-muted);
-  background: var(--rs-surface);
-  border: 1px solid var(--rs-rule-strong);
+  background: none;
+  border: 1px solid var(--rs-rule);
   border-radius: 8px;
   cursor: pointer;
 }
 .rs-fbtn:hover {
   color: var(--rs-ink);
-  border-color: var(--rs-accent);
+  background: var(--rs-surface);
+  border-color: var(--rs-rule-strong);
 }
 .rs-fbtn.is-selected {
-  color: var(--rs-accent);
-  border-color: var(--rs-accent);
-  background: var(--rs-accent-wash);
+  color: var(--rs-ink);
+  border-color: var(--rs-rule-strong);
+  background: var(--rs-active-wash);
+  text-shadow: -0.2px 0 currentColor, 0.2px 0 currentColor;
+}
+
+/* content footer: socials left, powered-by right */
+.rs-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: var(--rs-measure);
+  margin: 34px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--rs-rule);
+}
+.rs-footer__socials {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.rs-footer__social {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: var(--rs-ink-faint);
+  border-radius: 7px;
+}
+.rs-footer__social:hover {
+  color: var(--rs-ink);
+  background: var(--rs-surface);
+}
+.rs-footer__powered {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  color: var(--rs-ink-faint);
+  font-size: 0.8rem;
+  text-decoration: none;
+  transition: color var(--rs-dur) var(--rs-ease);
+}
+.rs-footer__powered:hover {
+  color: var(--rs-ink);
+}
+.rs-footer__powered .rs-mark {
+  width: 15px;
+  height: 15px;
+  color: var(--rs-hallmark);
+  flex: 0 0 15px;
+}
+.rs-footer__powered strong {
+  color: var(--rs-ink-muted);
+  font-weight: 600;
+}
+.rs-footer__powered:hover strong {
+  color: var(--rs-ink);
 }
 
 /* on-this-page TOC */
@@ -494,11 +506,10 @@
 }
 .rs-toc__label {
   display: block;
-  margin-bottom: 14px;
-  font-family: var(--rs-font-mono);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.11em;
+  margin-bottom: 12px;
+  font-family: var(--rs-font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--rs-ink-faint);
 }
 .rs-toc__list {
@@ -510,7 +521,7 @@
   left: -1px;
   width: 2px;
   height: 22px;
-  background: var(--rs-accent);
+  background: var(--rs-ink);
   border-radius: 2px;
   opacity: 0;
   transform: translateY(var(--rs-ty, 0));
@@ -532,7 +543,8 @@
   color: var(--rs-ink);
 }
 .rs-toc__link.is-active {
-  color: var(--rs-accent);
+  color: var(--rs-ink);
+  text-shadow: -0.2px 0 currentColor, 0.2px 0 currentColor;
 }
 
 /* command palette */
@@ -554,6 +566,7 @@
   padding-top: 12vh;
   background: color-mix(in srgb, var(--rs-ink) 34%, transparent);
   backdrop-filter: blur(3px);
+  animation: rs-palette-fade 150ms var(--rs-ease);
 }
 .rs-palette[hidden] {
   display: none;
@@ -566,6 +579,18 @@
   border-radius: var(--rs-radius-lg);
   box-shadow: var(--rs-shadow-pop);
   overflow: hidden;
+  animation: rs-palette-in 200ms var(--rs-ease);
+}
+@keyframes rs-palette-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rs-palette-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-6px);
+  }
 }
 .rs-palette__input {
   display: flex;
@@ -574,6 +599,10 @@
   padding: 14px 16px;
   border-bottom: 1px solid var(--rs-rule);
   color: var(--rs-ink-faint);
+}
+/* Text-input focus is ink (white in dark, black in light), never the accent. */
+.rs-palette__input:focus-within {
+  border-bottom-color: var(--rs-ink);
 }
 .rs-palette__input input {
   flex: 1;
@@ -591,10 +620,9 @@
 }
 .rs-palette__group {
   padding: 8px 10px 4px;
-  font-family: var(--rs-font-mono);
-  font-size: 0.64rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  font-family: var(--rs-font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
   color: var(--rs-ink-faint);
 }
 .rs-palette__row {
@@ -614,7 +642,7 @@
 }
 .rs-palette__row:hover,
 .rs-palette__row.is-cursor {
-  background: var(--rs-accent-wash);
+  background: var(--rs-active-wash);
 }
 /* API-reference results: a coloured, bold method in its own column (matches the
  * sidebar), so the label reads cleanly beside it. */
@@ -640,8 +668,8 @@
   gap: 16px;
   padding: 9px 14px;
   border-top: 1px solid var(--rs-rule);
-  font-family: var(--rs-font-mono);
-  font-size: 0.68rem;
+  font-family: var(--rs-font-sans);
+  font-size: 0.72rem;
   color: var(--rs-ink-faint);
 }
 .rs-palette__foot .rs-kbd {
@@ -753,6 +781,10 @@
   .rs-pager__link {
     transition: none;
   }
+  .rs-palette,
+  .rs-palette__box {
+    animation: none;
+  }
 }
 
 /* ── Ask-AI console (Slice 7c) ─────────────────────────────────────────────
@@ -765,15 +797,13 @@
 
 .rs-headerlink--ask svg {
   color: var(--rs-hallmark);
-  vertical-align: -2px;
-  margin-right: 4px;
 }
 
 /* Push the reading layout left; collapse the TOC track into the console. */
 body.is-asking .rs-header,
 body.is-asking .rs-tabbar,
-body.is-asking .rs-progress,
-body.is-asking .rs-shell {
+body.is-asking .rs-shell,
+body.is-asking .rs-apiref {
   margin-right: var(--rs-ask-width);
   transition: margin-right 0.18s ease;
 }
@@ -799,6 +829,43 @@ body.is-asking-wide {
   z-index: 60;
   font-family: var(--rs-font-sans);
 }
+
+/* The Ask panel follows the page theme (unlike the API console, which stays a
+ * dark instrument): in light mode its console tokens remap to the page's light
+ * surfaces, so every descendant re-skins through the same variables. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .rs-ask {
+    --rs-con-bg: var(--rs-paper);
+    --rs-con-panel: #ffffff;
+    --rs-con-panel2: rgba(22, 24, 29, 0.05);
+    --rs-con-rule: rgba(22, 24, 29, 0.12);
+    --rs-con-ink: var(--rs-ink);
+    --rs-con-muted: var(--rs-ink-muted);
+    --rs-con-faint: var(--rs-ink-faint);
+    --rs-con-accent: var(--rs-accent);
+    --rs-con-accent-contrast: #ffffff;
+    --rs-con-gold: var(--rs-hallmark);
+  }
+}
+:root[data-theme="light"] .rs-ask {
+  --rs-con-bg: var(--rs-paper);
+  --rs-con-panel: #ffffff;
+  --rs-con-panel2: rgba(22, 24, 29, 0.05);
+  --rs-con-rule: rgba(22, 24, 29, 0.12);
+  --rs-con-ink: var(--rs-ink);
+  --rs-con-muted: var(--rs-ink-muted);
+  --rs-con-faint: var(--rs-ink-faint);
+  --rs-con-accent: var(--rs-accent);
+  --rs-con-accent-contrast: #ffffff;
+  --rs-con-gold: var(--rs-hallmark);
+}
+
+/* An author `display` beats the user-agent `[hidden]` rule, so a panel that sets
+   `display` must restore it explicitly. Without this the console is visible from
+   page load, the close button appears dead, and the layout never gets pushed. */
+.rs-ask[hidden] {
+  display: none;
+}
 .rs-ask__resize {
   position: absolute;
   left: -3px;
@@ -809,7 +876,7 @@ body.is-asking-wide {
   z-index: 1;
 }
 .rs-ask__resize:hover {
-  background: rgba(95, 195, 185, 0.35);
+  background: color-mix(in srgb, var(--rs-con-accent) 35%, transparent);
 }
 
 .rs-ask__head {
@@ -855,6 +922,16 @@ body.is-asking-wide {
   color: var(--rs-con-ink);
 }
 
+/* The one honest line, always visible (not only in the empty state). */
+.rs-ask__disclaimer {
+  margin: 0;
+  padding: 9px 16px 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--rs-con-faint);
+}
+
 .rs-ask__scroll {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -874,8 +951,8 @@ body.is-asking-wide {
   padding: 14px;
   border-radius: 50%;
   color: var(--rs-con-gold);
-  background: rgba(216, 162, 74, 0.1);
-  border: 1px solid rgba(216, 162, 74, 0.25);
+  background: color-mix(in srgb, var(--rs-con-gold) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--rs-con-gold) 25%, transparent);
 }
 .rs-ask__mark svg {
   width: 22px;
@@ -911,7 +988,7 @@ body.is-asking-wide {
   cursor: pointer;
 }
 .rs-ask__chip:hover {
-  border-color: var(--rs-con-teal);
+  border-color: var(--rs-con-accent);
   background: var(--rs-con-panel2);
 }
 
@@ -959,7 +1036,7 @@ body.is-asking-wide {
   background: var(--rs-con-panel);
   padding: 1px 5px;
   border-radius: 4px;
-  color: var(--rs-con-teal);
+  color: var(--rs-con-accent);
 }
 .rs-ask__pre {
   margin: 0.6em 0;
@@ -975,7 +1052,7 @@ body.is-asking-wide {
   color: var(--rs-con-ink);
 }
 .rs-ask__a a {
-  color: var(--rs-con-teal);
+  color: var(--rs-con-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -993,7 +1070,7 @@ body.is-asking-wide {
   height: 1.05em;
   margin-left: 1px;
   vertical-align: text-bottom;
-  background: var(--rs-con-teal);
+  background: var(--rs-con-accent);
   animation: rs-ask-blink 1s steps(2) infinite;
 }
 @keyframes rs-ask-blink {
@@ -1088,35 +1165,42 @@ body.is-asking-wide {
   font-size: 0.92rem;
   line-height: 1.45;
 }
+/* Focus on a text input is ink, not accent (the console is always dark, so
+ * ink here is always the light stroke). */
 .rs-ask__input:focus {
   outline: none;
-  border-color: var(--rs-con-teal);
+  border-color: var(--rs-con-ink);
 }
 .rs-ask__input::placeholder {
   color: var(--rs-con-faint);
 }
+/* Quiet at rest, alive on intent: fills with the console accent on hover/focus. */
 .rs-ask__send {
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  border-radius: 10px;
-  background: var(--rs-con-teal);
-  color: #08110f;
+  border: 1px solid var(--rs-con-rule);
+  border-radius: 50%;
+  background: var(--rs-con-panel2);
+  color: var(--rs-con-muted);
   cursor: pointer;
+  transition: background var(--rs-dur-fast) var(--rs-ease), color var(--rs-dur-fast) var(--rs-ease);
 }
-.rs-ask__send:hover {
-  filter: brightness(1.08);
+.rs-ask__send:hover,
+.rs-ask__send:focus-visible {
+  background: var(--rs-con-accent);
+  border-color: var(--rs-con-accent);
+  color: var(--rs-con-accent-contrast);
 }
 
 @media (max-width: 900px) {
   body.is-asking .rs-header,
   body.is-asking .rs-tabbar,
-  body.is-asking .rs-progress,
-  body.is-asking .rs-shell {
+  body.is-asking .rs-shell,
+  body.is-asking .rs-apiref {
     margin-right: 0;
   }
   .rs-ask {
@@ -1126,11 +1210,14 @@ body.is-asking-wide {
 @media (prefers-reduced-motion: reduce) {
   body.is-asking .rs-header,
   body.is-asking .rs-tabbar,
-  body.is-asking .rs-progress,
-  body.is-asking .rs-shell {
+  body.is-asking .rs-shell,
+  body.is-asking .rs-apiref {
     transition: none;
   }
   .rs-ask__caret {
     animation: none;
+  }
+  .rs-ask__send {
+    transition: none;
   }
 }

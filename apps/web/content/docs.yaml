@@ -2,6 +2,10 @@ site:
   name: Readsmith
   url: https://readsmith.dev
   description: Beautiful, self-hostable, AI-native documentation.
+footer:
+  socials:
+    github: https://github.com/readsmith
+    x: https://x.com/readsmith
 # branding: false   # uncomment to white-label (hide the "Powered by Readsmith" badge)
 tabs:
   - tab: Guides

@@ -1,6 +1,6 @@
 import { createMemoryCache } from "@readsmith/cache";
 import { describe, expect, it } from "vitest";
-import { createApiApp } from "../src/app.js";
+import { API_BASE_PATH, createApiApp } from "../src/app.js";
 import type { AiServices, ApiDatabase } from "../src/deps.js";
 import {
   type CounterCache,
@@ -247,9 +247,9 @@ describe("createApiApp: rate limiting", () => {
   // AC-2.1
   it("AC-2.1: 429s past the limit, with Retry-After", async () => {
     const app = appWith({ ask: { limit: 1, windowMs: 60_000 } });
-    expect((await post(app, "/api/ask", "1.1.1.1")).status).toBe(200);
+    expect((await post(app, `${API_BASE_PATH}/ask`, "1.1.1.1")).status).toBe(200);
 
-    const denied = await post(app, "/api/ask", "1.1.1.1");
+    const denied = await post(app, `${API_BASE_PATH}/ask`, "1.1.1.1");
     expect(denied.status).toBe(429);
     expect(denied.headers.get("retry-after")).toBe("60");
     expect(denied.headers.get("x-ratelimit-limit")).toBe("1");
@@ -258,9 +258,9 @@ describe("createApiApp: rate limiting", () => {
 
   it("limits /api/search on its own bucket", async () => {
     const app = appWith({ search: { limit: 1, windowMs: 60_000 } });
-    expect((await post(app, "/api/search", "1.1.1.1")).status).toBe(200);
-    expect((await post(app, "/api/search", "1.1.1.1")).status).toBe(429);
-    expect((await post(app, "/api/ask", "1.1.1.1")).status).toBe(200); // ask is untouched
+    expect((await post(app, `${API_BASE_PATH}/search`, "1.1.1.1")).status).toBe(200);
+    expect((await post(app, `${API_BASE_PATH}/search`, "1.1.1.1")).status).toBe(429);
+    expect((await post(app, `${API_BASE_PATH}/ask`, "1.1.1.1")).status).toBe(200); // ask is untouched
   });
 
   // AC-2.3 at the route level
@@ -275,7 +275,7 @@ describe("createApiApp: rate limiting", () => {
       }),
     });
     const attempt = (xff: string) =>
-      app.request("/api/ask", {
+      app.request(`${API_BASE_PATH}/ask`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-forwarded-for": xff },
         body: JSON.stringify({ query: "x" }),
@@ -288,6 +288,6 @@ describe("createApiApp: rate limiting", () => {
 
   it("passes everything through when no limiter is injected", async () => {
     const app = createApiApp({ db: okDb, ai: mockAi() });
-    for (let i = 0; i < 20; i++) expect((await post(app, "/api/ask")).status).toBe(200);
+    for (let i = 0; i < 20; i++) expect((await post(app, `${API_BASE_PATH}/ask`)).status).toBe(200);
   });
 });

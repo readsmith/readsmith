@@ -1,9 +1,9 @@
 import type { Diagnostic } from "@readsmith/model";
-import { type ShikiTransformer, codeToHtml } from "shiki";
+import { type ShikiTransformer, type ThemeRegistrationAny, codeToHtml } from "shiki";
 
 export interface HighlightOptions {
-  /** Light and dark theme names (Shiki bundled themes). Dual themes render once, with CSS variables. */
-  themes?: { light: string; dark: string };
+  /** Light and dark themes (Shiki bundled theme names, or theme objects). Dual themes render once, with CSS variables. */
+  themes?: { light: string | ThemeRegistrationAny; dark: string | ThemeRegistrationAny };
 }
 
 export interface HighlightInput {
@@ -21,7 +21,90 @@ export interface HighlightResult {
   diagnostics: Diagnostic[];
 }
 
-const DEFAULT_THEMES = { light: "github-light", dark: "github-dark" } as const;
+/*
+ * The "assay" syntax palette: five roles per mode, nothing else. Plain code is
+ * ink, keywords recede to gray, strings carry the teal, types/functions/numbers
+ * carry the gold, comments are faint. A restrained palette is what makes code
+ * read as typeset rather than decorated; the two hues echo the product's accent
+ * (teal links) and hallmark (gold marking), so code belongs to the same page.
+ */
+function assayTheme(
+  mode: "light" | "dark",
+  c: { fg: string; bg: string; comment: string; keyword: string; string: string; gold: string },
+): ThemeRegistrationAny {
+  return {
+    name: `assay-${mode}`,
+    type: mode,
+    colors: { "editor.background": c.bg, "editor.foreground": c.fg },
+    settings: [
+      { settings: { foreground: c.fg, background: c.bg } },
+      { scope: ["comment", "punctuation.definition.comment"], settings: { foreground: c.comment } },
+      {
+        scope: [
+          "keyword",
+          "storage",
+          "storage.type",
+          "storage.modifier",
+          "keyword.control",
+          "keyword.operator",
+          "entity.other.attribute-name",
+          "punctuation.definition.tag",
+        ],
+        settings: { foreground: c.keyword },
+      },
+      {
+        scope: [
+          "string",
+          "string.quoted",
+          "punctuation.definition.string",
+          "constant.other.symbol",
+          "string.regexp",
+          "markup.inline.raw",
+        ],
+        settings: { foreground: c.string },
+      },
+      {
+        scope: [
+          "entity.name.function",
+          "entity.name.type",
+          "entity.name.class",
+          "entity.name.tag",
+          "entity.name.namespace",
+          "support.function",
+          "support.class",
+          "support.type",
+          "support.type.property-name",
+          "constant.numeric",
+          "constant.language",
+          "constant.character",
+          "variable.other.constant",
+          "markup.heading",
+        ],
+        settings: { foreground: c.gold },
+      },
+    ],
+  };
+}
+
+const ASSAY_LIGHT = assayTheme("light", {
+  fg: "#24262b",
+  bg: "#ffffff",
+  comment: "#9a958a",
+  keyword: "#6a7077",
+  string: "#0c6e6e",
+  gold: "#8a6a1e",
+});
+
+const ASSAY_DARK = assayTheme("dark", {
+  fg: "#e4e2dc",
+  bg: "#0c0c0c",
+  comment: "#67645c",
+  keyword: "#99958c",
+  string: "#7ccfc4",
+  gold: "#d8a24a",
+});
+
+const DEFAULT_THEMES = { light: ASSAY_LIGHT, dark: ASSAY_DARK };
 const PLAIN = new Set(["", "text", "txt", "plain", "plaintext"]);
 
 /**

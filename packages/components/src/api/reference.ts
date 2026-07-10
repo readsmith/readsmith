@@ -6,7 +6,7 @@ import type {
   Parameter,
   SecurityScheme,
 } from "@readsmith/model";
-import { header, palette } from "../shell/layout.js";
+import { askConsole, header, palette, tabbar } from "../shell/layout.js";
 import type { ShellSite } from "../shell/layout.js";
 import { esc } from "../shell/util.js";
 import { operationSamples, renderCodeSamples } from "./code-samples.js";
@@ -282,11 +282,70 @@ ${renderResponses(op, spec)}
 ${renderAuth(spec, op)}`;
 }
 
-function responseExample(response: ApiResponse | undefined): string | null {
+/**
+ * Synthesize a representative value from a schema so the console shows a real
+ * response body even when the spec carries no explicit example (the common case
+ * for reflection-generated specs). Resolves `ref` nodes against the component
+ * schemas, drops write-only fields from responses, and bounds cycles and depth.
+ */
+function synthExample(
+  schema: NormalizedSchema | undefined,
+  schemas: Record<string, NormalizedSchema>,
+  seen: ReadonlySet<string>,
+  depth: number,
+): unknown {
+  if (!schema || depth > 8) return null;
+  if (schema.example !== undefined) return schema.example;
+  if (schema.ref !== undefined) {
+    if (seen.has(schema.ref)) return null; // cycle
+    const target = schemas[schema.ref];
+    if (!target) return null;
+    return synthExample(target, schemas, new Set([...seen, schema.ref]), depth + 1);
+  }
+  if (schema.enum && schema.enum.length > 0) return schema.enum[0];
+  if (schema.properties) {
+    const out: Record<string, unknown> = {};
+    for (const [key, prop] of Object.entries(schema.properties)) {
+      if (prop.writeOnly) continue;
+      out[key] = synthExample(prop, schemas, seen, depth + 1);
+    }
+    return out;
+  }
+  const type = (schema.type ?? []).find((t) => t !== "null");
+  if (type === "array") return [synthExample(schema.items, schemas, seen, depth + 1)];
+  if (type === "object") return {};
+  if (schema.default !== undefined) return schema.default;
+  switch (type) {
+    case "integer":
+    case "number":
+      return 0;
+    case "boolean":
+      return false;
+    case "string":
+      switch (schema.format) {
+        case "date-time":
+          return "2026-01-02T15:04:05Z";
+        case "date":
+          return "2026-01-02";
+        case "uuid":
+          return "00000000-0000-0000-0000-000000000000";
+        case "binary":
+          return "<binary>";
+        default:
+          return "string";
+      }
+    default:
+      return null;
+  }
+}
+
+function responseExample(response: ApiResponse | undefined, spec: NormalizedSpec): string | null {
   const json = response?.content?.["application/json"];
   if (!json) return null;
-  const value = json.examples?.[0]?.value ?? json.schema.example;
-  return value !== undefined ? JSON.stringify(value, null, 2) : null;
+  const explicit = json.examples?.[0]?.value ?? json.schema.example;
+  const value =
+    explicit !== undefined ? explicit : synthExample(json.schema, spec.schemas, new Set(), 0);
+  return value === undefined || value === null ? null : JSON.stringify(value, null, 2);
 }
 
 /** The right (dark) console for one operation: request samples plus a response readout. */
@@ -300,7 +359,7 @@ export function renderOperationConsole(op: Operation, spec: NormalizedSpec): str
   const success = op.responses.find((r) => r.status.startsWith("2")) ?? op.responses[0];
   let responseCard = "";
   if (success) {
-    const example = responseExample(success);
+    const example = responseExample(success, spec);
     const ok = success.status.startsWith("2");
     const body = example
       ? `<figure class="rs-code" data-lang="json"><pre class="shiki"><code>${esc(
@@ -361,6 +420,7 @@ export function renderReferenceBody(
     .join("");
   return `<a class="rs-skip" href="#rs-content">Skip to content</a>
 ${header(site)}
+${tabbar(site)}
 <div class="rs-scrim" data-rs-scrim hidden></div>
 <div class="rs-apiref" data-rs-apiref>
   <div class="rs-apinav-col" data-rs-navcol>${renderApiNav(spec, undefined, options)}</div>
@@ -369,5 +429,6 @@ ${header(site)}
     ${sections}
   </main>
 </div>
-${palette(site)}`;
+${palette(site)}
+${askConsole(site)}`;
 }

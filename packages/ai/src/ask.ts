@@ -133,11 +133,14 @@ export function askDocs(deps: AskDeps, input: AskInput): AskResult {
         query,
         filters: input.filters,
         topK,
+        // Ground on the whole chunk. `snippet` is a 200-character palette preview,
+        // and a model given one will report that the docs omit whatever followed.
+        includeText: true,
       });
       return hits.map((hit) => {
         const ref = ++refCounter;
         registry.set(ref, { ref, id: hit.id, title: hit.title, url: hit.url });
-        return { ref, title: hit.title, url: hit.url, content: hit.snippet };
+        return { ref, title: hit.title, url: hit.url, content: hit.text ?? hit.snippet };
       });
     },
   });

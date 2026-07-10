@@ -3,7 +3,7 @@ import { createCache, resolveCacheConfig } from "@readsmith/cache";
 import { getSite } from "./site";
 
 /**
- * The process-wide rate limiter, shared by `/api/*` and `/mcp` so both buckets
+ * The process-wide rate limiter, shared by the JSON API and the MCP endpoint so both
  * count against one store. Server-only, memoized.
  *
  * It rides the cache port: the in-memory driver is correct for single-instance

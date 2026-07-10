@@ -21,6 +21,7 @@
   padding: 0 0 var(--rs-space-3) var(--rs-space-5);
   border-left: 1px solid var(--rs-rule);
 }
+/* The timeline stamp carries the hallmark: marking is the hallmark's job. */
 .rs-update__body::before {
   content: "";
   position: absolute;
@@ -29,7 +30,7 @@
   width: 7px;
   height: 7px;
   border-radius: 2px;
-  background: var(--rs-accent);
+  background: var(--rs-hallmark);
   transform: rotate(45deg);
 }
 .rs-update__title {

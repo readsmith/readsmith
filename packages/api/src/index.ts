@@ -1,4 +1,5 @@
-export { createApiApp } from "./app.js";
+export { API_BASE_PATH, createApiApp } from "./app.js";
+export type { ApiAppOptions } from "./app.js";
 export type { AiCapabilities, AiServices, ApiDatabase, ApiDeps } from "./deps.js";
 export {
   DEFAULT_RATE_LIMITS,

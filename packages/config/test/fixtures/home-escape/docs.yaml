@@ -1,0 +1,5 @@
+site:
+  name: escape
+content:
+  root: docs
+  home: ../../outside/README.md

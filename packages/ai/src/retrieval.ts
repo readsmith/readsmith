@@ -104,6 +104,12 @@ export interface SearchInput {
   query: string;
   filters: SearchFilters;
   topK?: number;
+  /**
+   * Attach each hit's full chunk text. Agents (Ask-AI, the MCP tools) must set
+   * this: they reason over the content, and the 200-character `snippet` is a UI
+   * preview that truncates mid-sentence. The command palette leaves it off.
+   */
+  includeText?: boolean;
 }
 
 /**
@@ -137,6 +143,7 @@ function toHit(
   score: number,
   baseUrl: string,
   apiBasePath: string,
+  includeText: boolean,
 ): SearchHit {
   const isEndpoint = chunk.kind === "endpoint";
   const hash = chunk.anchor ? `#${chunk.anchor}` : "";
@@ -146,6 +153,7 @@ function toHit(
     kind: chunk.kind,
     title: chunk.headerPath.at(-1) ?? titleFromPath(chunk.path),
     snippet: chunk.text.replace(/\s+/g, " ").trim().slice(0, 200),
+    ...(includeText ? { text: chunk.text } : {}),
     url,
     anchor: chunk.anchor,
     headerPath: chunk.headerPath,
@@ -195,8 +203,11 @@ export async function hybridSearch(deps: SearchDeps, input: SearchInput): Promis
   const fused = rrfFuse([vector.chunks, fts], k);
   const baseUrl = deps.baseUrl ?? "";
   const apiBasePath = deps.apiBasePath ?? "/api-reference";
+  const includeText = input.includeText ?? false;
   return {
-    hits: fused.slice(0, topK).map(({ chunk, score }) => toHit(chunk, score, baseUrl, apiBasePath)),
+    hits: fused
+      .slice(0, topK)
+      .map(({ chunk, score }) => toHit(chunk, score, baseUrl, apiBasePath, includeText)),
     degraded: vector.degraded,
   };
 }

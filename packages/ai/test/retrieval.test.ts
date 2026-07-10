@@ -250,3 +250,38 @@ describe("hybridSearch: runtime degradation", () => {
     expect(degraded).toBe(false);
   });
 });
+
+/**
+ * `snippet` is a 200-character preview for the command palette. It is not
+ * grounding. A model handed one will faithfully report that the docs omit
+ * whatever sat at character 201, which is exactly what happened: a 1192-char
+ * "Quick start" chunk had its install command at offset 452, and Ask-AI answered
+ * that the documentation "lacks detailed installation instructions".
+ */
+describe("hybridSearch: includeText", () => {
+  // Mirrors the real chunk: 1192 chars, with the install command at offset ~452,
+  // well past the 200-character snippet the palette shows.
+  const long = `${"A".repeat(450)} INSTALL_COMMAND ${"B".repeat(700)}`;
+
+  it("omits the full text by default, so a palette keystroke stays small", async () => {
+    const store = fakeStore([], [chunk("a", { text: long })]);
+    const { hits } = await hybridSearch(
+      { store, provider: createMockProvider({ hasEmbedding: false }) },
+      { siteId: "default", query: "x", filters },
+    );
+    expect(hits[0]?.text).toBeUndefined();
+    expect(hits[0]?.snippet).toHaveLength(200);
+  });
+
+  it("attaches the whole chunk when an agent asks for it", async () => {
+    const store = fakeStore([], [chunk("a", { text: long })]);
+    const { hits } = await hybridSearch(
+      { store, provider: createMockProvider({ hasEmbedding: false }) },
+      { siteId: "default", query: "x", filters, includeText: true },
+    );
+    expect(hits[0]?.text).toBe(long);
+    // The thing the truncated snippet hid.
+    expect(hits[0]?.snippet).not.toContain("INSTALL_COMMAND");
+    expect(hits[0]?.text).toContain("INSTALL_COMMAND");
+  });
+});

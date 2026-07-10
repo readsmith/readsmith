@@ -5,6 +5,12 @@
  * priority, the explicit [data-theme] set by the serving shell (SSR + persisted,
  * so there is no toggle flash).
  *
+ * Discipline: the accent appears in one chrome role only, links in prose (and
+ * the focus ring). All other chrome is ink on neutral. Depth comes from alpha
+ * hairlines and alpha fills, never surface shadows, so every value composes
+ * over per-site themed surfaces. Dark is true black on a hue-free gray ramp
+ * (a warm tint reads muddy over black); light keeps the warm paper.
+ *
  * Fonts: the stacks below fall back to system faces. The self-hosted woff2 for
  * Spectral, IBM Plex Sans, and IBM Plex Mono are wired with @font-face once the
  * font assets land (no external CDN, per the CSP). Fallbacks keep metrics close.
@@ -15,13 +21,13 @@
 
   /* color: light ("assay white") */
   --rs-paper: #fafaf8;
-  --rs-surface: #f1f1ec;
-  --rs-surface-2: #e9e9e3;
+  --rs-surface: rgba(22, 24, 29, 0.04);
+  --rs-surface-2: rgba(22, 24, 29, 0.07);
   --rs-ink: #16181d;
   --rs-ink-muted: #565b63;
   --rs-ink-faint: #767c84;
-  --rs-rule: #e3e3dd;
-  --rs-rule-strong: #cfcfc8;
+  --rs-rule: rgba(22, 24, 29, 0.1);
+  --rs-rule-strong: rgba(22, 24, 29, 0.17);
   --rs-accent: #0c6e6e;
   --rs-accent-hover: #0a5a5a;
   --rs-accent-wash: rgba(12, 110, 110, 0.08);
@@ -29,6 +35,10 @@
   --rs-hallmark-ink: #7a5a1e;
   --rs-hallmark-wash: rgba(184, 135, 58, 0.1);
   --rs-focus: #0c6e6e;
+  /* code panels: white in light, near-black in dark (never the surface tint) */
+  --rs-code-bg: #ffffff;
+  /* the ink-tint pill behind active chrome states (nav, palette cursor) */
+  --rs-active-wash: rgba(22, 24, 29, 0.07);
 
   /* semantic callouts (low chroma) */
   --rs-info: #0c6e6e;
@@ -42,21 +52,25 @@
   --rs-font-serif: "Spectral", Georgia, "Iowan Old Style", "Times New Roman", serif;
   --rs-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas,
     monospace;
+  /* The header wordmark. Defaults to the heading face; a site can point it
+   * elsewhere (e.g. the mono face for a terminal feel) via `theme.fontWordmark`. */
+  --rs-font-wordmark: var(--rs-font-serif);
 
-  --rs-text-display: 3.25rem;
-  --rs-text-h1: 2.25rem;
-  --rs-text-h2: 1.6875rem;
-  --rs-text-h3: 1.3125rem;
-  --rs-text-h4: 1.125rem;
-  --rs-text-body: 1.0625rem;
-  --rs-text-small: 0.9rem;
+  --rs-text-display: 2.75rem;
+  --rs-text-h1: 1.875rem;
+  --rs-text-h2: 1.375rem;
+  --rs-text-h3: 1.125rem;
+  --rs-text-h4: 1rem;
+  --rs-text-body: 1rem;
+  --rs-text-small: 0.875rem;
   --rs-text-label: 0.78rem;
-  --rs-text-code: 0.9rem;
+  --rs-text-code: 0.84375rem;
 
   --rs-leading-body: 1.7;
   --rs-leading-heading: 1.25;
-  --rs-leading-code: 1.6;
-  --rs-measure: 68ch;
+  --rs-leading-code: 1.7;
+  /* Fixed reading measure (~680px). Big screens get margins, not longer lines. */
+  --rs-measure: 42.5rem;
 
   /* spacing (4px base) */
   --rs-space-1: 4px;
@@ -90,14 +104,14 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --rs-paper: #0f1318;
-    --rs-surface: #161b22;
-    --rs-surface-2: #1e252e;
-    --rs-ink: #e7e8e4;
-    --rs-ink-muted: #a2a8af;
-    --rs-ink-faint: #7c828a;
-    --rs-rule: #232a32;
-    --rs-rule-strong: #333b44;
+    --rs-paper: #0a0a0a;
+    --rs-surface: rgba(255, 255, 255, 0.05);
+    --rs-surface-2: rgba(255, 255, 255, 0.09);
+    --rs-ink: #e6e6e6;
+    --rs-ink-muted: #9e9e9e;
+    --rs-ink-faint: #6f6f6f;
+    --rs-rule: rgba(255, 255, 255, 0.1);
+    --rs-rule-strong: rgba(255, 255, 255, 0.17);
     --rs-accent: #48b0a6;
     --rs-accent-hover: #5fc3b9;
     --rs-accent-wash: rgba(72, 176, 166, 0.14);
@@ -105,6 +119,8 @@
     --rs-hallmark-ink: #e4b76a;
     --rs-hallmark-wash: rgba(216, 162, 74, 0.14);
     --rs-focus: #5fc3b9;
+    --rs-code-bg: #0c0c0c;
+    --rs-active-wash: rgba(255, 255, 255, 0.09);
     --rs-info: #48b0a6;
     --rs-tip: #5fbe8c;
     --rs-warning: #e0a44b;
@@ -115,14 +131,14 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --rs-paper: #0f1318;
-  --rs-surface: #161b22;
-  --rs-surface-2: #1e252e;
-  --rs-ink: #e7e8e4;
-  --rs-ink-muted: #a2a8af;
-  --rs-ink-faint: #7c828a;
-  --rs-rule: #232a32;
-  --rs-rule-strong: #333b44;
+  --rs-paper: #0a0a0a;
+  --rs-surface: rgba(255, 255, 255, 0.05);
+  --rs-surface-2: rgba(255, 255, 255, 0.09);
+  --rs-ink: #e6e6e6;
+  --rs-ink-muted: #9e9e9e;
+  --rs-ink-faint: #6f6f6f;
+  --rs-rule: rgba(255, 255, 255, 0.1);
+  --rs-rule-strong: rgba(255, 255, 255, 0.17);
   --rs-accent: #48b0a6;
   --rs-accent-hover: #5fc3b9;
   --rs-accent-wash: rgba(72, 176, 166, 0.14);
@@ -130,6 +146,8 @@
   --rs-hallmark-ink: #e4b76a;
   --rs-hallmark-wash: rgba(216, 162, 74, 0.14);
   --rs-focus: #5fc3b9;
+  --rs-code-bg: #0c0c0c;
+  --rs-active-wash: rgba(255, 255, 255, 0.09);
   --rs-info: #48b0a6;
   --rs-tip: #5fbe8c;
   --rs-warning: #e0a44b;
@@ -140,13 +158,13 @@
 :root[data-theme="light"] {
   color-scheme: light;
   --rs-paper: #fafaf8;
-  --rs-surface: #f1f1ec;
-  --rs-surface-2: #e9e9e3;
+  --rs-surface: rgba(22, 24, 29, 0.04);
+  --rs-surface-2: rgba(22, 24, 29, 0.07);
   --rs-ink: #16181d;
   --rs-ink-muted: #565b63;
   --rs-ink-faint: #767c84;
-  --rs-rule: #e3e3dd;
-  --rs-rule-strong: #cfcfc8;
+  --rs-rule: rgba(22, 24, 29, 0.1);
+  --rs-rule-strong: rgba(22, 24, 29, 0.17);
   --rs-accent: #0c6e6e;
   --rs-accent-hover: #0a5a5a;
   --rs-accent-wash: rgba(12, 110, 110, 0.08);
@@ -154,6 +172,8 @@
   --rs-hallmark-ink: #7a5a1e;
   --rs-hallmark-wash: rgba(184, 135, 58, 0.1);
   --rs-focus: #0c6e6e;
+  --rs-code-bg: #ffffff;
+  --rs-active-wash: rgba(22, 24, 29, 0.07);
   --rs-info: #0c6e6e;
   --rs-tip: #2e7d57;
   --rs-warning: #a85a17;
@@ -175,10 +195,11 @@ body {
 }
 
 /* custom scrollbars: explicit track colors so the gutter never falls through
- * to the browser's dark default (which bleeds black in light mode). */
+ * to the browser's dark default (which bleeds black in light mode). The thumb
+ * needs an opaque-ish color, so it derives from ink over paper. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--rs-rule-strong) var(--rs-paper);
+  scrollbar-color: var(--rs-ink-faint) var(--rs-paper);
 }
 *::-webkit-scrollbar {
   width: 11px;
@@ -189,13 +210,13 @@ body {
   background: var(--rs-paper);
 }
 *::-webkit-scrollbar-thumb {
-  background: var(--rs-rule-strong);
+  background: var(--rs-ink-faint);
   border-radius: 9px;
   border: 3px solid var(--rs-paper);
   background-clip: padding-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--rs-ink-faint);
+  background: var(--rs-ink-muted);
   background-clip: padding-box;
 }
 

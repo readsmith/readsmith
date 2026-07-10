@@ -3,6 +3,21 @@ import { z } from "zod";
 import type { ApiDeps } from "./deps.js";
 import { rateLimitMiddleware } from "./rate-limit.js";
 
+/**
+ * Where the JSON API is mounted.
+ *
+ * Not `/api`. A documentation site is the one kind of site most likely to have a
+ * page called `api.md`, and mounting here would reserve `/api` and everything
+ * under it, shadowing that page and any `docs/api/` folder. The reading shell is
+ * the only client, so the path is an implementation detail rather than a contract.
+ */
+export const API_BASE_PATH = "/_readsmith/api";
+
+export interface ApiAppOptions {
+  /** Override the mount point. Must match the host's route file location. */
+  basePath?: string;
+}
+
 const scopedQuery = z.object({
   query: z.string().min(1),
   version: z.string().optional(),
@@ -22,14 +37,14 @@ async function parseJson(request: Request): Promise<unknown> {
  *
  * M3 adds search, Ask-AI, and feedback; each fails closed with a keyless message
  * when its capability is off (the degradation ladder). MCP is served by the host
- * at `/mcp` via `deps.ai.mcp` (outside this `/api` base path), and the host
- * enforces the `mcp` bucket there with the same limiter.
+ * via `deps.ai.mcp` (outside this base path), and the host enforces the `mcp`
+ * bucket there with the same limiter.
  *
  * The rate limiter runs ahead of the capability check so that every priced route
  * is guarded uniformly, including the paths that fail closed.
  */
-export function createApiApp(deps: ApiDeps): Hono {
-  const app = new Hono().basePath("/api");
+export function createApiApp(deps: ApiDeps, options: ApiAppOptions = {}): Hono {
+  const app = new Hono().basePath(options.basePath ?? API_BASE_PATH);
   const limiter = deps.rateLimit ?? null;
   const limit = (bucket: "ask" | "search") =>
     rateLimitMiddleware(limiter, bucket, deps.clientAddress);

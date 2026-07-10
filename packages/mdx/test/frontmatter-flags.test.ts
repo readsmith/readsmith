@@ -57,7 +57,10 @@ describe("noindex", () => {
       "draft.md": page("title: Draft\nnoindex: true"),
     });
     expect(site.nav.map((n) => n.type === "page" && n.slug)).toContain("draft");
-    expect(site.searchChunks.some((c) => c.path === "draft.md")).toBe(true);
+    // chunk.path is the page URL (search deep-links are built from it); the source
+    // file survives as page_id.
+    expect(site.searchChunks.some((c) => c.path === "/draft")).toBe(true);
+    expect(site.searchChunks.some((c) => c.page_id === "draft.md")).toBe(true);
   });
 
   // AC-10.4

@@ -32,7 +32,15 @@ export const searchHitSchema = z.object({
   id: z.string(),
   kind: chunkKindSchema,
   title: z.string(),
+  /** A short preview for the command palette. Never grounding for a model. */
   snippet: z.string(),
+  /**
+   * The full chunk text, present only when the caller asks for it. Agents need
+   * it: a 200-character preview truncates mid-sentence, and a model grounded on
+   * one will confidently report that the docs omit whatever sat at character 201.
+   * The palette omits it so a keystroke does not ship kilobytes.
+   */
+  text: z.string().optional(),
   url: z.string(),
   anchor: z.string().nullable(),
   headerPath: z.array(z.string()),

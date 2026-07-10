@@ -1,4 +1,4 @@
-/* Tabs (FR-2). A stamped label row with a teal active underline. */
+/* Tabs (FR-2). A stamped label row with an ink active underline. */
 
 .rs-tabs {
   margin: var(--rs-space-5) 0;
@@ -30,7 +30,7 @@
 }
 .rs-tabs__tab[aria-selected="true"] {
   color: var(--rs-ink);
-  border-bottom-color: var(--rs-accent);
+  border-bottom-color: var(--rs-ink);
 }
 
 .rs-tabs__panels {

@@ -49,12 +49,15 @@ export function createMcpServer(deps: McpDeps): McpServer {
           locale: locale ?? deps.filters.locale,
         },
         topK: 8,
+        // An agent reasons over the content: give it the whole chunk, not the
+        // 200-character preview the command palette renders.
+        includeText: true,
       });
       const text = hits.length
         ? hits
             .map(
               (h, i) =>
-                `${i + 1}. ${h.title}${h.method ? ` (${h.method} ${h.path})` : ""}\n   ${h.url}\n   ${h.snippet}`,
+                `${i + 1}. ${h.title}${h.method ? ` (${h.method} ${h.path})` : ""}\n   ${h.url}\n   ${h.text ?? h.snippet}`,
             )
             .join("\n\n")
         : "No matching documentation found.";
