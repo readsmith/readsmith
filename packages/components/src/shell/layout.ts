@@ -1,4 +1,6 @@
 import type { Breadcrumb, FinalNavNode, NavLink, TocNode } from "@readsmith/mdx";
+import type { NormalizedSpec } from "@readsmith/model";
+import { type OperationPageApi, renderOperationMain } from "../api/operation.js";
 import { renderNav } from "./nav.js";
 import { renderToc } from "./toc.js";
 import { HALLMARK_SVG, ICONS, esc, socialIcon } from "./util.js";
@@ -42,6 +44,15 @@ export interface ShellPage {
   breadcrumbs: Breadcrumb[];
   prev?: NavLink;
   next?: NavLink;
+  /** "api-operation" pages swap the TOC for the assay console rail. */
+  kind?: "doc" | "api-operation";
+  /** The operation binding of a hybrid page (mirrors the mdx PageApi shape). */
+  api?: OperationPageApi & { method?: string; path?: string };
+}
+
+export interface ShellBodyOptions {
+  /** The normalized spec hybrid operation pages render their sections from. */
+  apiSpec?: NormalizedSpec | null;
 }
 
 export interface DocumentOptions {
@@ -50,6 +61,8 @@ export interface DocumentOptions {
   /** Href of the island runtime module that calls `hydrate()`. */
   scriptHref?: string;
   lang?: string;
+  /** The normalized spec hybrid operation pages render their sections from. */
+  apiSpec?: NormalizedSpec | null;
 }
 
 /** Sets the theme before first paint from the persisted choice, so there is no flash. */
@@ -61,22 +74,40 @@ const THEME_INIT =
  * on-this-page TOC), pager, and the command palette. Returns body-level HTML;
  * `renderDocument` wraps it into a full page. The content column is measure
  * constrained and the whole thing collapses responsively.
+ *
+ * A `kind: "api-operation"` page renders the hybrid operation layout instead:
+ * the assay console takes the right rail (no TOC), the measure cap lifts for
+ * the operation grid, and the content composes per the spec's order (title,
+ * method bar, description, authored prose, generated sections).
  */
-export function renderShellBody(site: ShellSite, page: ShellPage): string {
+export function renderShellBody(
+  site: ShellSite,
+  page: ShellPage,
+  options: ShellBodyOptions = {},
+): string {
+  const isOp = page.kind === "api-operation" && page.api !== undefined;
+  // The tag stands in for missing breadcrumbs, so the eyebrow never goes blank.
+  const crumbPage =
+    isOp && page.breadcrumbs.length === 0 && page.api?.tag
+      ? { ...page, breadcrumbs: [{ label: page.api.tag }] }
+      : page;
+  const content = isOp
+    ? renderOperationMain(page, options.apiSpec)
+    : `<article class="rs-prose">${page.html}</article>`;
   return `<a class="rs-skip" href="#rs-content">Skip to content</a>
 ${header(site)}
 ${tabbar(site)}
 <div class="rs-scrim" data-rs-scrim hidden></div>
-<div class="rs-shell">
+<div class="rs-shell${isOp ? " rs-shell--op" : ""}">
   <div class="rs-nav-col" data-rs-navcol>${renderNav(site.nav, page.slug)}</div>
-  <main class="rs-main" id="rs-content" tabindex="-1">
-    ${topbar(site, page)}
-    <article class="rs-prose">${page.html}</article>
+  <main class="rs-main${isOp ? " rs-main--op" : ""}" id="rs-content" tabindex="-1">
+    ${topbar(site, crumbPage)}
+    ${content}
     ${pager(page)}
     ${pagefoot()}
     ${footer(site)}
   </main>
-  ${renderToc(page.toc)}
+  ${isOp ? "" : renderToc(page.toc)}
 </div>
 ${palette(site)}
 ${askConsole(site)}`;
@@ -128,7 +159,7 @@ ${desc ? `<meta name="description" content="${esc(desc)}">\n` : ""}<link rel="st
 <script>${THEME_INIT}</script>
 </head>
 <body>
-${renderShellBody(site, page)}
+${renderShellBody(site, page, { apiSpec: options.apiSpec })}
 ${options.scriptHref ? `<script type="module" src="${esc(options.scriptHref)}"></script>` : ""}
 </body>
 </html>`;

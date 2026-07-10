@@ -164,6 +164,9 @@ export const configInputSchema = z.object({
       path: z.string().optional(),
       /** Label used for the link into the reference. Defaults to "API Reference". */
       label: z.string().optional(),
+      /** "single" renders one continuous page (the default); "pages" generates
+       * one page per operation with the reference root as an overview. */
+      layout: z.enum(["single", "pages"]).optional(),
     })
     .optional(),
   variables: z.record(z.string(), z.unknown()).optional(),
@@ -228,7 +231,7 @@ export interface ResolvedConfig {
   /** Top-level tabs, when configured. Each carries its own navigation subtree. */
   tabs?: NavTab[];
   /** A read-only API reference from an OpenAPI spec, when configured. */
-  apiReference?: { spec: string; path: string; label: string };
+  apiReference?: { spec: string; path: string; label: string; layout: "single" | "pages" };
   /** Content footer: social links by platform (Mintlify-compatible shape). */
   footer?: { socials?: Record<string, string> };
   /** Whether to show the "Powered by Readsmith" badge (white-label when false). */

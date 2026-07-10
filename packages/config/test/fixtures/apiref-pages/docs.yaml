@@ -1,0 +1,7 @@
+site:
+  name: ApiRefPages
+apiReference:
+  spec: openapi.json
+  layout: pages
+  path: /reference
+  label: API

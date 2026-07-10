@@ -198,6 +198,38 @@
   grid-template-columns: 288px minmax(0, 1fr) 256px;
 }
 
+/* Hybrid operation pages: the assay console rail replaces the TOC column and
+ * the measure cap lifts for the operation grid; authored prose inside the
+ * detail column keeps its own readable measure. */
+.rs-shell--op {
+  grid-template-columns: 288px minmax(0, 1fr);
+}
+.rs-main--op {
+  align-items: stretch;
+}
+.rs-main--op .rs-topbar,
+.rs-main--op .rs-pager,
+.rs-main--op .rs-pagefoot,
+.rs-main--op .rs-footer {
+  max-width: none;
+}
+.rs-main--op .rs-op__grid {
+  flex: 1 0 auto;
+  align-content: start;
+}
+.rs-main--op h1.rs-op__title {
+  margin: 4px 0 14px;
+}
+.rs-op__prose {
+  margin: 24px 0 4px;
+}
+/* method badges on docs-nav rows (hybrid pages borrow the apinav grammar) */
+.rs-nav__link--api {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
 .rs-nav-col {
   position: sticky;
   top: var(--rs-chrome-height);

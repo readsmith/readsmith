@@ -1,41 +1,20 @@
 import { HydrateClient } from "@/components/hydrate-client";
+import { renderDocPage } from "@/lib/render-page";
 import { getSite } from "@/lib/site";
-import { type ShellSite, type ShellTab, renderShellBody } from "@readsmith/components";
-import type { FinalNavNode, FinalNavTab } from "@readsmith/mdx";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-
-/** Whether a finalized nav subtree contains the given page slug. */
-function navHasSlug(nav: FinalNavNode[], slug: string): boolean {
-  return nav.some((node) =>
-    node.type === "page" ? node.slug === slug : navHasSlug(node.children, slug),
-  );
-}
-
-/** Resolve the sidebar nav and the tab bar for a page, given the build's tabs. */
-function resolveTabs(
-  tabs: FinalNavTab[] | undefined,
-  fallbackNav: FinalNavNode[],
-  slug: string,
-): { nav: FinalNavNode[]; bar?: ShellTab[] } {
-  if (!tabs || tabs.length === 0) return { nav: fallbackNav };
-  const activeIndex = Math.max(
-    0,
-    tabs.findIndex((tab) => navHasSlug(tab.nav, slug)),
-  );
-  const active = tabs[activeIndex] ?? tabs[0];
-  const bar = tabs.map((tab, i) => ({ label: tab.label, url: tab.url, active: i === activeIndex }));
-  return { nav: active?.nav ?? fallbackNav, bar };
-}
 
 interface Params {
   slug?: string[];
 }
 
 export async function generateStaticParams(): Promise<Params[]> {
-  const { build } = await getSite();
+  const { build, apiReference } = await getSite();
+  // The reference ROOT belongs to the dedicated route (a static segment wins
+  // over this catch-all); its children (pages-mode operations) are served here.
+  const refSlug = apiReference?.path.replace(/^\//, "");
   return build.pages
-    .filter((page) => !page.hidden)
+    .filter((page) => !page.hidden && page.slug !== refSlug)
     .map((page) => ({ slug: page.slug === "" ? [] : page.slug.split("/") }));
 }
 
@@ -73,22 +52,10 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
 }
 
 export default async function DocPage({ params }: { params: Promise<Params> }) {
-  const { build, name, branding, url, logo, apiReference, footer } = await getSite();
   const slug = ((await params).slug ?? []).join("/");
-  const page = build.pages.find((p) => p.slug === slug);
-  if (!page) notFound();
-
-  const { nav, bar } = resolveTabs(build.tabs, build.nav, slug);
-  // The API reference joins the tab bar when one exists (the Mintlify pattern:
-  // one product, one row); a tabless site keeps the header cross-link instead.
-  const tabs =
-    bar && apiReference
-      ? [...bar, { label: apiReference.label, url: apiReference.path, active: false }]
-      : bar;
-  const links =
-    !bar && apiReference ? [{ label: apiReference.label, href: apiReference.path }] : undefined;
-  const site: ShellSite = { name, nav, tabs, poweredBy: branding, url, logo, links, footer };
-  const html = renderShellBody(site, page);
+  const rendered = await renderDocPage(slug);
+  if (!rendered) notFound();
+  const { page, html } = rendered;
 
   return (
     <>

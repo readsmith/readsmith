@@ -212,6 +212,7 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
         spec: input.apiReference.spec,
         path: input.apiReference.path ?? "/api-reference",
         label: input.apiReference.label ?? "API Reference",
+        layout: input.apiReference.layout ?? "single",
       }
     : undefined;
 

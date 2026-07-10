@@ -63,18 +63,35 @@ async function buildApiReference(config, contentRoot) {
   console.log(
     `[readsmith] api reference: ${spec.operations.length} operation(s), ${errors} error(s), ${warnings} warning(s)`,
   );
-  return { spec, path: config.apiReference.path, label: config.apiReference.label };
+  return {
+    spec,
+    path: config.apiReference.path,
+    label: config.apiReference.label,
+    layout: config.apiReference.layout,
+  };
 }
 
 async function main() {
   const config = await resolveConfig(CONTENT_DIR);
   // Shared with copy-assets: both must resolve the same content root.
   const contentRoot = contentRootOf(CONTENT_DIR, config);
+  // The spec normalizes before assembly: hybrid `openapi:` pages bind to its
+  // operations during the P7 build.
+  const apiReference = await buildApiReference(config, contentRoot);
   const build = await assembleSite({
     config,
     readPage: (path) => readFile(join(contentRoot, path), "utf8"),
     registry: createRegistry(),
     baseUrl: config.site.url,
+    apiReference: apiReference
+      ? {
+          spec: apiReference.spec,
+          source: config.apiReference.spec,
+          path: config.apiReference.path,
+          layout: config.apiReference.layout,
+          label: config.apiReference.label,
+        }
+      : null,
   });
 
   // Config diagnostics (reserved paths, asset mounts, home page) matter as much as
@@ -106,7 +123,6 @@ async function main() {
     footer: config.footer,
     ai: config.ai ?? null,
   };
-  const apiReference = await buildApiReference(config, contentRoot);
 
   await store.put(BUNDLE_KEY, JSON.stringify({ site, apiReference }));
   console.log(`[readsmith] wrote content bundle: ${build.pages.length} page(s) -> ${BUNDLE_KEY}`);

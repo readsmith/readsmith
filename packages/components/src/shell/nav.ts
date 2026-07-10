@@ -19,9 +19,15 @@ function navItems(nodes: FinalNavNode[], current: string): string {
     .map((node) => {
       if (node.type === "page") {
         const active = node.slug === current;
-        return `<a class="rs-nav__link${active ? " is-active" : ""}" href="${esc(node.url)}"${
-          active ? ' aria-current="page"' : ""
-        }>${esc(node.title)}</a>`;
+        // Hybrid API-operation pages carry a method badge, the apinav grammar.
+        const label = node.method
+          ? `<span class="rs-method rs-method--sm rs-method--${esc(
+              node.method.toLowerCase(),
+            )}">${esc(node.method)}</span><span class="rs-apinav__label">${esc(node.title)}</span>`
+          : esc(node.title);
+        return `<a class="rs-nav__link${node.method ? " rs-nav__link--api" : ""}${
+          active ? " is-active" : ""
+        }" href="${esc(node.url)}"${active ? ' aria-current="page"' : ""}>${label}</a>`;
       }
       // Groups render open by default and stay open across navigations (the state
       // is not recomputed per page), so a section never collapses on its own. The

@@ -15,10 +15,14 @@ tabs:
         pages:
           - guides/setup
           - guides/usage
+      - group: Endpoints
+        pages:
+          - api/create-pet
   - tab: Architecture
     pages:
       - architecture
 apiReference:
   spec: openapi.json
+  layout: pages
   # path: /api-reference   # default
   # label: API Reference   # default

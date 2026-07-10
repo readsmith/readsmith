@@ -1,0 +1,12 @@
+---
+openapi: "POST /pets"
+---
+
+<Callout type="info" title="Write access required">
+  Creating pets needs an API key with the `pets:write` scope. Read-only keys
+  receive a `403`.
+</Callout>
+
+Registered pets appear in [List pets](/api-reference/listpets) immediately;
+the store is strongly consistent. Names do not have to be unique, so register
+twins freely.

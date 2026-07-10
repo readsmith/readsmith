@@ -1,0 +1,4 @@
+site:
+  name: ApiRef
+apiReference:
+  spec: openapi.json

@@ -103,3 +103,26 @@ describe("resolveConfig: tabbed repo", () => {
     expect(r.tabs).toBeUndefined();
   });
 });
+
+// Hybrid-authoring spec HA-10/HA-18: apiReference.layout resolution.
+describe("resolveConfig: apiReference layout", () => {
+  it("defaults layout to single (plus path and label defaults)", async () => {
+    const r = await resolveConfig(join(fixtures, "apiref"));
+    expect(r.apiReference).toEqual({
+      spec: "openapi.json",
+      path: "/api-reference",
+      label: "API Reference",
+      layout: "single",
+    });
+  });
+
+  it("passes an explicit pages layout through", async () => {
+    const r = await resolveConfig(join(fixtures, "apiref-pages"));
+    expect(r.apiReference).toEqual({
+      spec: "openapi.json",
+      path: "/reference",
+      label: "API",
+      layout: "pages",
+    });
+  });
+});

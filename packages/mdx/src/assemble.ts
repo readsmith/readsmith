@@ -1,5 +1,11 @@
 import { posix } from "node:path";
-import { type Diagnostic, contentHash } from "@readsmith/model";
+import {
+  type OperationContext,
+  findOperation,
+  operationToMarkdown,
+} from "@readsmith/api-reference";
+import { type Diagnostic, type Operation, contentHash } from "@readsmith/model";
+import GithubSlugger from "github-slugger";
 import type { Root } from "mdast";
 import { toString as mdastToString } from "mdast-util-to-string";
 import { visit } from "unist-util-visit";
@@ -86,6 +92,35 @@ export interface AssembleInput {
   /** Canonical base URL for absolute links in sitemap, RSS, and agent outputs.
    * Falls back to `config.site.url`. Without either, URLs stay root-relative. */
   baseUrl?: string;
+  /**
+   * The normalized API spec for hybrid `openapi:` frontmatter pages, plus the
+   * config-relative source path it was ingested from (validates Mintlify-style
+   * file tokens like `openapi: "openapi.json GET /pets"`).
+   */
+  apiReference?: ApiReferenceInput | null;
+}
+
+/** The API-reference wiring assembly consumes (the resolved config's shape). */
+export interface ApiReferenceInput {
+  /** The normalized spec; `tags`, `info`, and `servers` feed pages mode. */
+  spec: OperationContext & {
+    tags?: { name: string; description?: string }[];
+    info?: { title: string; version: string; description?: string };
+    servers?: { url: string }[];
+  };
+  /** Config-relative source path (validates frontmatter file tokens). */
+  source: string;
+  /**
+   * The URL the reference is mounted at. In single mode (the continuous page,
+   * served outside this build) links to it validate against the operation ids
+   * instead of being reported broken; in pages mode it is where the synthesized
+   * pages and the overview live.
+   */
+  path?: string;
+  /** "single" (default) or "pages" (synthesize one page per operation). */
+  layout?: "single" | "pages";
+  /** The nav label of the reference tab in pages mode. */
+  label?: string;
 }
 
 export interface Breadcrumb {
@@ -97,6 +132,24 @@ export interface NavLink {
   slug: string;
   url: string;
   title: string;
+}
+
+/** Hybrid API-operation binding: which operation an `openapi:` page documents. */
+export interface PageApi {
+  /** The frontmatter reference as written (trimmed), for example "GET /pets". */
+  ref: string;
+  /**
+   * The resolved operation id, or null when the reference matched nothing (the
+   * serving layer renders a danger callout in place of the generated sections).
+   */
+  operationId: string | null;
+  /** Uppercased method from the reference, for example "GET". */
+  method: string;
+  path: string;
+  /** The operation's first tag: the page's breadcrumb/eyebrow. */
+  tag?: string;
+  /** The frontmatter `deprecated` override, or the operation's own flag. */
+  deprecated: boolean;
 }
 
 export interface PageModel {
@@ -127,11 +180,22 @@ export interface PageModel {
   breadcrumbs: Breadcrumb[];
   prev?: NavLink;
   next?: NavLink;
+  /** What the page is; "api-operation" pages carry `api` and a console layout. */
+  kind: "doc" | "api-operation";
+  /** Present when `kind` is "api-operation". */
+  api?: PageApi;
   diagnostics: Diagnostic[];
 }
 
 export type FinalNavNode =
-  | { type: "page"; slug: string; url: string; title: string }
+  | {
+      type: "page";
+      slug: string;
+      url: string;
+      title: string;
+      /** HTTP method badge for hybrid API-operation pages, e.g. "GET". */
+      method?: string;
+    }
   | { type: "group"; label: string; children: FinalNavNode[] };
 
 /** A finalized top-level tab: label, landing URL (first page), and its nav tree. */
@@ -225,8 +289,26 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
   const models = built.map((b) => b.model);
   const rebuilt = built.filter((b) => b.rebuilt).map((b) => b.model.path);
 
+  // Hybrid `openapi:` pages bind to their operations before nav finalization and
+  // the agent outputs, because binding sets titles, descriptions, and rawMd.
+  const claims = applyApiBindings(models, input.apiReference ?? null);
+
+  // Pages mode: synthesize a page per unclaimed operation plus the overview,
+  // and get back the reference nav subtree for the tab (null in single mode).
+  const refNav = await applyPagesMode(input, built, models, claims);
+
   // Cross-page link + anchor validation, now that every page's anchors are known.
   const anchorsBySlug = new Map(models.map((m) => [m.slug, new Set(m.anchors)]));
+  // In single mode the continuous API reference is served outside this build;
+  // links to it are valid, and its anchors are the operation ids. (In pages
+  // mode the reference pages are real pages and validate like any other.)
+  const apiRefPath = input.apiReference?.layout === "pages" ? undefined : input.apiReference?.path;
+  if (apiRefPath) {
+    anchorsBySlug.set(
+      apiRefPath.replace(/^\//, ""),
+      new Set(input.apiReference?.spec.operations.map((op) => op.id) ?? []),
+    );
+  }
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
     const links = built[i]?.links ?? [];
@@ -244,7 +326,16 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
       applyNavRelations(tabNav, bySlug);
       return { label: tab.label, url: firstPageUrl(tabNav) ?? "/", nav: tabNav };
     });
+    // Pages mode: the reference joins the tab row as its own tab. Rows whose
+    // home is an explicit placement elsewhere keep that home's relations.
+    if (refNav) {
+      const tabNav = finalizeNav(refNav.nodes, bySlug);
+      applyNavRelations(tabNav, bySlug, refNav.foreign);
+      tabs.push({ label: refNav.label, url: refNav.url, nav: tabNav });
+    }
   } else {
+    // A tabless site gets the reference nav appended to the main sidebar.
+    if (refNav) nav.push(...finalizeNav(refNav.nodes, bySlug));
     applyNavRelations(nav, bySlug);
   }
 
@@ -427,6 +518,7 @@ async function buildPage(
     anchors,
     islands: renderResult.hydration,
     breadcrumbs: [],
+    kind: "doc",
     diagnostics: [
       ...parsed.diagnostics,
       ...expanded.diagnostics,
@@ -436,6 +528,391 @@ async function buildPage(
   };
 
   return { model, links, rebuilt };
+}
+
+const HTTP_METHODS = new Set(["get", "put", "post", "delete", "options", "head", "patch", "trace"]);
+
+interface OpenapiRef {
+  file?: string;
+  method: string;
+  path: string;
+}
+
+/**
+ * Parse an `openapi:` frontmatter value: `METHOD /path`, optionally preceded by
+ * a spec-file token (the Mintlify multi-spec form): `openapi.json GET /pets`.
+ */
+function parseOpenapiRef(value: string): OpenapiRef | null {
+  const parts = value.trim().split(/\s+/);
+  const [file, method, path] =
+    parts.length === 2 ? [undefined, parts[0], parts[1]] : parts.length === 3 ? parts : [];
+  if (!method || !path) return null;
+  if (!HTTP_METHODS.has(method.toLowerCase()) || !path.startsWith("/")) return null;
+  return file !== undefined ? { file, method, path } : { method, path };
+}
+
+/** Compare spec-file tokens leniently: a leading "./" is not a different file. */
+function fileToken(p: string): string {
+  return p.replace(/^\.\//, "");
+}
+
+/** The first sentence of a description, for metadata fallbacks. */
+function firstSentence(text: string): string {
+  const line = text.replace(/\s+/g, " ").trim();
+  const match = line.match(/^.*?[.!?](?=\s|$)/);
+  const sentence = match ? (match[0] ?? line) : line;
+  return sentence.length > 200 ? `${sentence.slice(0, 200).trimEnd()}...` : sentence;
+}
+
+/**
+ * Resolve one model's binding to its operation: id, tag, deprecated carry,
+ * title and description fallbacks (frontmatter always wins), and the markdown
+ * projection appended to rawMd plus a synthetic search chunk. Shared by
+ * authored hybrid pages and pages-mode synthesis.
+ */
+function applyOperationBinding(
+  model: PageModel,
+  op: Operation,
+  spec: ApiReferenceInput["spec"],
+): void {
+  if (!model.api) return;
+  model.api.operationId = op.id;
+  if (op.tags[0] !== undefined) model.api.tag = op.tags[0];
+  model.api.deprecated = model.api.deprecated || op.deprecated;
+
+  if (typeof model.frontmatter.title !== "string" || !model.frontmatter.title.trim()) {
+    model.title = op.summary?.trim() || `${model.api.method} ${op.path}`;
+  }
+  if (model.description === undefined && op.description) {
+    model.description = firstSentence(op.description);
+  }
+
+  // The agent projection rides the raw markdown and the search chunks: the
+  // .md route, llms.txt, and Ask-AI citations see the full contract.
+  const projection = operationToMarkdown(op, spec);
+  model.rawMd = model.rawMd.trim() ? `${model.rawMd.trim()}\n\n${projection}` : projection;
+  model.chunks = [
+    ...model.chunks,
+    {
+      id: contentHash({ path: model.path, api: op.id }),
+      page_id: model.path,
+      path: model.url,
+      header_path: [model.title],
+      anchor: "",
+      text: projection,
+    },
+  ];
+}
+
+/**
+ * Bind hybrid `openapi:` pages to their operations (spec section HA-1..5, 22..25).
+ * Runs after every page is built and before nav finalization: binding sets the
+ * page kind, title and description fallbacks, and appends the operation's
+ * markdown projection to rawMd and the search chunks, so agent surfaces carry
+ * the full contract per operation. One operation, one page: the first claim in
+ * discovery order wins; later claims are diagnosed and left unresolved (the
+ * serving layer shows a danger callout for an unresolved binding). Returns the
+ * claims (operation id to the page that documents it) for pages-mode synthesis.
+ */
+function applyApiBindings(
+  models: PageModel[],
+  apiReference: ApiReferenceInput | null,
+): Map<string, PageModel> {
+  const claimed = new Map<string, PageModel>();
+  for (const model of models) {
+    const fail = (severity: Diagnostic["severity"], code: string, message: string): void => {
+      model.diagnostics.push({ severity, code, message, source: model.path });
+    };
+
+    // Data-model pages are a planned follow-up; say so instead of silently
+    // rendering the page as plain prose.
+    if (model.frontmatter["openapi-schema"] !== undefined) {
+      fail(
+        "warning",
+        "openapi-schema-unsupported",
+        "`openapi-schema` pages are not supported yet; the page renders as plain prose.",
+      );
+    }
+
+    const raw = model.frontmatter.openapi;
+    if (raw === undefined) continue;
+
+    if (typeof raw !== "string" || !raw.trim()) {
+      fail(
+        "error",
+        "invalid-openapi-ref",
+        'The `openapi` frontmatter must be a string like "GET /pets".',
+      );
+      continue;
+    }
+    const ref = parseOpenapiRef(raw);
+    if (!ref) {
+      fail(
+        "error",
+        "invalid-openapi-ref",
+        `Could not parse openapi reference "${raw.trim()}" (expected "METHOD /path" or "spec-file METHOD /path").`,
+      );
+      continue;
+    }
+
+    model.kind = "api-operation";
+    model.api = {
+      ref: raw.trim(),
+      operationId: null,
+      method: ref.method.toUpperCase(),
+      path: ref.path,
+      deprecated: model.frontmatter.deprecated === true,
+    };
+
+    // Mintlify pages may carry a `version` key; versioning is a later milestone.
+    if (model.frontmatter.version !== undefined) {
+      fail(
+        "info",
+        "openapi-version-ignored",
+        "Frontmatter `version` is not supported yet; ignored.",
+      );
+    }
+
+    if (!apiReference) {
+      fail(
+        "error",
+        "openapi-not-configured",
+        "This page references an OpenAPI operation, but no `apiReference` spec is configured.",
+      );
+      continue;
+    }
+    if (ref.file !== undefined && fileToken(ref.file) !== fileToken(apiReference.source)) {
+      fail(
+        "warning",
+        "openapi-file-mismatch",
+        `The spec file "${ref.file}" does not match the configured "${apiReference.source}"; token ignored (one spec per site for now).`,
+      );
+    }
+
+    const op = findOperation(apiReference.spec, ref.method, ref.path);
+    if (!op) {
+      fail(
+        "error",
+        "unknown-operation",
+        `No operation matches "${model.api.method} ${ref.path}" in the configured spec.`,
+      );
+      continue;
+    }
+    const prior = claimed.get(op.id);
+    if (prior !== undefined) {
+      fail(
+        "error",
+        "duplicate-operation-page",
+        `Operation "${op.id}" is already documented by "${prior.path}"; one operation, one page.`,
+      );
+      continue;
+    }
+    claimed.set(op.id, model);
+    applyOperationBinding(model, op, apiReference.spec);
+  }
+  return claimed;
+}
+
+interface RefNav {
+  label: string;
+  url: string;
+  nodes: NavNode[];
+  /**
+   * Slugs listed in the reference tab whose HOME is an explicit nav placement
+   * elsewhere: their rows are links, but the reference chain must not take
+   * over their breadcrumbs, prev/next, or active-tab context.
+   */
+  foreign: Set<string>;
+}
+
+/** Every page slug placed explicitly in the configured navigation. */
+function collectNavSlugs(config: SiteConfig): Set<string> {
+  const slugs = new Set<string>();
+  const walk = (nodes: NavNode[]): void => {
+    for (const node of nodes) {
+      if (node.type === "page") slugs.add(node.slug);
+      else walk(node.children);
+    }
+  };
+  walk(config.nav);
+  for (const tab of config.tabs ?? []) walk(tab.nav);
+  return slugs;
+}
+
+/** Operations grouped by first tag; tag order from the spec, then alphabetical. */
+function groupOperations(
+  spec: ApiReferenceInput["spec"],
+): { tag: string; operations: Operation[] }[] {
+  const order = (spec.tags ?? []).map((t) => t.name);
+  const byTag = new Map<string, Operation[]>();
+  for (const op of spec.operations) {
+    const tag = op.tags[0] ?? "General";
+    const list = byTag.get(tag);
+    if (list) list.push(op);
+    else byTag.set(tag, [op]);
+  }
+  const tags = [...byTag.keys()].sort((a, b) => {
+    const ia = order.indexOf(a);
+    const ib = order.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
+  return tags.map((tag) => ({ tag, operations: byTag.get(tag) ?? [] }));
+}
+
+/** The generated overview page: title, description, meta, tag-grouped index. */
+function buildOverviewMarkdown(
+  spec: ApiReferenceInput["spec"],
+  urlByOp: Map<string, string>,
+): string {
+  const info = spec.info;
+  const lines = [`# ${info?.title ?? "API Reference"}`, ""];
+  if (info?.description) lines.push(info.description, "");
+  const meta: string[] = [];
+  const server = spec.servers?.[0]?.url;
+  if (server) meta.push(`- Base URL: \`${server}\``);
+  if (info?.version) meta.push(`- Version: ${info.version}`);
+  if (meta.length > 0) lines.push(...meta, "");
+  for (const group of groupOperations(spec)) {
+    lines.push(`## ${group.tag}`, "");
+    const description = spec.tags?.find((t) => t.name === group.tag)?.description;
+    if (description) lines.push(description, "");
+    for (const op of group.operations) {
+      const url = urlByOp.get(op.id);
+      if (!url) continue;
+      lines.push(`- [\`${op.method.toUpperCase()}\` ${op.summary ?? op.path}](${url})`);
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Pages mode (spec HA-11/12/13): synthesize one page per operation that no
+ * authored page claims (deterministic github-slugger slugs from the operation
+ * id, collisions diagnosed), plus a pipeline-rendered overview at the
+ * reference root (skipped when an authored page owns that slug). Returns the
+ * reference nav subtree; pages an author placed explicitly in the configured
+ * navigation stay where they were put and are not duplicated here.
+ */
+async function applyPagesMode(
+  input: AssembleInput,
+  built: BuiltPage[],
+  models: PageModel[],
+  claims: Map<string, PageModel>,
+): Promise<RefNav | null> {
+  const ref = input.apiReference;
+  if (!ref || ref.layout !== "pages") return null;
+  const spec = ref.spec;
+  const refPath = (ref.path ?? "/api-reference").replace(/\/+$/, "");
+  const refSlug = refPath.replace(/^\//, "");
+  const label = ref.label ?? "API Reference";
+
+  const slugger = new GithubSlugger();
+  const seenBases = new Set<string>();
+  const urlByOp = new Map<string, string>();
+
+  for (const op of spec.operations) {
+    const claimedModel = claims.get(op.id);
+    if (claimedModel) {
+      urlByOp.set(op.id, claimedModel.url);
+      continue;
+    }
+    const base = new GithubSlugger().slug(op.id);
+    const opSlug = slugger.slug(op.id); // deduplicates deterministically
+    const slug = `${refSlug}/${opSlug}`;
+    const model: PageModel = {
+      path: `${slug}.generated`,
+      slug,
+      url: `/${slug}`,
+      title: "",
+      frontmatter: {},
+      hidden: false,
+      noindex: false,
+      jsonLd: null,
+      html: "",
+      toc: [],
+      rawMd: "",
+      chunks: [],
+      anchors: [],
+      islands: { islands: [] },
+      breadcrumbs: [],
+      kind: "api-operation",
+      api: {
+        ref: `${op.method.toUpperCase()} ${op.path}`,
+        operationId: null,
+        method: op.method.toUpperCase(),
+        path: op.path,
+        deprecated: false,
+      },
+      diagnostics: [],
+    };
+    if (seenBases.has(base)) {
+      model.diagnostics.push({
+        severity: "error",
+        code: "operation-slug-collision",
+        message: `Operation slug "${base}" collides with another operation; serving this one at "${opSlug}".`,
+        source: model.path,
+      });
+    }
+    seenBases.add(base);
+    applyOperationBinding(model, op, spec);
+    models.push(model);
+    built.push({ model, links: [], rebuilt: true });
+    urlByOp.set(op.id, model.url);
+  }
+
+  // The overview at the reference root, unless an authored page owns the slug
+  // (an author replacing the generated front door is a feature, not a clash).
+  const rootTaken = models.some((m) => m.slug === refSlug);
+  if (!rootTaken) {
+    const virtualPath = `${refSlug}/_overview.md`;
+    const overviewMd = buildOverviewMarkdown(spec, urlByOp);
+    const overviewInput: AssembleInput = {
+      ...input,
+      readPage: (p) => (p === virtualPath ? overviewMd : input.readPage(p)),
+    };
+    const overview = await buildPage(
+      { path: virtualPath, slug: refSlug },
+      overviewInput,
+      input.trust ?? "owner",
+      () => null,
+      () => null,
+      undefined,
+    );
+    models.push(overview.model);
+    built.push(overview);
+  }
+
+  // The nav subtree: overview first, then tag groups with EVERY operation (the
+  // reference is a catalog; a missing row reads as an undocumented endpoint).
+  // Explicit nav placement decides a page's HOME: with tabs, such pages still
+  // get a reference row (marked foreign, so the reference chain never takes
+  // over their breadcrumbs or prev/next); on a tabless site they are excluded,
+  // because there the row would duplicate inside one sidebar column.
+  const hasTabs = (input.config.tabs?.length ?? 0) > 0;
+  const explicit = collectNavSlugs(input.config);
+  const foreign = new Set<string>();
+  const nodes: NavNode[] = [];
+  if (models.some((m) => m.slug === refSlug) && !explicit.has(refSlug)) {
+    nodes.push({ type: "page", slug: refSlug });
+  }
+  for (const group of groupOperations(spec)) {
+    const children: NavNode[] = [];
+    for (const op of group.operations) {
+      const slug = urlByOp.get(op.id)?.replace(/^\//, "");
+      if (!slug) continue;
+      if (explicit.has(slug)) {
+        if (!hasTabs) continue;
+        foreign.add(slug);
+      }
+      children.push({ type: "page", slug });
+    }
+    if (children.length > 0) nodes.push({ type: "group", label: group.tag, children });
+  }
+  return { label, url: refPath, nodes, foreign };
 }
 
 function errorPage(page: SitePage, message: string): BuiltPage {
@@ -456,6 +933,7 @@ function errorPage(page: SitePage, message: string): BuiltPage {
       anchors: [],
       islands: { islands: [] },
       breadcrumbs: [],
+      kind: "doc",
       diagnostics: [{ severity: "error", code: "page-build-error", message, source: page.path }],
     },
     links: [],
@@ -569,7 +1047,14 @@ function finalizeNav(nav: NavNode[], bySlug: Map<string, PageModel>): FinalNavNo
     if (node.type === "page") {
       const model = bySlug.get(node.slug);
       if (!model || model.hidden) continue;
-      out.push({ type: "page", slug: model.slug, url: model.url, title: navTitle(model) });
+      const method = model.kind === "api-operation" ? model.api?.method : undefined;
+      out.push({
+        type: "page",
+        slug: model.slug,
+        url: model.url,
+        title: navTitle(model),
+        ...(method !== undefined ? { method } : {}),
+      });
     } else {
       const children = finalizeNav(node.children, bySlug);
       if (children.length > 0) out.push({ type: "group", label: node.label, children });
@@ -588,8 +1073,17 @@ function firstPageUrl(nav: FinalNavNode[]): string | undefined {
   return undefined;
 }
 
-/** Compute prev/next and breadcrumbs from the finalized nav order. */
-function applyNavRelations(nav: FinalNavNode[], bySlug: Map<string, PageModel>): void {
+/**
+ * Compute prev/next and breadcrumbs from the finalized nav order. Slugs in
+ * `skip` stay in the order (neighbors still link TO them) but are not assigned
+ * relations themselves: their home is another nav context that already owns
+ * their breadcrumbs and chain.
+ */
+function applyNavRelations(
+  nav: FinalNavNode[],
+  bySlug: Map<string, PageModel>,
+  skip?: ReadonlySet<string>,
+): void {
   const order: { slug: string; trail: Breadcrumb[] }[] = [];
   const walk = (nodes: FinalNavNode[], trail: Breadcrumb[]): void => {
     for (const node of nodes) {
@@ -607,7 +1101,7 @@ function applyNavRelations(nav: FinalNavNode[], bySlug: Map<string, PageModel>):
 
   for (let i = 0; i < order.length; i++) {
     const entry = order[i];
-    if (!entry) continue;
+    if (!entry || skip?.has(entry.slug)) continue;
     const model = bySlug.get(entry.slug);
     if (!model) continue;
     model.breadcrumbs = entry.trail;

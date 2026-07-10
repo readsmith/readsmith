@@ -19,6 +19,7 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@readsmith/api-reference": "workspace:*",
     "@readsmith/model": "workspace:*",
     "github-slugger": "^2.0.0",
     "hast-util-from-html": "^2.0.3",

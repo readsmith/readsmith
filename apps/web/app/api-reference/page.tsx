@@ -1,5 +1,6 @@
 import { HydrateClient } from "@/components/hydrate-client";
 import { getApiReference } from "@/lib/api-reference";
+import { renderDocPage } from "@/lib/render-page";
 import { getSite } from "@/lib/site";
 import { type ShellSite, renderReferenceBody } from "@readsmith/components";
 import type { Metadata } from "next";
@@ -31,6 +32,21 @@ function baseUrl(url: string | undefined): URL | undefined {
 export default async function ApiReferencePage() {
   const ref = await getApiReference();
   if (!ref) notFound();
+
+  // Pages mode: the root serves the generated overview (a normal built page);
+  // the per-operation pages live under it in the catch-all docs route.
+  if (ref.layout === "pages") {
+    const rendered = await renderDocPage(ref.path.replace(/^\//, ""));
+    if (!rendered) notFound();
+    return (
+      <>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted prebuilt page HTML from the P1-P7 pipeline */}
+        <div dangerouslySetInnerHTML={{ __html: rendered.html }} />
+        <HydrateClient />
+      </>
+    );
+  }
+
   const { build, name, url, logo, branding } = await getSite();
 
   // Mirror the docs pages' tab bar with the reference tab active, so the
