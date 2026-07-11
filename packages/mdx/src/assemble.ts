@@ -1365,8 +1365,9 @@ const SKILL_COMPATIBILITY_MAX = 500;
 /** Per-file cap: keeps a stray binary or fixture dump out of the bundle. */
 const SKILL_FILE_MAX_BYTES = 262144;
 
-/** Squeeze an arbitrary display name into a spec-valid skill name. */
-function skillNameOf(display: string): string {
+/** Squeeze an arbitrary display name into a spec-valid skill name. Exported
+ * for the skill generator, whose write target must match the fallback's name. */
+export function skillNameOf(display: string): string {
   const squeezed = display
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")

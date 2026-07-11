@@ -27,3 +27,7 @@ apiReference:
   layout: pages
   # path: /api-reference   # default
   # label: API Reference   # default
+ai:
+  chat:
+    provider: gateway
+    model: openai/gpt-4o-mini

@@ -26,6 +26,7 @@
     "@readsmith/cache": "workspace:*",
     "@readsmith/model": "workspace:*",
     "ai": "^7.0.16",
+    "yaml": "^2.6.1",
     "zod": "^4.0.5"
   }
 }

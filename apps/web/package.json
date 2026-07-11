@@ -12,6 +12,7 @@
     "start": "next start -p 4321",
     "ai:index": "node scripts/ai-index.mjs",
     "ai:reindex": "node scripts/ai-index.mjs --reindex",
+    "skill:generate": "node scripts/generate-skill.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome check ."
   },

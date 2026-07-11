@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { h } from "hastscript";
 import { describe, expect, it } from "vitest";
 import {
@@ -155,5 +156,36 @@ describe("determinism", () => {
     expect(a.bundleHash).toBe(b.bundleHash);
     expect(JSON.stringify(a.skills)).toBe(JSON.stringify(b.skills));
     expect(c.bundleHash).not.toBe(a.bundleHash);
+  });
+});
+
+// Spec agent-skills SK-36: the build path is AI-free. The generator lives in
+// @readsmith/ai and only the offline command invokes it.
+describe("determinism guard (SK-36)", () => {
+  it("takes no AI dependency and builds identically with and without AI keys", async () => {
+    const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
+    expect(deps).not.toContain("@readsmith/ai");
+
+    const buildScript = new URL("../../../apps/web/scripts/build-content.mjs", import.meta.url);
+    const source = await readFile(buildScript, "utf8");
+    expect(source).not.toContain("@readsmith/ai");
+
+    // Reflect.deleteProperty rather than assignment: setting a process.env key
+    // to undefined coerces it to the string "undefined".
+    const prev = process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_API_KEY = "sk-fake-for-test";
+    try {
+      const withKey = await assembleSite(inputOf([skill("pets", "s/pets", GOOD)]));
+      Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
+      const withoutKey = await assembleSite(inputOf([skill("pets", "s/pets", GOOD)]));
+      expect(withKey.bundleHash).toBe(withoutKey.bundleHash);
+    } finally {
+      if (prev !== undefined) process.env.ANTHROPIC_API_KEY = prev;
+      else Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
+    }
   });
 });
