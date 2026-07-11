@@ -1,6 +1,7 @@
 {
   "name": "@readsmith/cache",
   "version": "0.0.0",
+  "license": "FSL-1.1-MIT",
   "private": true,
   "type": "module",
   "description": "A small cache port with an in-memory LRU/TTL driver (Redis behind the same interface later).",

@@ -2,6 +2,7 @@
   "name": "readsmith",
   "private": true,
   "version": "0.0.0",
+  "license": "FSL-1.1-MIT",
   "description": "Beautiful, self-hostable, AI-native documentation.",
   "packageManager": "pnpm@9.15.9",
   "engines": {

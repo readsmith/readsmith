@@ -1,6 +1,7 @@
 {
   "name": "@readsmith/api-reference",
   "version": "0.0.0",
+  "license": "FSL-1.1-MIT",
   "private": true,
   "type": "module",
   "description": "OpenAPI ingestion: parse, bundle, dereference, normalize to NormalizedSpec, derive, diff, and persist.",

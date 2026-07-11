@@ -217,4 +217,54 @@ describe("skillGates", () => {
     const long = `${GOOD_DRAFT}\n${"filler\n".repeat(500)}`;
     expect(skillGates(long, input)).toMatchObject([expect.stringContaining("lines")]);
   });
+
+  it("rejects em dashes", () => {
+    const dashed = GOOD_DRAFT.replace(
+      "- Sharing the key leaks access.",
+      "- Sharing the key — it leaks access.",
+    );
+    expect(skillGates(dashed, input)).toMatchObject([expect.stringContaining("em dash")]);
+  });
+});
+
+// Spec subpath-hosting SP-2: page urls carry the base path, absolute links
+// compose as origin + path. site.url + page.url would double the prefix.
+describe("skillGates on a subpath site", () => {
+  const subInput: SkillGenInput = {
+    site: { name: "Pets API", description: "The pets docs.", url: "https://pets.dev/docs" },
+    pages: [
+      { url: "/docs", title: "Home", rawMd: "# Home" },
+      { url: "/docs/auth", title: "Auth", rawMd: "# Auth" },
+    ],
+    name: "pets-api",
+    inputHash: "hash123",
+  };
+  const draft = (authLink: string) =>
+    GOOD_DRAFT.replace("[Auth](/auth)", "[Auth](/docs/auth)")
+      .replace("- [Auth](https://pets.dev/auth)", authLink)
+      .replace("- [Index](/llms.txt)", "- [Index](/docs/llms.txt)");
+
+  it("accepts origin-composed links and rejects a doubled prefix", () => {
+    expect(skillGates(draft("- [Auth](https://pets.dev/docs/auth)"), subInput)).toEqual([]);
+    expect(skillGates(draft("- [Auth](https://pets.dev/docs/docs/auth)"), subInput)).toMatchObject([
+      expect.stringContaining("not a page"),
+    ]);
+  });
+
+  it("catches wrong-host docs URLs even in plain text, prefixed or base-relative", () => {
+    const ok = draft("- [Auth](https://pets.dev/docs/auth)");
+    const staleHost = `${ok}\n\nDirectory: https://docs.pets.dev/llms.txt`;
+    // The remedy names the canonical PREFIXED path, so the repair round gets
+    // an exact instruction.
+    expect(skillGates(staleHost, subInput)).toMatchObject([
+      expect.stringContaining("use https://pets.dev/docs/llms.txt"),
+    ]);
+    const staleRel = `${ok}\n\nSee https://old.pets.dev/auth for keys.`;
+    expect(skillGates(staleRel, subInput)).toMatchObject([expect.stringContaining("wrong host")]);
+  });
+
+  it("leaves external homepages and unrelated hosts alone", () => {
+    const ok = `${draft("- [Auth](https://pets.dev/docs/auth)")}\n\nFormat: https://agentskills.io plus https://github.com/x/y.`;
+    expect(skillGates(ok, subInput)).toEqual([]);
+  });
 });

@@ -1,6 +1,7 @@
 {
   "name": "@readsmith/storage",
   "version": "0.0.0",
+  "license": "FSL-1.1-MIT",
   "private": true,
   "type": "module",
   "description": "Artifact storage: the BundleStore port and its local filesystem driver.",

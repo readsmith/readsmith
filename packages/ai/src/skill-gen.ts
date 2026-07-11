@@ -183,16 +183,37 @@ const REPLY_FORMAT = [
   "Line 3 onward: the complete markdown document, starting with the `# <title>` heading.",
 ].join("\n");
 
+/**
+ * Absolute URLs compose as origin + page path (spec subpath-hosting SP-2):
+ * page urls already carry any base path, so joining with the full site.url
+ * would double a subpath prefix ("/docs/docs/...").
+ */
+function siteUrlParts(url: string | undefined): {
+  home?: string;
+  origin?: string;
+  basePath: string;
+} {
+  const home = url?.replace(/\/+$/, "");
+  if (!home) return { basePath: "" };
+  try {
+    const origin = new URL(home).origin;
+    return { home, origin, basePath: home.slice(origin.length) };
+  } catch {
+    return { home, basePath: "" };
+  }
+}
+
 function reducePrompt(input: SkillGenInput, merged: Extraction): string {
-  const siteBase = input.site.url?.replace(/\/+$/, "");
+  const { home, origin, basePath } = siteUrlParts(input.site.url);
+  const llmsUrl = origin ? `${origin}${basePath}/llms.txt` : "/llms.txt";
   const urls = input.pages
-    .map((p) => (siteBase ? `${siteBase}${p.url === "/" ? "" : p.url}` : p.url))
+    .map((p) => (origin ? `${origin}${p.url === "/" ? "" : p.url}` : p.url))
     .join("\n");
   return [
     `Write the body of an agent skill for "${input.site.name}" (Agent Skills format, agentskills.io).`,
     "Use ONLY the extracted material below. Never invent endpoints, parameters, or facts.",
-    siteBase
-      ? `The documentation site itself lives at ${siteBase} (do NOT confuse it with any API base URL the docs describe).`
+    home
+      ? `The documentation site itself lives at ${home} (do NOT confuse it with any API base URL the docs describe).`
       : "",
     "",
     "Document structure, exactly in this order:",
@@ -207,7 +228,8 @@ function reducePrompt(input: SkillGenInput, merged: Extraction): string {
     "   ## Resources - deep links into the docs; end with the llms.txt pointer",
     "",
     `Budgets: at most ${SKILL_LINE_MAX - 20} lines and roughly 4000 tokens. Dense beats long.`,
-    "Link ONLY to these documentation URLs, EXACTLY as written (plus the llms.txt on the same host):",
+    "Style: never use em dashes; use commas, colons, or parentheses instead. In tables, leave a cell empty or write (none) rather than a dash placeholder.",
+    `Link ONLY to these documentation URLs, EXACTLY as written (plus the machine-readable directory, whose ONLY correct URL is ${llmsUrl}):`,
     urls,
     "",
     "Extracted material:",
@@ -295,6 +317,12 @@ export function skillGates(content: string, input: SkillGenInput): string[] {
       failures.push('The description must contain a "Use when ..." trigger phrase.');
     }
   }
+  const emDashes = (content.match(/—/g) ?? []).length;
+  if (emDashes > 0) {
+    failures.push(
+      `The file contains ${emDashes} em dash(es); replace every one with a comma, colon, or parentheses (in tables, leave the cell empty or write "(none)").`,
+    );
+  }
   const lines = content.split("\n").length;
   if (lines > SKILL_LINE_MAX) failures.push(`The file has ${lines} lines (max ${SKILL_LINE_MAX}).`);
   if (content.length > SKILL_CHAR_MAX) {
@@ -302,37 +330,71 @@ export function skillGates(content: string, input: SkillGenInput): string[] {
   }
 
   // Every internal link must resolve to a page the site actually serves.
-  const valid = new Set<string>(["/", "/llms.txt"]);
-  const siteBase = input.site.url?.replace(/\/+$/, "");
+  // Absolute forms are origin + page path (SP-2: page urls carry any base
+  // path; site.url + page.url would double a subpath prefix).
+  const { home, origin, basePath } = siteUrlParts(input.site.url);
+  const llmsPath = `${basePath}/llms.txt`;
+  const valid = new Set<string>(["/", llmsPath]);
   for (const page of input.pages) {
     valid.add(page.url);
-    if (siteBase) valid.add(`${siteBase}${page.url === "/" ? "" : page.url}`);
+    if (origin) valid.add(`${origin}${page.url === "/" ? "" : page.url}`);
   }
-  if (siteBase) {
-    valid.add(siteBase);
-    valid.add(`${siteBase}/llms.txt`);
+  if (home && origin) {
+    valid.add(home);
+    valid.add(`${origin}${llmsPath}`);
   }
-  const pagePaths = new Set<string>(["/", "/llms.txt", ...input.pages.map((p) => p.url)]);
+  // Both prefixed and base-relative page paths count as "our pages" here: a
+  // wrong-host URL usually carries the path as some other host would serve
+  // it, without our base path. The map remembers the canonical (prefixed)
+  // path so the remedy in the failure message is exact.
+  const canonicalByPath = new Map<string, string>([
+    [llmsPath, llmsPath],
+    ["/llms.txt", llmsPath],
+  ]);
+  for (const p of input.pages) {
+    canonicalByPath.set(p.url, p.url);
+    if (basePath && p.url.startsWith(basePath)) {
+      const rel = p.url.slice(basePath.length);
+      if (rel && rel !== "/") canonicalByPath.set(rel, p.url);
+    }
+  }
+  // A docs path reached through some other host (a model conflating the
+  // documented API's base URL with the docs site, or copying a stale host)
+  // is a broken link wherever it appears, plain text included. "/" is
+  // exempt: external homepages are legitimate.
+  const wrongHost = (target: string): string | null => {
+    if (!origin || !/^https?:\/\//.test(target)) return null;
+    if (target.startsWith(origin)) return null;
+    try {
+      const path = new URL(target).pathname.replace(/\/+$/, "");
+      const canonical = path ? canonicalByPath.get(path) : undefined;
+      if (canonical) {
+        return `URL "${target}" points at a docs page through the wrong host; use ${origin}${canonical}.`;
+      }
+    } catch {
+      // not a parseable URL: leave external strings alone
+    }
+    return null;
+  };
   for (const match of content.matchAll(/\]\(([^)\s]+)\)/g)) {
     const target = (match[1] ?? "").replace(/[#?].*$/, "");
     if (!target || valid.has(target)) continue;
-    if (target.startsWith("/") || (siteBase ? target.startsWith(siteBase) : false)) {
+    if (target.startsWith("/") || (origin ? target.startsWith(origin) : false)) {
       failures.push(`Link target "${target}" is not a page this site serves.`);
       continue;
     }
-    // A docs path reached through some other host (a model conflating the
-    // documented API's base URL with the docs site) is a broken link too.
-    if (siteBase && /^https?:\/\//.test(target)) {
-      try {
-        const path = new URL(target).pathname.replace(/\/+$/, "") || "/";
-        if (pagePaths.has(path)) {
-          failures.push(
-            `Link target "${target}" points at a docs page through the wrong host; use ${siteBase}${path === "/" ? "" : path}.`,
-          );
-        }
-      } catch {
-        // not a parseable URL: leave external strings alone
-      }
+    const wrong = wrongHost(target);
+    if (wrong) failures.push(wrong);
+  }
+  // Plain-text URLs get the wrong-host check too: the failure mode that
+  // motivated it showed up in prose and headings, not markdown links.
+  const seen = new Set<string>(failures);
+  for (const match of content.matchAll(/https?:\/\/[^\s)<>"'\]]+/g)) {
+    const target = (match[0] ?? "").replace(/[#?].*$/, "").replace(/[.,;:]+$/, "");
+    const wrong = wrongHost(target);
+    if (wrong && !seen.has(wrong)) {
+      seen.add(wrong);
+      failures.push(wrong);
     }
   }
   return failures;

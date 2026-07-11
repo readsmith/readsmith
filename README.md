@@ -20,7 +20,17 @@
 
 ## Quickstart
 
-Coming soon. See [`CLAUDE.md`](./CLAUDE.md) for the stack and development conventions.
+```bash
+git clone https://github.com/readsmith/readsmith && cd readsmith
+cp .env.example .env   # set POSTGRES_PASSWORD; everything else has a working default
+docker compose up
+```
+
+Then visit `http://localhost:4321`. You are looking at the bundled sample
+content, served exactly the way your docs will be. The full guide lives at
+[readsmith.dev/docs](https://readsmith.dev/docs).
+
+To develop on Readsmith itself:
 
 ```bash
 pnpm install
@@ -29,8 +39,20 @@ pnpm dev
 
 ## Contributing
 
-Contributions are welcome under the Developer Certificate of Origin. Sign your commits with `git commit -s`.
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Contributions are welcome under the
+Developer Certificate of Origin: sign your commits with `git commit -s`.
 
 ## License
 
-Source-available. See `LICENSE` (added during setup).
+Readsmith is [Fair Source](https://fair.io) software under the
+[Functional Source License, v1.1, MIT Future License](./LICENSE.md) (FSL-1.1-MIT).
+
+In plain words:
+
+- **You can** self-host Readsmith for your own docs (personal, internal, or
+  public), modify it, and redistribute it. Every feature is included; nothing
+  is gated behind the license.
+- **You cannot** offer Readsmith itself to others as a competing commercial
+  product or service (for example, a hosted docs platform built on this code).
+- **Each release becomes MIT automatically two years after it ships.** The
+  future of the code is guaranteed open source, on a public clock.

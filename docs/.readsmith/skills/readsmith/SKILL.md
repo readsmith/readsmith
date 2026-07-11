@@ -1,308 +1,275 @@
 ---
 name: readsmith
-description: Readsmith is an open-source documentation platform that builds a
-  Markdown/MDX repo into a docs site with navigation, search, generated OpenAPI
-  reference, and agent-readable outputs (llms.txt, MCP server, Agent Skills),
-  self-hosted via Docker Compose. Use when a user asks to set up, configure,
-  author, self-host, upgrade, or theme a Readsmith site; wants to generate or
-  hand-write an Agent Skill; needs the search/Ask AI/MCP endpoints; is writing
-  docs.yaml, frontmatter, components (callouts, tabs, cards, steps, accordions),
-  or an OpenAPI-driven API reference (hybrid pages, schema pages); or is
-  deciding between Readsmith and Mintlify/GitBook/Starlight/Fumadocs.
+description: Readsmith is a Fair Source documentation platform that builds a
+  docs site (navigation, search, generated OpenAPI reference, agent outputs like
+  llms.txt/MCP/skill.md) from a Markdown/MDX repo, self-hosted via Docker
+  Compose with Postgres/pgvector. Use when configuring docs.yaml, authoring
+  pages or components (callouts, tabs, steps, cards, code groups, accordions,
+  operation embeds), setting up hybrid/schema API reference pages, enabling AI
+  search/Ask AI/MCP, generating or hand-authoring an Agent Skill,
+  deploying/upgrading/backing up a self-hosted instance, tuning rate
+  limits/CSP/reverse proxy, or debugging degraded search/Ask AI capabilities.
 metadata:
   readsmith-proj: readsmith
   version: "1.0"
-  readsmith-generated: 0f0a13618375c00258f1088331541cd6f854e1d343188461a2b359ec1dc57cad
+  readsmith-generated: 3094c72ba4d1fc419c1985b33af01d16cab53fd2c9127ad7430630389a44a273
 ---
 
 # Readsmith
 
 ## Product summary
-Readsmith is an open-source documentation platform (docs at https://docs.readsmith.dev) that compiles a repository of Markdown/MDX into an immutable static bundle — navigation, search, a generated API reference from an OpenAPI spec, and agent-readable outputs — with zero-JS prose pages and islands only where needed. It self-hosts as two containers (the app plus Postgres with pgvector) via a single Docker Compose file, is released under the Fair Source License with no feature gates, and needs only `site.name` set in `docs.yaml`/`docs.json` to build a working site by convention. Search and Ask AI run on the operator's own model keys (OpenAI, Anthropic, Google, or a gateway) with a documented degradation ladder when a database or key is missing; agent outputs include `/llms.txt`, `/llms-full.txt`, per-page Markdown, an MCP server, and a generated `/skill.md` written into the repo for review.
+Readsmith is a Fair Source (FSL-1.1-MIT, becomes MIT two years after each release) documentation platform that compiles a repository of Markdown/MDX into a static-first docs site: zero-JS prose pages with islands only where needed, folder-based navigation by convention, a generated API reference from an OpenAPI spec, hybrid full-text/vector search, an Ask AI answerer, and machine-readable agent outputs (llms.txt, llms-full.txt, per-page /md/ Markdown, MCP server, and a generated or hand-authored Agent Skill at /skill.md). The primary docs are at https://readsmith.dev/docs. Load-bearing facts: it self-hosts as exactly two containers (the app plus Postgres with pgvector) via one Docker Compose file, and every build produces an immutable bundle so rollbacks just repoint, nothing rebuilds; without DATABASE_URL the app runs fully docs-only (pages, navigation, agent outputs all work) while search and Ask AI degrade or turn off; and AI features run on your own model keys (OpenAI, Anthropic, Google, or a gateway) resolved only from environment variables, never from config.
 
 ## When to use
-- User wants to scaffold, run, or point Readsmith at a docs repo (`quickstart`, `READSMITH_CONTENT`)
-- User is authoring pages/frontmatter, snippets, variables, images/links, or Markdown vs MDX questions
-- User is building or debugging a generated API reference (hybrid pages, schema pages, `apiReference` config, `<Operation>` embeds)
-- User needs Readsmith's Search API, Ask AI API, MCP server, or Agent Skill generation/discovery
-- User is configuring `docs.yaml` (navigation, theming, settings) or self-hosting (deploy, environment variables, reverse proxy, security, upgrading)
-- User is choosing components (callouts, tabs, steps, accordions, cards, code groups, frames, inline) or comparing Readsmith to Mintlify/GitBook/Starlight/Fumadocs
+- Setting up or editing docs.yaml (navigation, theming, API reference, AI, security settings)
+- Authoring Markdown/MDX pages, snippets, variables, or components (callouts, tabs, steps, accordions, cards, code groups, frames, badges, updates)
+- Declaring OpenAPI-backed hybrid pages (`openapi:`) or schema pages (`openapi-schema:`)
+- Configuring or querying search, Ask AI, or the MCP server
+- Generating (`pnpm skill:generate`) or hand-authoring a Readsmith Agent Skill
+- Deploying, upgrading, backing up, or reverse-proxying a self-hosted Readsmith instance
+- Debugging rate limits, CSP, degraded AI capabilities, or storage-root/content-root issues
+- Choosing Readsmith versus Mintlify, GitBook, Starlight, or Fumadocs
 
 ## Quick reference
 
-### Core paths
-| Item | Value |
-|---|---|
-| Docs site | https://docs.readsmith.dev |
-| Site API base URL | https://docs.readsmith.dev |
-| Site API version | 0.1.0 |
-| Local dev URL | http://localhost:4321 |
-| llms.txt | `/llms.txt` (endpoint index appended if API reference present) |
-| llms-full.txt | `/llms-full.txt` (single Markdown export, hidden pages excluded) |
-| Per-page Markdown | `/md/<page-path>` |
-| Skill discovery | `/skill.md`, `/.well-known/skills/index.json`, `/.well-known/skills/<name>/SKILL.md` |
-| MCP canonical endpoint | `/_readsmith/mcp` (public alias default `/mcp`, set via `mcp.path`) |
-
-### Site API endpoints (no auth; rate limited per IP)
-| Endpoint | Method | Purpose | Responses |
-|---|---|---|---|
-| `/_readsmith/api/search` | POST | Hybrid search (full-text + vector) | 200, 400, 429, 503 |
-| `/_readsmith/api/ask` | POST | Ask AI, SSE UI message stream | 200 (text/event-stream), 400, 429, 503 |
-| `/_readsmith/api/ai/feedback` | POST | Thumbs signal on a logged answer | 200, 400, 503 |
-| `/_readsmith/api/ai/capabilities` | GET | Degradation-ladder state | 200 |
-| `/_readsmith/api/health` | GET | Liveness + DB reachability | 200, 503 |
-
-### Search / Ask AI request body (both endpoints)
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| query | string | yes | min length 1, max length 2000 |
-| version | string | no | defaults to current |
-| locale | string | no | defaults to `en` |
-
-### SearchHit fields
-| Field | Type | Notes |
+### Public site API (all public, rate limited per client IP, no auth)
+| Endpoint | Method | Notes |
 |---|---|---|
-| id, title, snippet, url, headerPath[], score | required | snippet is display-only preview |
-| kind | required | `"doc"` \| `"endpoint"` |
-| text | optional | full chunk text, if requested |
-| anchor, method, path | string\|null, required | |
-
-### Feedback / Capabilities / Health response fields
-| Endpoint | Field | Type |
-|---|---|---|
-| feedback 200 | ok | boolean |
-| capabilities 200 | search, vectorSearch, askAi | boolean |
-| health 200/503 | status | `"ok"` \| `"degraded"` |
-| health 200/503 | database | `"up"` \| `"down"` \| `"disabled"` |
+| /_readsmith/api/search | POST | body: query (required, 1-2000 chars), version, locale; returns hits[], degraded |
+| /_readsmith/api/ask | POST | streams SSE UI message stream; same body shape as search |
+| /_readsmith/api/ai/feedback | POST | body: id (required), value (integer, up/down) |
+| /_readsmith/api/ai/capabilities | GET | returns search, vectorSearch, askAi booleans |
+| /_readsmith/api/health | GET | returns status (ok/degraded), database (up/down/disabled); 503 if DB unreachable |
+| /mcp (canonical /_readsmith/mcp) | POST (streamable HTTP) | tools: search_docs, list_endpoints, get_endpoint (latter two need API reference) |
+| /llms.txt, /llms-full.txt | GET | directory and full-site Markdown export |
+| /md/<page> | GET | per-page Markdown projection |
+| /skill.md | GET | skill or redirect to index |
+| /.well-known/skills/index.json, /.well-known/skills/<name>/SKILL.md | GET | skill discovery |
+| /rss.xml | GET | fed by changelog Update entries with date frontmatter |
 
 ### Default rate limits (per client IP)
-| Feature | Default |
-|---|---|
-| Ask AI | 10 req/min |
-| Search | 60 req/min |
-| MCP | 60 req/min |
+| Feature | Limit | Config key |
+|---|---|---|
+| Ask AI | 10/min | ai.limits.ask, READSMITH_RATE_LIMIT_ASK |
+| Search | 60/min | ai.limits.search, READSMITH_RATE_LIMIT_SEARCH |
+| MCP | 60/min | ai.limits.mcp, READSMITH_RATE_LIMIT_MCP |
 
 ### Key docs.yaml settings
-| Key | Default |
-|---|---|
-| site.name | required, no default |
-| site.url | unset |
-| content.root | `.` |
-| content.include | `**/*.md`, `**/*.mdx` |
-| appearance.default | `system` |
-| apiReference.spec | unset (required to enable) |
-| apiReference.path | `/api-reference` |
-| apiReference.layout | `single` (or `pages`) |
-| branding | `true` |
-| mcp.path | `/mcp` |
-| ai.search.rrfK / topK | 60 / 8 |
-| ai.askAi.enabled / maxSteps / maxOutputTokens / timeoutMs | true / 4 / 1024 / 30000 |
-| ai.limits.ask / search / mcp | 10/min / 60/min / 60/min |
+| Key | Default | Notes |
+|---|---|---|
+| site.name | (required) | only mandatory key anywhere |
+| content.root | . | (none) |
+| content.home | unset | may escape content root, never the repo |
+| apiReference.spec | unset | required to enable reference; relative to content root |
+| apiReference.layout | single | single or pages |
+| apiReference.path | /api-reference | (none) |
+| mcp.path | /mcp | canonical endpoint always answers regardless |
+| ai.chat.provider/model | unset | openai, anthropic, google, gateway |
+| ai.embedding.provider/model | unset | openai, google, gateway |
+| ai.search.topK | 8 | (none) |
+| ai.askAi.enabled | true | (none) |
+| branding | true | set false to remove "Powered by Readsmith" |
 
 ### Key environment variables
-| Variable | Default |
-|---|---|
-| READSMITH_CONTENT | `apps/web/content` |
-| DATABASE_URL | unset |
-| PORT | `4321` |
-| STORAGE_ROOT / STORAGE_DRIVER | `apps/web/.readsmith` / `local` |
-| READSMITH_STORAGE_ROOT | unset (must be unique per site) |
-| CACHE_DRIVER | `memory` |
-| READSMITH_LOG_LEVEL | `info` |
-| READSMITH_WORKER_CONCURRENCY | `2` |
-| AI role-override keys | `READSMITH_AI_CHAT_KEY`, `READSMITH_AI_EMBEDDING_KEY`, `READSMITH_AI_RERANK_KEY` (checked before provider-native vars) |
-| Provider-native keys | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `AI_GATEWAY_API_KEY` |
-| READSMITH_RATE_LIMIT* | master switch + per-feature overrides, win over config |
-| READSMITH_TRUSTED_IP_HEADER | unset (uses socket address) |
-| READSMITH_CSP_* | build-time only |
+| Variable | Default | Notes |
+|---|---|---|
+| DATABASE_URL | unset | absent = docs-only mode |
+| READSMITH_CONTENT | apps/web/content | dir holding docs.yaml/content |
+| PORT | 4321 | (none) |
+| STORAGE_ROOT / STORAGE_DRIVER | apps/web/.readsmith / local | compiled bundle store |
+| READSMITH_STORAGE_ROOT | unset | spec blobs root; never share across sites |
+| READSMITH_AI_CHAT_KEY / EMBEDDING_KEY / RERANK_KEY | unset | role overrides, checked first |
+| OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY / AI_GATEWAY_API_KEY | unset | provider-native, checked second |
+| READSMITH_RATE_LIMIT | (none) | master on/off switch |
+| READSMITH_TRUSTED_IP_HEADER | unset | only set if a trusted proxy sets it |
+| READSMITH_CSP_IMG_SRC / CONNECT_SRC / FONT_SRC / FRAME_SRC / FRAME_ANCESTORS | unset | build-time only |
 
 ## Decision guidance
 
-### apiReference.layout
+### API reference layout
 | Option | When |
 |---|---|
-| `single` (default) | Small API; one continuous page at `/api-reference` |
-| `pages` | Operations need own URLs/search results; joins top-level tab row |
-
-### Config file format
-| Option | When |
-|---|---|
-| `docs.yaml`/`docs.yml` | Default, native shape |
-| `docs.json` | Migrating from Mintlify-compatible setup |
+| single (default) | small API; one continuous page at /api-reference |
+| pages | operations deserve own URLs/search/prev-next; appears as its own nav tab |
 
 ### .md vs .mdx
 | Option | When |
 |---|---|
-| `.md` | Dual-published/shared file (also renders on GitHub); MDX tags degrade to raw text outside Readsmith |
-| `.mdx` | Site-only page needing full component library |
+| .md (plain Markdown) | docs are dual-published and also render on GitHub, or file is a shared snippet |
+| .mdx | site-only page needing full component library |
 
-### Navigation
+### Model choice: Ask AI vs skill generation
 | Option | When |
 |---|---|
-| Auto-navigation (no config) | Start here; file tree already matches mental model |
-| Explicit `navigation`/`tabs` config | Only once auto sidebar stops matching intent |
+| A cheap model | live site Ask AI |
+| Your strongest model, via --model | pnpm skill:generate; runs rarely, quality gap in extracted gotchas is large |
 
-### Local run
+### Operation embed vs generated reference pages
 | Option | When |
 |---|---|
-| Docker + Compose plugin | Standard path; full stack incl. search/Ask AI |
-| Node.js 22+ / pnpm | Preview without containers; runs docs-only, no DB |
+| `<Operation op="..."/>` | narrative page interleaving prose with a few fully specified calls |
+| apiReference.layout: pages | many operations (e.g. twenty); get navigation, search, per-operation URLs for free |
 
-### Callout severity
-| Severity | When |
-|---|---|
-| Note | Skippable enriching detail |
-| Info | Context needed to proceed correctly |
-| Tip | Best practice/recommendation |
-| Warning | Reversible harm/surprise/data risk |
-| Danger | Irreversible or security-relevant harm |
-| Check | Confirmation at end of procedure |
-
-### Tabs vs alternatives
+### Choosing among Tabs, headings, Accordion, code group
 | Option | When |
 |---|---|
-| Tabs | Reader chooses exactly one alternative |
-| Headings | Reader should read all content |
-| Accordion | Optional, skippable depth |
-| Code group | Alternatives are code-only |
+| Tabs | reader must choose exactly one alternative (install paths, OS, languages) |
+| Headings | reader should read all content, not choose one |
+| Accordion | content is optional depth expanded on demand |
+| Code group | alternatives are code-only, tighter presentation |
 
-### Operation embed vs generated pages
+### Navigation: auto vs explicit
 | Option | When |
 |---|---|
-| `<Operation op="...">` | Narrative page interleaving prose with 3–4 fully specified calls |
-| `apiReference.layout: pages` | Many operations; free navigation/search/URLs instead of stacked embeds |
+| Auto (no config) | file tree already matches desired structure |
+| Explicit `navigation`/`tabs` | need curated ordering or sections; requires manual slug upkeep |
 
-### Steps vs plain list
+### Reverse proxy choice
 | Option | When |
 |---|---|
-| `<Steps>` | Order carries real sequential meaning |
-| Plain list | Items are independent options, not a required sequence |
+| Caddy | want automatic TLS with minimal config |
+| nginx | terminating TLS yourself (certbot/CDN), prefer familiar setup |
+
+### Where to run Readsmith
+| Option | When |
+|---|---|
+| Self-host, one Docker Compose file | available now |
+| Readsmith Cloud | soon, not yet available |
+
+### Model provider for Search/Ask AI
+| Option | When |
+|---|---|
+| OpenAI / Anthropic / Google | use your own keys with that provider directly |
+| Gateway | route through a model gateway instead of a direct provider key |
 
 ## Workflow
 
-1. **Quickstart with Docker Compose**
-   1. `git clone https://github.com/readsmith/readsmith && cd readsmith`
-   2. `cp .env.example .env` and set `POSTGRES_PASSWORD`
-   3. `docker compose up`
-   4. Visit `http://localhost:4321`
-   5. Point at your own docs: set `READSMITH_CONTENT` to your content directory and restart
+1. **Deploy with Docker Compose (zero to serving)**
+   1. `git clone https://github.com/readsmith/readsmith` and `cd readsmith`
+   2. `cp .env.example .env`
+   3. Set a real `POSTGRES_PASSWORD`, point `READSMITH_CONTENT` at your docs dir, keep `.env` out of version control
+   4. `docker compose up -d --build`
+   5. `curl -s https://readsmith.dev/docs/llms.txt | head -3` to confirm pages/search/agent outputs
+   6. Put a reverse proxy in front before going live
 
-2. **Write your first page**
-   1. Create `index.md` in the content directory with a heading and content
-   2. Rebuild or let the dev server pick it up
-   3. Page is live, in navigation, in `/llms.txt`, and indexed for search
+2. **Configure search and Ask AI**
+   1. Add `ai.chat` (provider, model) and `ai.embedding` (provider, model) to docs.yaml
+   2. Set matching API keys via environment variables (role overrides first, provider-native second)
+   3. Run `pnpm ai:index`
+   4. Re-run `pnpm ai:index` after every deploy; it is manual, not part of automatic migrations
 
-3. **Set up the generated API reference**
-   1. Add `apiReference.spec: <path>` in `docs.yaml`, relative to content root
+3. **Generate an Agent Skill from docs**
+   1. `pnpm skill:generate --dry-run` to preview
+   2. `pnpm skill:generate --model <strongest-available-model>`
+   3. Generator extracts facts/procedures/gotchas via bounded map-reduce and verifies links against real pages
+   4. Review the diff written into `.readsmith/skills/`, edit, commit
+   5. Next build serves the committed skill
+
+4. **Author an Agent Skill by hand**
+   1. Create a directory under reserved `.readsmith/skills/` at content root, one per skill
+   2. Add `SKILL.md` with frontmatter `name` (matching directory) and `description`
+   3. Write body content; authored skills always win over generated ones
+
+5. **Declare a hybrid API operation page**
+   1. Add frontmatter `openapi: "METHOD /path"` matching a spec operation
+   2. Write prose body
+   3. Generated sections (authorization, parameters, request body, responses, request console) render automatically after it
+
+6. **Declare a data-model (schema) page**
+   1. Add frontmatter `openapi-schema: "SchemaName"` naming a `components.schemas` entry
+   2. Write prose about the model
+   3. Generated fields/required/enums/nesting render after the authored body
+
+7. **Set up the generated API reference**
+   1. Set `apiReference.spec` to the OpenAPI file path (relative to content root) in docs.yaml
    2. Optionally set `apiReference.layout` to `single` (default) or `pages`
-   3. For a hybrid narrative page: frontmatter `openapi: "METHOD /path"` (or `"file.json POST /path"`), write prose; generated sections render after it
-   4. For a data-model page: frontmatter `openapi-schema: "SchemaName"` (or `"openapi.json Pet"`), write prose; generated fields render after it
+   3. Reference builds automatically with the site
 
-4. **Generate or author an Agent Skill**
-   1. To generate: run `pnpm skill:generate --dry-run` to preview, or `pnpm skill:generate --model <model>` for a stronger model
-   2. Generator reads the built site, extracts facts/procedures/gotchas, verifies links, writes into `.readsmith/skills/`, and prints cost
-   3. Review the diff, edit as needed, commit
-   4. To hand-write instead: create `.readsmith/skills/<name>/SKILL.md` with frontmatter `name` (matching dir) and `description`; hand-written skills always win over generated ones
-
-5. **Deploy and verify a self-hosted instance**
-   1. `git clone ... && cd readsmith && cp .env.example .env`
-   2. Set `POSTGRES_PASSWORD`, point `READSMITH_CONTENT`
-   3. `docker compose up -d --build`
-   4. `curl -s http://localhost:4321/llms.txt | head -3` to verify
-   5. Put a reverse proxy (e.g. Caddy) in front; set `READSMITH_TRUSTED_IP_HEADER` only to a header your proxy controls
-   6. `curl -sI https://<domain> | grep -iE "content-security-policy|x-frame-options"` to confirm both headers present
-   7. Send 11 quick Ask AI requests and confirm the 11th returns 429 with `Retry-After`
-
-6. **Upgrade a deployment**
+8. **Upgrade a self-hosted deployment**
    1. `git pull --tags`
-   2. `docker compose up -d --build` (migrations run automatically)
+   2. `docker compose up -d --build` (migrations run automatically on start, forward-only)
    3. Load the site, run one search, spot-check `/llms.txt`
-   4. Back up DB (`pg_dump`), `storage-data` volume, and content repo beforehand
+   4. Check release notes before rolling back across a migration boundary
+
+9. **Pass the real client IP through a reverse proxy**
+   1. Configure the proxy to set a header only it controls (e.g. `X-Real-IP`, `CF-Connecting-IP`)
+   2. Set `READSMITH_TRUSTED_IP_HEADER` to that header's name
+   3. Never point it at a client-settable header on a directly exposed app
+
+10. **Verify security posture after deploying**
+    1. `curl -sI https://<host> | grep -iE "content-security-policy|x-frame-options"` and confirm both present
+    2. Send eleven quick Ask AI requests; the eleventh should return 429 with `Retry-After`
+    3. `curl -s https://<host> | grep -ci "api_key\|apikey"` and confirm zero
 
 ## Common gotchas
-- Generating a skill refuses to overwrite a hand-written `SKILL.md` lacking the generated marker unless `--force` is passed
-- Skill generation never runs during a build and is a no-op if content is unchanged since last generation
-- If a docs page itself claims `/mcp`, the MCP endpoint is still reachable only at `/_readsmith/mcp` or the configured `mcp.path` alias; MCP is strictly read-only
-- After deploys, `pnpm ai:index` must be run manually — it is not automatic like migrations
-- `degraded:true` in search reflects runtime provider health, not configuration — a valid key can still degrade under load
-- The `snippet` field is a display preview only, never used for grounding; use MCP `search_docs` for full text
-- Two pages claiming the same OpenAPI operation, or two schema pages claiming the same schema, is a build error (first claim wins)
-- A `openapi-schema` name matching nothing renders a visible danger callout instead of failing silently; same for `<Operation op="...">` matching nothing
-- If a page has both `openapi` and `openapi-schema` frontmatter keys, `openapi` wins and a build warning is emitted
-- Untagged (no language) code blocks render as plain text in both themes
-- An asset mount (`assets: - from/to`) copies the entire directory, not just referenced files — can leak scripts/private data
-- MDX component tags render as raw text on GitHub; dual-published shared files should stay `.md`
-- `{{version}}` syntax is Markdown-only; used inside `.mdx` it parses as an expression and warns
+- Hidden pages (`hidden: true`) are excluded from `/llms-full.txt`, navigation, sitemap, feeds, and the AI index, but their URLs still serve
 - `hidden: true` implies `noindex` unless `noindex: false` is explicitly set
-- `{{variable}}` inside code spans/fences is never interpolated; unknown variable references warn rather than fail
-- Sharing one `READSMITH_STORAGE_ROOT` between two sites makes the second overwrite the first's compiled bundle
-- A snippet cycle or excessive nesting is reported as a build diagnostic, not an infinite loop
-- Forgetting a blank line between `<CodeGroup>` tags and fenced blocks breaks the grouping
-- Skipping `ratio` on a `Frame` forfeits layout-shift protection
-- Tooltips must never carry essential content — hidden until hover/focus
-- A navigation slug matching no page, or a page missing from an explicit `navigation` list, is only caught at build time (and the page stays reachable by URL either way)
-- `content.exclude` merges with default ignores (`node_modules`, `.git`, `snippets/`) — never replaces them
-- CSP env vars (`READSMITH_CSP_*`) are read at build time only, not on a running container; malformed CSP tokens are dropped, not trusted
-- Trusting a client-settable header (e.g. raw `X-Forwarded-For`) for `READSMITH_TRUSTED_IP_HEADER` defeats rate limiting by giving every request its own bucket
-- Behind a CDN, exclude `POST` requests under `/_readsmith/` from caching; let `/llms.txt`, `/skill.md`, `/.well-known/*` through untouched
-- Docs pages are baked into the image at build time; a content change requires `docker compose up -d --build` — nothing compiles at request time
-- Database migrations are forward-only; check release notes before rolling back across a migration boundary
-- A docs-only site (no `DATABASE_URL`) reports database status `"disabled"` and still reports healthy; 503 from `/health` means the DB is configured but unreachable, a distinct case
+- A `SKILL.md` without the generated marker is refused during regeneration unless `--force` is passed; the generator never overwrites hand-written skills and never runs during a build
+- MCP is strictly read-only; agents can look things up but never change anything
+- `pnpm ai:index` is manual: forgetting it after deploy leaves search/Ask AI stale even though migrations ran automatically
+- `degraded: true` in search results reflects runtime provider health, not configuration; a valid embedding key can still degrade to keyword-only at request time
+- The `snippet` field in search hits is a display preview only, never model grounding; use MCP `search_docs` or the `text` field for full chunk content
+- A second page claiming the same OpenAPI operation or schema is a build error; the first claim wins
+- A page with both `openapi` and `openapi-schema` keeps only the operation page and emits a build warning
+- A schema or operation reference matching nothing in the spec renders a visible danger callout rather than silently shipping stale docs
+- Untagged fenced code blocks render as plain text with worse theming; always specify a language
+- Asset mounts (`assets[].from`) copy the entire directory, not just referenced files, and may escape content root but never the repo root
+- The double-brace `{{var}}` syntax is Markdown-only; inside `.mdx` it parses as an expression and warns
+- MDX component tags render as raw text on repos whose docs also render on GitHub; plain `.md` degrades gracefully, MDX does not
+- Two sites must never share one storage root (`STORAGE_ROOT`/`READSMITH_STORAGE_ROOT`); the second build overwrites the first's compiled bundle
+- CSP environment variables are read at build time only; setting them on a running container has no effect
+- Setting `READSMITH_TRUSTED_IP_HEADER` to a client-settable header on a directly exposed app lets attackers forge fresh rate-limit buckets per request
+- A CDN must never cache the POST endpoints under `/_readsmith/`, and must pass `/llms.txt`, `/skill.md`, `/.well-known/*` through untouched
+- Publishing a content change requires rebuilding the image; there is no live content reload in a running container
+- A site with no database reports `database: disabled` but overall `status: ok`; a configured-but-unreachable database returns 503, not 200
+- Content files (`.md`, `.mdx`, config) are never served raw; they are build inputs only
 
 ## Verification checklist
-- [ ] `docs.yaml`/`docs.json` sets `site.name` and builds without missing-variable or broken-link/anchor warnings
-- [ ] `curl https://<site>/llms.txt` (or local `http://localhost:4321/llms.txt`) returns the expected directory
-- [ ] If an API reference is configured, `apiReference.spec` resolves and `/api-reference` (or per-operation pages) render without danger-callout placeholders for missing operations/schemas
-- [ ] `GET /_readsmith/api/health` returns `status: "ok"` and the expected `database` value for the deployment's configuration
-- [ ] `GET /_readsmith/api/ai/capabilities` matches expectations (search/vectorSearch/askAi on only where keys and DB are configured)
-- [ ] Rate limiting confirmed: an 11th rapid Ask AI request returns 429 with `Retry-After`
-- [ ] Security headers present: `content-security-policy` and `x-frame-options` on responses
-- [ ] No API keys leak into served output (`grep -ci "api_key\|apikey"` on the response is zero)
-- [ ] Generated or hand-written `SKILL.md` reviewed/committed and `name` matches its directory
-- [ ] `READSMITH_STORAGE_ROOT` is unique per deployment, not shared across sites
+- [ ] `docs.yaml` has `site.name` set and, if used, a valid `content.root`
+- [ ] `apiReference.spec` path resolves relative to content root if an API reference is expected
+- [ ] No two pages claim the same `openapi` operation or `openapi-schema` schema
+- [ ] AI keys are set via environment variables only (never in `docs.yaml`), matching the configured `ai.chat.provider`/`ai.embedding.provider`
+- [ ] `pnpm ai:index` has been run after the latest content deploy
+- [ ] `GET /_readsmith/api/ai/capabilities` returns the expected `search`/`vectorSearch`/`askAi` booleans
+- [ ] `GET /_readsmith/api/health` returns `status: ok` (or documented `degraded` cause) with correct `database` state
+- [ ] `/llms.txt`, `/llms-full.txt`, and `/skill.md` serve and reflect current content (hidden pages excluded as expected)
+- [ ] Reverse proxy passes `/_readsmith/*` POST requests uncached and lets `/.well-known/*` through untouched
+- [ ] `READSMITH_STORAGE_ROOT`/`STORAGE_ROOT` is unique per site (no shared bundle overwrite)
+- [ ] Rate limits (10/min Ask AI, 60/min search, 60/min MCP) behave as configured under load test
 
 ## Resources
-- https://docs.readsmith.dev/what-is-readsmith
-- https://docs.readsmith.dev/quickstart
-- https://docs.readsmith.dev/configuration/overview
-- https://docs.readsmith.dev/configuration/settings-reference
-- https://docs.readsmith.dev/configuration/navigation
-- https://docs.readsmith.dev/configuration/theming
-- https://docs.readsmith.dev/authoring/pages
-- https://docs.readsmith.dev/authoring/markdown
-- https://docs.readsmith.dev/authoring/snippets-and-variables
-- https://docs.readsmith.dev/authoring/images-and-links
-- https://docs.readsmith.dev/authoring/code-blocks
-- https://docs.readsmith.dev/components/overview
-- https://docs.readsmith.dev/components/callouts
-- https://docs.readsmith.dev/components/cards
-- https://docs.readsmith.dev/components/tabs
-- https://docs.readsmith.dev/components/steps
-- https://docs.readsmith.dev/components/accordions
-- https://docs.readsmith.dev/components/code-groups
-- https://docs.readsmith.dev/components/frames
-- https://docs.readsmith.dev/components/inline
-- https://docs.readsmith.dev/components/operation
-- https://docs.readsmith.dev/components/updates
-- https://docs.readsmith.dev/api-reference-guide/setup
-- https://docs.readsmith.dev/api-reference-guide/hybrid-pages
-- https://docs.readsmith.dev/api-reference-guide/schema-pages
-- https://docs.readsmith.dev/api-reference
-- https://docs.readsmith.dev/api-reference/askdocs
-- https://docs.readsmith.dev/api-reference/sendfeedback
-- https://docs.readsmith.dev/api-reference/getcapabilities
-- https://docs.readsmith.dev/api-reference/gethealth
-- https://docs.readsmith.dev/ai/agent-outputs
-- https://docs.readsmith.dev/ai/agent-skills
-- https://docs.readsmith.dev/ai/mcp
-- https://docs.readsmith.dev/ai/search-and-ask
-- https://docs.readsmith.dev/ai/search-api
-- https://docs.readsmith.dev/self-host/deploy
-- https://docs.readsmith.dev/self-host/environment
-- https://docs.readsmith.dev/self-host/reverse-proxy
-- https://docs.readsmith.dev/self-host/security
-- https://docs.readsmith.dev/self-host/upgrading
-- https://docs.readsmith.dev/comparisons
-- https://docs.readsmith.dev/changelog
-- https://docs.readsmith.dev
-- Directory of all docs for agents: https://docs.readsmith.dev/llms.txt
+- https://readsmith.dev/docs
+- https://readsmith.dev/docs/what-is-readsmith
+- https://readsmith.dev/docs/quickstart
+- https://readsmith.dev/docs/configuration/overview
+- https://readsmith.dev/docs/configuration/settings-reference
+- https://readsmith.dev/docs/configuration/navigation
+- https://readsmith.dev/docs/configuration/theming
+- https://readsmith.dev/docs/authoring/pages
+- https://readsmith.dev/docs/authoring/markdown
+- https://readsmith.dev/docs/authoring/snippets-and-variables
+- https://readsmith.dev/docs/authoring/images-and-links
+- https://readsmith.dev/docs/authoring/code-blocks
+- https://readsmith.dev/docs/components/overview
+- https://readsmith.dev/docs/components/operation
+- https://readsmith.dev/docs/api-reference-guide/setup
+- https://readsmith.dev/docs/api-reference-guide/hybrid-pages
+- https://readsmith.dev/docs/api-reference-guide/schema-pages
+- https://readsmith.dev/docs/api-reference
+- https://readsmith.dev/docs/api-reference/askdocs
+- https://readsmith.dev/docs/api-reference/sendfeedback
+- https://readsmith.dev/docs/api-reference/getcapabilities
+- https://readsmith.dev/docs/api-reference/gethealth
+- https://readsmith.dev/docs/ai/search-and-ask
+- https://readsmith.dev/docs/ai/search-api
+- https://readsmith.dev/docs/ai/mcp
+- https://readsmith.dev/docs/ai/agent-outputs
+- https://readsmith.dev/docs/ai/agent-skills
+- https://readsmith.dev/docs/self-host/deploy
+- https://readsmith.dev/docs/self-host/environment
+- https://readsmith.dev/docs/self-host/reverse-proxy
+- https://readsmith.dev/docs/self-host/security
+- https://readsmith.dev/docs/self-host/upgrading
+- https://readsmith.dev/docs/comparisons
+- https://readsmith.dev/docs/changelog
+- https://readsmith.dev/docs/llms.txt

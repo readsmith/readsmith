@@ -1,7 +1,7 @@
 site:
   name: Readsmith
   url: https://readsmith.dev/docs
-  description: The open-source documentation platform. Precompiled MDX, a beautiful API reference, and agent-ready outputs from the first build.
+  description: The Fair Source documentation platform. Precompiled MDX, a beautiful API reference, and agent-ready outputs from the first build.
 variables:
   version: 0.1.0
 footer:

@@ -1,6 +1,7 @@
 {
   "name": "@readsmith/api",
   "version": "0.0.0",
+  "license": "FSL-1.1-MIT",
   "private": true,
   "type": "module",
   "description": "The portable Hono API: routes plus a dependency contract, runtime-agnostic (Node or edge). Hosts inject a database and other services.",

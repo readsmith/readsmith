@@ -1,6 +1,7 @@
 {
   "name": "@readsmith/model",
   "version": "0.0.0",
+  "license": "FSL-1.1-MIT",
   "private": true,
   "type": "module",
   "description": "Shared Zod schemas, inferred types, and JSON-Schema. The cross-boundary contracts.",

@@ -1,6 +1,7 @@
 {
   "name": "@readsmith/db",
   "version": "0.0.0",
+  "license": "FSL-1.1-MIT",
   "private": true,
   "type": "module",
   "description": "Persistence backbone: Postgres pool, migrations, typed access layer, storage, and the pg-boss job runner.",

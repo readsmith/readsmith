@@ -1,6 +1,7 @@
 {
   "name": "@readsmith/components",
   "version": "0.0.0",
+  "license": "FSL-1.1-MIT",
   "private": true,
   "type": "module",
   "description": "The Readsmith component library and reading shell: design tokens, in-content components, and island hydration.",

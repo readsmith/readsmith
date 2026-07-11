@@ -1,6 +1,7 @@
 {
   "name": "@readsmith/ai",
   "version": "0.0.0",
+  "license": "FSL-1.1-MIT",
   "private": true,
   "type": "module",
   "description": "Search, Ask-AI (RAG), and MCP over the doc index, with BYOK on the AI SDK.",

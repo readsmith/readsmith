@@ -5,7 +5,7 @@
     "version": "0.1.0",
     "description": "The HTTP surface every self-hosted Readsmith site serves: hybrid search, streamed Ask AI answers, reader feedback, and capability discovery. All endpoints are public and rate limited per client IP; none require authentication."
   },
-  "servers": [{ "url": "https://docs.readsmith.dev" }],
+  "servers": [{ "url": "https://readsmith.dev/docs" }],
   "tags": [
     {
       "name": "Search",
