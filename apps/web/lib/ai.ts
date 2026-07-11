@@ -24,6 +24,7 @@ import type { NormalizedSpec, SearchFilters } from "@readsmith/model";
 
 import { InMemoryEventStore } from "@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { siteBasePath, siteOrigin } from "@readsmith/config";
 import { getDb } from "./db";
 import { getApiReference, getSite } from "./site";
 
@@ -108,8 +109,10 @@ async function build(): Promise<AiServices | null> {
   const search: SearchDeps = {
     store: retrievalStore(db),
     provider,
-    baseUrl: site.url ?? "",
-    apiBasePath: site.apiReference?.path ?? "/api-reference",
+    // Deep links compose as origin + prefixed path (spec subpath-hosting SP-2):
+    // chunk paths already carry the base path, the reference path does not.
+    baseUrl: siteOrigin(site.url),
+    apiBasePath: siteBasePath(site.url) + (site.apiReference?.path ?? "/api-reference"),
     rrfK: aiConfig?.search.rrfK,
     // Query-embedding cache (RT-5): repeats within the TTL skip the provider.
     // In-memory by default; swap CACHE_DRIVER to a shared store when hosted.

@@ -71,3 +71,16 @@ describe("mcpAlias", () => {
     expect(mcpAlias([page("mcp-server.md", "mcp-server")], "/mcp-server")).toBeNull();
   });
 });
+
+describe("subpath url helpers", () => {
+  it("derives base path and origin from site.url", async () => {
+    const { siteBasePath, siteOrigin } = await import("../src/url.js");
+    expect(siteBasePath("https://readsmith.dev/docs")).toBe("/docs");
+    expect(siteBasePath("https://readsmith.dev/docs/")).toBe("/docs");
+    expect(siteBasePath("https://readsmith.dev")).toBe("");
+    expect(siteBasePath(undefined)).toBe("");
+    expect(siteBasePath("not a url")).toBe("");
+    expect(siteOrigin("https://readsmith.dev/docs")).toBe("https://readsmith.dev");
+    expect(siteOrigin(undefined)).toBe("");
+  });
+});

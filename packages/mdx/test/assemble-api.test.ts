@@ -383,6 +383,46 @@ describe("pages mode (HA-11/12/13)", () => {
     ]);
   });
 
+  it("keeps the full catalog nav and one prefix under a subpath site.url", async () => {
+    const f = fixture({
+      "index.md": "# Home\n",
+      "api/create-pet.mdx": '---\nopenapi: "POST /pets"\n---\n\nAuthored.\n',
+    });
+    f.config.site = { name: "Docs", url: "https://readsmith.dev/docs" };
+    f.config.tabs = [
+      {
+        label: "Guides",
+        nav: [
+          { type: "page", slug: "index" },
+          { type: "page", slug: "api/create-pet" },
+        ],
+      },
+    ];
+    const build = await assembleSite(inputOf(f, { apiReference: pagesRef }));
+
+    // The reference tab carries the prefix exactly once and keeps EVERY
+    // operation row: nav nodes address pages by slug, and slugs never carry
+    // the base path (the regression was slugs derived from prefixed urls,
+    // which silently dropped all catalog rows at nav finalization).
+    const tab = build.tabs?.at(-1);
+    expect(tab?.url).toBe("/docs/api-reference");
+    const group = tab?.nav.find((n) => n.type === "group");
+    if (group?.type !== "group") throw new Error("no group");
+    expect(group.children.map((c) => (c.type === "page" ? c.slug : ""))).toEqual([
+      "api-reference/listpets",
+      "api-reference/createpet",
+    ]);
+
+    const list = build.pages.find((p) => p.slug === "api-reference/listpets");
+    expect(list?.url).toBe("/docs/api-reference/listpets");
+    const mirror = build.pages.find((p) => p.slug === "api-reference/createpet");
+    expect(mirror?.url).toBe("/docs/api-reference/createpet");
+    expect(mirror?.canonicalOf).toBe("/docs/api/create-pet");
+    const overview = build.pages.find((p) => p.slug === "api-reference");
+    expect(overview?.html).toContain('href="/docs/api-reference/listpets"');
+    expect(build.diagnostics).toHaveLength(0);
+  });
+
   it("is deterministic in pages mode", async () => {
     const f = () => {
       const x = fixture({ "index.md": "# Home\n" });

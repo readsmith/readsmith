@@ -94,6 +94,11 @@ export interface AssembleInput {
   /** Canonical base URL for absolute links in sitemap, RSS, and agent outputs.
    * Falls back to `config.site.url`. Without either, URLs stay root-relative. */
   baseUrl?: string;
+  /** Base path when the site serves under a parent domain's subpath (spec
+   * subpath-hosting). Defaults to the pathname of the base URL, so
+   * `site.url: https://a.dev/docs` needs nothing extra. Absolute URLs compose
+   * as origin + prefixed path, never site.url + path. */
+  basePath?: string;
   /**
    * The normalized API spec for hybrid `openapi:` frontmatter pages, plus the
    * config-relative source path it was ingested from (validates Mintlify-style
@@ -366,7 +371,7 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
     const links = built[i]?.links ?? [];
-    if (model) validateLinks(model, links, anchorsBySlug);
+    if (model) validateLinks(model, links, anchorsBySlug, basePathOf(input));
   }
 
   // Nav finalization needs titles and hidden flags from the built pages.
@@ -400,7 +405,9 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
   // The sitemap is the one output that invites a crawler, so it honors `noindex`
   // in addition to `hidden`. The feeds and the AI index track `hidden` alone.
   const indexable = visible.filter((m) => !m.noindex);
-  const base = (input.baseUrl ?? config.site.url ?? "").replace(/\/+$/, "");
+  // Absolute URLs compose as origin + already-prefixed path (SP-2); using the
+  // full site.url here would double a subpath prefix.
+  const base = originOfUrl(input.baseUrl ?? config.site.url);
 
   // Structured data needs the canonical base, which is only known here. Hidden
   // pages emit none: they are unlisted everywhere else, and a search engine has
@@ -490,11 +497,12 @@ async function buildPage(
   try {
     raw = await input.readPage(page.path);
   } catch (err) {
-    return errorPage(page, `Could not read page: ${(err as Error).message}`);
+    return errorPage(page, `Could not read page: ${(err as Error).message}`, basePathOf(input));
   }
 
   const parsed = parse({ path: page.path, raw });
   const frontmatter = parsed.frontmatter;
+  const basePath = basePathOf(input);
 
   const usedSnippets = new Map<string, string>();
   const expanded = expandSnippetsAndVariables(parsed.body, {
@@ -506,6 +514,7 @@ async function buildPage(
 
   const transformed = transform(expanded.body, {
     path: page.path,
+    basePath,
     contentRel: config.content?.root ?? ".",
     resolvePage,
     resolveAsset,
@@ -513,7 +522,7 @@ async function buildPage(
   });
   const projections = project(transformed.body, {
     path: page.path,
-    url: slugToUrl(page.slug),
+    url: slugToUrl(page.slug, basePath),
   });
   const anchors = collectAnchors(transformed.body);
   const links = collectLinks(transformed.body);
@@ -561,7 +570,7 @@ async function buildPage(
   const model: PageModel = {
     path: page.path,
     slug: page.slug,
-    url: slugToUrl(page.slug),
+    url: slugToUrl(page.slug, basePath),
     title,
     sidebarTitle,
     description,
@@ -966,6 +975,7 @@ async function applyPagesMode(
   const ref = input.apiReference;
   if (!ref || ref.layout !== "pages") return null;
   const spec = ref.spec;
+  const basePath = basePathOf(input);
   const refPath = (ref.path ?? "/api-reference").replace(/\/+$/, "");
   const refSlug = refPath.replace(/^\//, "");
   const label = ref.label ?? "API Reference";
@@ -975,6 +985,9 @@ async function applyPagesMode(
   const slugger = new GithubSlugger();
   const seenBases = new Set<string>();
   const urlByOp = new Map<string, string>();
+  // Nav nodes address pages by SLUG; urls carry the base path and cannot be
+  // turned back into slugs by stripping a leading slash (subpath SP-2).
+  const slugByOp = new Map<string, string>();
 
   for (const op of spec.operations) {
     const claimedModel = claims.get(op.id);
@@ -982,6 +995,7 @@ async function applyPagesMode(
     // simply homed in the reference tree at its own URL; no mirror needed.
     if (claimedModel && !(hasTabs && explicit.has(claimedModel.slug))) {
       urlByOp.set(op.id, claimedModel.url);
+      slugByOp.set(op.id, claimedModel.slug);
       continue;
     }
     const base = new GithubSlugger().slug(op.id);
@@ -996,7 +1010,7 @@ async function applyPagesMode(
         ...claimedModel,
         path: `${slug}.generated`,
         slug,
-        url: `/${slug}`,
+        url: `${basePath}/${slug}`,
         canonicalOf: claimedModel.url,
         chunks: [],
         breadcrumbs: [],
@@ -1016,12 +1030,13 @@ async function applyPagesMode(
       models.push(mirror);
       built.push({ model: mirror, links: [], rebuilt: true });
       urlByOp.set(op.id, mirror.url);
+      slugByOp.set(op.id, mirror.slug);
       continue;
     }
     const model: PageModel = {
       path: `${slug}.generated`,
       slug,
-      url: `/${slug}`,
+      url: `${basePath}/${slug}`,
       title: "",
       frontmatter: {},
       hidden: false,
@@ -1057,6 +1072,7 @@ async function applyPagesMode(
     models.push(model);
     built.push({ model, links: [], rebuilt: true });
     urlByOp.set(op.id, model.url);
+    slugByOp.set(op.id, model.slug);
   }
 
   // The overview at the reference root, unless an authored page owns the slug
@@ -1093,22 +1109,22 @@ async function applyPagesMode(
   for (const group of groupOperations(spec)) {
     const children: NavNode[] = [];
     for (const op of group.operations) {
-      const slug = urlByOp.get(op.id)?.replace(/^\//, "");
+      const slug = slugByOp.get(op.id);
       if (!slug) continue;
       if (!hasTabs && explicit.has(slug)) continue;
       children.push({ type: "page", slug });
     }
     if (children.length > 0) nodes.push({ type: "group", label: group.tag, children });
   }
-  return { label, url: refPath, nodes };
+  return { label, url: `${basePath}${refPath}`, nodes };
 }
 
-function errorPage(page: SitePage, message: string): BuiltPage {
+function errorPage(page: SitePage, message: string, basePath = ""): BuiltPage {
   return {
     model: {
       path: page.path,
       slug: page.slug,
-      url: slugToUrl(page.slug),
+      url: slugToUrl(page.slug, basePath),
       title: page.slug || "Untitled",
       frontmatter: {},
       hidden: false,
@@ -1182,6 +1198,7 @@ function validateLinks(
   model: PageModel,
   links: InternalLink[],
   anchorsBySlug: Map<string, Set<string>>,
+  basePath = "",
 ): void {
   for (const link of links) {
     const url = link.url;
@@ -1193,8 +1210,12 @@ function validateLinks(
       anchor = url.slice(1);
     } else if (url.startsWith("/")) {
       const hash = url.indexOf("#");
-      const pathPart = hash === -1 ? url : url.slice(0, hash);
+      let pathPart = hash === -1 ? url : url.slice(0, hash);
       anchor = hash === -1 ? "" : url.slice(hash + 1);
+      // Resolved URLs carry the base path; slugs do not (SP-2).
+      if (basePath && pathPart.startsWith(basePath)) {
+        pathPart = pathPart.slice(basePath.length) || "/";
+      }
       targetSlug = pathPart === "/" ? "" : pathPart.slice(1);
     } else {
       continue; // external, mailto, or already-diagnosed relative link
@@ -1570,8 +1591,32 @@ function pickTitle(
   return last.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function slugToUrl(slug: string): string {
-  return slug === "" ? "/" : `/${slug}`;
+function slugToUrl(slug: string, base = ""): string {
+  return slug === "" ? base || "/" : `${base}/${slug}`;
+}
+
+/* Mirrors @readsmith/config's url helpers (this package stays dependency-light). */
+function basePathOfUrl(url: string | undefined): string {
+  if (!url) return "";
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, "");
+    return path === "" || path === "/" ? "" : path;
+  } catch {
+    return "";
+  }
+}
+function originOfUrl(url: string | undefined): string {
+  if (!url) return "";
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "";
+  }
+}
+
+/** The effective base path for a build: an explicit override, else derived. */
+function basePathOf(input: AssembleInput): string {
+  return input.basePath ?? basePathOfUrl(input.baseUrl ?? input.config.site.url);
 }
 
 function xml(value: string): string {

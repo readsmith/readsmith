@@ -1,6 +1,7 @@
 import { getApiReference } from "@/lib/api-reference";
 import { getSite } from "@/lib/site";
 import { type ShellSite, type ShellTab, renderShellBody } from "@readsmith/components";
+import { siteBasePath } from "@readsmith/config";
 import type { FinalNavNode, FinalNavTab, PageModel } from "@readsmith/mdx";
 
 /**
@@ -49,13 +50,15 @@ export async function renderDocPage(slug: string): Promise<RenderedPage | null> 
   // The API reference joins the tab bar (the Mintlify pattern: one product, one
   // row). In pages mode the build already carries its tab; in single mode it is
   // appended here. A tabless site keeps the header cross-link instead.
-  const hasRefTab = apiReference && bar?.some((tab) => tab.url === apiReference.path);
+  // Tab URLs from the build already carry any subpath prefix; the config path
+  // does not, so it is prefixed here before comparing or serving (SP-2).
+  const refUrl = apiReference ? siteBasePath(url) + apiReference.path : "";
+  const hasRefTab = apiReference && bar?.some((tab) => tab.url === refUrl);
   const tabs =
     bar && apiReference && !hasRefTab
-      ? [...bar, { label: apiReference.label, url: apiReference.path, active: false }]
+      ? [...bar, { label: apiReference.label, url: refUrl, active: false }]
       : bar;
-  const links =
-    !bar && apiReference ? [{ label: apiReference.label, href: apiReference.path }] : undefined;
+  const links = !bar && apiReference ? [{ label: apiReference.label, href: refUrl }] : undefined;
   const site: ShellSite = {
     name,
     nav,

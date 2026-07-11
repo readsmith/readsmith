@@ -6,3 +6,4 @@ export * from "./load.js";
 export * from "./discover.js";
 export * from "./nav.js";
 export * from "./resolve.js";
+export * from "./url.js";

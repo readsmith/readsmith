@@ -21,7 +21,9 @@ export async function generateStaticParams(): Promise<Params[]> {
 function baseUrl(url: string | undefined): URL | undefined {
   if (!url) return undefined;
   try {
-    return new URL(url);
+    // The ORIGIN only: page URLs already carry any subpath prefix, and a
+    // metadataBase with a path would double it (spec subpath-hosting SP-2).
+    return new URL(new URL(url).origin);
   } catch {
     return undefined;
   }

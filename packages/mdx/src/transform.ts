@@ -8,6 +8,9 @@ import { visit } from "unist-util-visit";
 export interface TransformContext {
   /** Current page path relative to the content root, for example "guide/setup.mdx". */
   path: string;
+  /** The site's base path when hosted under a parent domain's subpath (spec
+   * subpath-hosting SP-3): prefixes every resolved page and asset URL. */
+  basePath?: string;
   /**
    * Resolve an internal link target (a content-relative path without extension)
    * to a URL slug, or null when no such page exists. When omitted, links are
@@ -122,7 +125,7 @@ export function resolveLinks(body: Root, ctx: TransformContext, diagnostics: Dia
       });
       return;
     }
-    node.url = pageUrl(slug) + anchor;
+    node.url = pageUrl(slug, ctx.basePath ?? "") + anchor;
   });
 }
 
@@ -154,7 +157,7 @@ export function resolveImages(body: Root, ctx: TransformContext, diagnostics: Di
       });
       return;
     }
-    node.url = resolved;
+    node.url = (ctx.basePath ?? "") + resolved;
   });
 }
 
@@ -165,8 +168,8 @@ function isRelativeFileLink(url: string): boolean {
   return true;
 }
 
-function pageUrl(slug: string): string {
-  return slug === "" ? "/" : `/${slug}`;
+function pageUrl(slug: string, base: string): string {
+  return slug === "" ? base || "/" : `${base}/${slug}`;
 }
 
 function nodePosition(node: {

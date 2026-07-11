@@ -1,4 +1,6 @@
+import { getSite } from "@/lib/site";
 import { getSkills } from "@/lib/skills";
+import { siteBasePath } from "@readsmith/config";
 
 /**
  * The root skill entry point (Mintlify-compatible behavior): a single skill
@@ -10,9 +12,11 @@ export const dynamic = "force-static";
 export async function GET() {
   const skills = await getSkills();
   if (skills.length > 1) {
+    // Location headers are not basePath-scoped by Next; prefix explicitly.
+    const base = siteBasePath((await getSite()).url);
     return new Response(null, {
       status: 307,
-      headers: { location: "/.well-known/skills/index.json" },
+      headers: { location: `${base}/.well-known/skills/index.json` },
     });
   }
   const content = skills[0]?.files[0]?.content;

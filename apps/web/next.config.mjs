@@ -6,10 +6,30 @@ import {
   mergeCspFromEnv,
   resolveConfig,
   securityHeaders,
+  siteBasePath,
 } from "@readsmith/config";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CONTENT_DIR = process.env.READSMITH_CONTENT ?? join(here, "content");
+
+/**
+ * Subpath hosting (spec subpath-hosting SP-4): the base path derives from
+ * site.url's pathname (`https://a.dev/docs` -> "/docs"), overridable at build
+ * time with READSMITH_BASE_PATH. Next scopes routing, assets, public/ files,
+ * and rewrites under it.
+ */
+async function basePath() {
+  if (process.env.READSMITH_BASE_PATH !== undefined) {
+    return process.env.READSMITH_BASE_PATH.replace(/\/+$/, "");
+  }
+  try {
+    const config = await resolveConfig(CONTENT_DIR);
+    return siteBasePath(config.site.url);
+  } catch {
+    return "";
+  }
+}
+const BASE_PATH = await basePath();
 
 /**
  * The site's own CSP sources (a badge host, an embed) come from `docs.yaml`; the
@@ -49,6 +69,7 @@ async function mcpRewrites() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  ...(BASE_PATH ? { basePath: BASE_PATH } : {}),
   async rewrites() {
     // `beforeFiles` so the aliases resolve ahead of the static docs pages.
     // `agent-skills` is the alternate spelling some skills clients probe.

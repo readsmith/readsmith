@@ -189,3 +189,29 @@ describe("determinism guard (SK-36)", () => {
     }
   });
 });
+
+// Spec subpath-hosting AC-1: a site.url with a path prefixes every path once;
+// absolute URLs use the origin.
+describe("subpath hosting", () => {
+  it("prefixes page, nav, and agent-output URLs exactly once", async () => {
+    const input = inputOf(undefined, { baseUrl: "https://readsmith.dev/docs" });
+    input.config = {
+      ...input.config,
+      site: { ...input.config.site, url: "https://readsmith.dev/docs" },
+    };
+    const build = await assembleSite(input);
+    const home = build.pages.find((p) => p.slug === "");
+    expect(home?.url).toBe("/docs");
+    expect(build.llmsTxt).toContain("(https://readsmith.dev/docs)");
+    expect(build.llmsTxt).not.toContain("/docs/docs");
+    expect(build.sitemap).toContain("<loc>https://readsmith.dev/docs</loc>");
+    const skillMd = build.skills[0]?.files[0]?.content ?? "";
+    expect(skillMd).toContain("(https://readsmith.dev/docs)");
+    expect(skillMd).not.toContain("/docs/docs");
+  });
+
+  it("leaves no-path sites unchanged", async () => {
+    const build = await assembleSite(inputOf(undefined, { baseUrl: "https://pets.dev" }));
+    expect(build.pages.find((p) => p.slug === "")?.url).toBe("/");
+  });
+});

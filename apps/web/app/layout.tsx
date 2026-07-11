@@ -12,6 +12,7 @@ import "@fontsource/ibm-plex-mono/500.css";
 import "@readsmith/components/styles.css";
 import { getSite } from "@/lib/site";
 import { themeInitScript } from "@readsmith/components";
+import { siteBasePath } from "@readsmith/config";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
@@ -23,8 +24,10 @@ import type { ReactNode } from "react";
  * so pages set titles without re-declaring icons.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const { favicon } = await getSite();
-  if (!favicon) return { icons: { icon: "/_readsmith/favicon.svg" } };
+  const { favicon, url } = await getSite();
+  // Metadata URLs are not basePath-scoped by Next; prefix explicitly (SP-3).
+  const base = siteBasePath(url);
+  if (!favicon) return { icons: { icon: `${base}/_readsmith/favicon.svg` } };
   if (favicon.light === favicon.dark) return { icons: { icon: favicon.light } };
   return {
     icons: {
@@ -37,9 +40,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const { themeCss, appearance } = await getSite();
+  const { themeCss, appearance, url } = await getSite();
   return (
-    <html lang="en" suppressHydrationWarning>
+    // data-rs-base tells the client islands where the site is mounted (SP-5),
+    // so no island hardcodes a root path.
+    <html lang="en" suppressHydrationWarning data-rs-base={siteBasePath(url)}>
       <head>
         {/* Per-site brand theme, layered over the base tokens (see themeToCss). */}
         {themeCss ? (

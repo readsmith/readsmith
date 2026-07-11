@@ -18,8 +18,12 @@ export interface ShellSite {
   description?: string;
   /** Canonical base URL, used to build absolute "open in ChatGPT/Claude" links. */
   url?: string;
-  /** Where the header brand links. Defaults to "/" (the docs home). */
+  /** Where the header brand links. Defaults to the site's mount point. */
   homeUrl?: string;
+  /** Base path when the site serves under a parent domain's subpath (spec
+   * subpath-hosting SP-3). Page and tab URLs already carry it; this covers the
+   * shell's own constructed URLs (brand home, the /md projection links). */
+  basePath?: string;
   /** Logo image URL, or a per-theme pair. When set, replaces the wordmark. */
   logo?: string | { light: string; dark: string };
   /** Top-level navigation tabs. When present, a tab bar renders below the header. */
@@ -206,7 +210,7 @@ function brandHtml(site: ShellSite): string {
 
 export function header(site: ShellSite): string {
   const brand = brandHtml(site);
-  const home = site.homeUrl ?? "/";
+  const home = site.homeUrl ?? (site.basePath || "/");
   const homeRel = /^https?:\/\//.test(home) ? ' rel="noopener"' : "";
   return `<header class="rs-header">
   <button class="rs-icon-btn rs-header__burger" data-rs-nav-toggle aria-label="Open navigation" aria-expanded="false">${ICONS.menu}</button>
@@ -236,9 +240,13 @@ export function tabbar(site: ShellSite): string {
 }
 
 function topbar(site: ShellSite, page: ShellPage): string {
-  const mdUrl = `/md${page.url === "/" ? "" : page.url}`;
-  const base = site.url ? site.url.replace(/\/+$/, "") : "";
-  const absMd = base ? base + mdUrl : mdUrl;
+  // page.url carries any subpath prefix; the /md route lives under the same
+  // prefix, so rebuild as base + /md + the page's base-relative path (SP-2).
+  const bp = site.basePath ?? "";
+  const rel = bp && page.url.startsWith(bp) ? page.url.slice(bp.length) || "/" : page.url;
+  const mdUrl = `${bp}/md${rel === "/" ? "" : rel}`;
+  const origin = siteOriginOf(site.url);
+  const absMd = origin ? origin + mdUrl : mdUrl;
   const prompt = encodeURIComponent(
     `Read ${absMd} and help me with questions about the "${page.title}" page.`,
   );
@@ -334,4 +342,14 @@ export function palette(site: ShellSite): string {
     <div class="rs-palette__foot"><span><kbd class="rs-kbd">&#8593;&#8595;</kbd> navigate</span><span><kbd class="rs-kbd">&#8629;</kbd> open</span><span><kbd class="rs-kbd">&#8997;&#8629;</kbd> ask</span></div>
   </div>
 </div>`;
+}
+
+/** The origin of a site URL ("" when unset/invalid); absolute URLs are origin + prefixed path. */
+function siteOriginOf(url: string | undefined): string {
+  if (!url) return "";
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "";
+  }
 }

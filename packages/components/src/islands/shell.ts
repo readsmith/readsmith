@@ -11,7 +11,12 @@
  * Not `/api`: that would shadow a docs page called `api.md`, which a
  * documentation site is unusually likely to have.
  */
-const API = "/_readsmith/api";
+// The site may be mounted under a subpath; the shell stamps it on <html> as
+// data-rs-base (spec subpath-hosting SP-5). Resolved lazily: this module is
+// also imported server-side, where `document` does not exist.
+function api(): string {
+  return `${document.documentElement.dataset.rsBase ?? ""}/_readsmith/api`;
+}
 
 export function initShell(root: ParentNode = document): void {
   // One lazy capabilities probe per hydrate, shared by the palette and console.
@@ -33,7 +38,7 @@ function makeCapabilities(): GetCapabilities {
   let pending: Promise<Capabilities> | null = null;
   return () => {
     if (!pending) {
-      pending = fetch(`${API}/ai/capabilities`)
+      pending = fetch(`${api()}/ai/capabilities`)
         .then((r) =>
           r.ok ? (r.json() as Promise<Partial<Capabilities>>) : ({} as Partial<Capabilities>),
         )
@@ -267,7 +272,7 @@ function initPalette(root: ParentNode, getCaps: GetCapabilities): void {
       const controller = new AbortController();
       searchAbort = controller;
       try {
-        const res = await fetch(`${API}/search`, {
+        const res = await fetch(`${api()}/search`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ query: q }),
@@ -496,7 +501,7 @@ function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
     paint();
 
     try {
-      const res = await fetch(`${API}/ask`, {
+      const res = await fetch(`${api()}/ask`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ query: q }),
@@ -605,7 +610,7 @@ function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
     const fb = target.closest<HTMLElement>("[data-fb]");
     const wrap = fb?.closest<HTMLElement>("[data-ask-fb]");
     if (fb && wrap?.dataset.askFb) {
-      void fetch(`${API}/ai/feedback`, {
+      void fetch(`${api()}/ai/feedback`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id: wrap.dataset.askFb, value: Number(fb.dataset.fb) }),
