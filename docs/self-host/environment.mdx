@@ -1,0 +1,85 @@
+---
+title: Environment reference
+description: Every environment variable the Readsmith app reads, with defaults and when each one matters.
+---
+
+# Environment reference
+
+Everything the app reads from its environment, in one place. Configuration that describes your site lives in `docs.yaml`; the environment carries what differs per deployment: paths, connection strings, and secrets. API keys in particular are environment-only and never belong in config.
+
+## Core
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `READSMITH_CONTENT` | `apps/web/content` | Directory holding your docs content (where `docs.yaml` lives) |
+| `DATABASE_URL` | unset | Postgres connection string; without it the app runs docs-only (pages and agent outputs work, search and Ask AI stay off) |
+| `PORT` | `4321` | Host port the compose file publishes the app on |
+
+## Storage
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `STORAGE_ROOT` | `apps/web/.readsmith` | Root of the bundle store: the compiled site artifact the app serves |
+| `STORAGE_DRIVER` | `local` | Bundle store driver; `local` is the self-host driver in this release |
+| `READSMITH_STORAGE_ROOT` | unset | Filesystem root for persisted spec blobs (the database-backed API reference ingest); a mounted volume in compose |
+
+<Warning>
+<Snippet file="storage-root.md" />
+</Warning>
+
+## AI keys
+
+Keys resolve in a fixed order: a role-specific override wins, then the provider-native variable for whichever provider your `docs.yaml` names.
+
+| Variable | Role |
+| --- | --- |
+| `READSMITH_AI_CHAT_KEY` | Overrides the chat (Ask AI) key, whatever the provider |
+| `READSMITH_AI_EMBEDDING_KEY` | Overrides the embedding (semantic search) key |
+| `READSMITH_AI_RERANK_KEY` | Overrides the rerank key, when rerank is enabled |
+| `OPENAI_API_KEY` | Native key when a model uses the `openai` provider |
+| `ANTHROPIC_API_KEY` | Native key for the `anthropic` provider |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Native key for the `google` provider |
+| `AI_GATEWAY_API_KEY` | Native key for the `gateway` provider |
+
+A missing embedding key degrades search to keyword-only; a missing chat key turns Ask AI off. Neither breaks the site.
+
+## Rate limits
+
+Defaults protect a public deployment out of the box: Ask AI 10 requests per minute, search 60, MCP 60, per client IP. The environment overrides `docs.yaml` at deploy time.
+
+| Variable | Format | What it does |
+| --- | --- | --- |
+| `READSMITH_RATE_LIMIT` | `true` / `false` | Master switch for the built-in limiter |
+| `READSMITH_RATE_LIMIT_ASK` | `10` or `10/30` | Ask AI policy: a count per minute, or count per N seconds |
+| `READSMITH_RATE_LIMIT_SEARCH` | same | Search policy |
+| `READSMITH_RATE_LIMIT_MCP` | same | MCP policy |
+| `READSMITH_TRUSTED_IP_HEADER` | header name | The proxy header to read the client IP from; unset, the socket address is used |
+
+<Danger>
+Set `READSMITH_TRUSTED_IP_HEADER` only when a proxy you control sets that header. Trusting a client-settable header like `X-Forwarded-For` on a directly exposed app gives every request its own rate-limit bucket.
+</Danger>
+
+## Content-Security-Policy
+
+CSP sources from the environment add to `docs.yaml` `security.csp` and to the strict defaults. These are read at build time, not at start: set them before `next build` (the compose image build), not on a running container.
+
+| Variable | Adds sources to |
+| --- | --- |
+| `READSMITH_CSP_IMG_SRC` | `img-src` |
+| `READSMITH_CSP_CONNECT_SRC` | `connect-src` |
+| `READSMITH_CSP_FONT_SRC` | `font-src` |
+| `READSMITH_CSP_FRAME_SRC` | `frame-src` |
+| `READSMITH_CSP_FRAME_ANCESTORS` | `frame-ancestors` |
+
+## Operations
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `CACHE_DRIVER` | `memory` | The query-embedding cache driver; in-memory suits a single instance |
+| `READSMITH_LOG_LEVEL` | `info` | Log verbosity |
+| `READSMITH_WORKER_CONCURRENCY` | `2` | Background job concurrency |
+| `READSMITH_MIGRATIONS_DIR` | resolved from the package | Where database migrations load from; the compose image sets it, you rarely will |
+
+## Compose-only
+
+`POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` are consumed by the compose file to configure the database container and assemble `DATABASE_URL`. The app itself only ever reads `DATABASE_URL`.

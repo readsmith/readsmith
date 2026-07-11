@@ -1,0 +1,57 @@
+---
+title: Upgrading and backups
+description: "Deploys are immutable artifacts: upgrading is building a new image, rolling back is running the previous one. Backups are one database and one volume."
+---
+
+# Upgrading and backups
+
+Readsmith's deployment model keeps operations boring on purpose: every deploy is an immutable artifact, so upgrades and rollbacks are image swaps, and state worth backing up lives in exactly two places.
+
+## Upgrading
+
+<Steps>
+  <Step title="Pull the release">
+    ```bash
+    git pull --tags
+    ```
+    Releases are tagged; the changelog says what each one changes.
+  </Step>
+  <Step title="Rebuild and restart">
+    ```bash
+    docker compose up -d --build
+    ```
+    The image build recompiles your content against the new version. Database migrations run automatically on start.
+  </Step>
+  <Step title="Verify">
+    Load the site, run one search, and spot-check `/llms.txt`.
+    <Check>
+    Same content, new version. The old image remains available for rollback.
+    </Check>
+  </Step>
+</Steps>
+
+## Rolling back
+
+Builds are deterministic and bundles immutable, so rolling back is running the previous image again; there is no compiled state on the server to untangle. Keep the last known-good image tagged and a rollback is one `docker compose up -d` with that tag.
+
+<Note>
+Migrations are forward-only. Rolling the app back after a release that migrated the database is safe for reading, but check the release notes before rolling back across a migration boundary.
+</Note>
+
+## What to back up
+
+| What | Where | Why |
+| --- | --- | --- |
+| The database | the `db-data` volume, or `pg_dump` | Search index, Ask AI records, jobs |
+| Spec blobs | the `storage-data` volume | Persisted API-reference ingests |
+| Your content | your repository | Already backed up if it is in git; the site rebuilds from it entirely |
+
+```bash title="A nightly dump"
+docker compose exec db pg_dump -U readsmith readsmith | gzip > backup-$(date +%F).sql.gz
+```
+
+The content repository plus these two stores reproduce the whole deployment. Nothing else on the host holds state.
+
+## Staying current
+
+Watch releases on [GitHub](https://github.com/readsmith/readsmith) and read the [changelog](/changelog) before upgrading. Patch releases are safe by default; anything requiring action says so at the top of its entry.

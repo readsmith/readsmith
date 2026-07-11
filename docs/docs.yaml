@@ -47,6 +47,10 @@ tabs:
   - tab: Self-host
     pages:
       - self-host/deploy
+      - self-host/environment
+      - self-host/reverse-proxy
+      - self-host/security
+      - self-host/upgrading
   - tab: Changelog
     pages:
       - changelog

@@ -15,20 +15,46 @@ docker-compose.yml
 └── db         Postgres 16 + pgvector: search, vectors, jobs
 ```
 
-The compose file in the repository root is the reference deployment. It wires the database, a persistent storage volume for compiled artifacts, and the app port; you provide an `.env` created from `.env.example`.
+The compose file in the repository root is the reference deployment. It wires the database with a health check, a persistent volume for each store, and the app port; you provide an `.env` created from `.env.example`.
 
-## Steps
+## From zero to serving
 
-Follow the [Quickstart](/quickstart) for the clone-to-running walkthrough. In production you additionally:
+<Steps>
+  <Step title="Clone and configure">
+    ```bash
+    git clone https://github.com/readsmith/readsmith
+    cd readsmith
+    cp .env.example .env
+    ```
+    Set a real `POSTGRES_PASSWORD` in `.env`, point `READSMITH_CONTENT` at your docs directory, and keep the file out of version control.
+  </Step>
+  <Step title="Build and start">
+    ```bash
+    docker compose up -d --build
+    ```
+    The image build compiles your content into the site bundle, so the running container serves prebuilt pages and never compiles at request time.
+  </Step>
+  <Step title="Verify">
+    ```bash
+    curl -s http://localhost:4321/llms.txt | head -3
+    ```
+    <Check>
+    Pages, search, and the agent outputs are serving. Put your reverse proxy in front and you are live.
+    </Check>
+  </Step>
+</Steps>
 
-1. Set a real `POSTGRES_PASSWORD` in `.env` and keep the file out of version control.
-2. Point `READSMITH_CONTENT` at your documentation directory.
-3. Put a reverse proxy or a CDN in front of the app port, and serve your domain over TLS.
-4. Set model keys in the environment if you want search embeddings and Ask AI: the app degrades gracefully without them (full-text search stays on, semantic search and Ask AI turn off).
+## Content is baked at build time
+
+Docs pages are prerendered into the image when it builds. Publishing a content change means rebuilding the image (`docker compose up -d --build`); rolling back means running the previous image. Deploys are therefore reproducible artifacts, not mutable state on a server.
 
 ## What runs without a database
 
 Without `DATABASE_URL` the app runs docs-only: pages, navigation, themes, the API reference, and every agent output (`llms.txt`, per-page Markdown, `skill.md`) work from the precompiled bundle alone. The database activates search, Ask AI, and background jobs.
+
+## Keys and limits
+
+Set model keys in the environment if you want semantic search and Ask AI; the app degrades gracefully without them (full-text search stays on). The built-in rate limits are on by default and sized for a public deployment. Both are cataloged in the [environment reference](/self-host/environment).
 
 <Warning>
 <Snippet file="storage-root.md" />

@@ -1,0 +1,57 @@
+---
+title: Reverse proxy and domains
+description: Put Caddy, nginx, or a CDN in front of the app port, serve your domain over TLS, and pass the client IP safely.
+---
+
+# Reverse proxy and domains
+
+The app serves plain HTTP on one port and expects a reverse proxy or CDN in front for TLS, compression, and your domain. Any proxy works; the examples here use Caddy for its two-line TLS and nginx for familiarity.
+
+## Caddy
+
+```text title="Caddyfile"
+docs.example.com {
+    reverse_proxy localhost:4321
+}
+```
+
+Caddy provisions and renews the certificate automatically. That is the entire configuration.
+
+## nginx
+
+```nginx title="/etc/nginx/sites-available/docs"
+server {
+    listen 443 ssl http2;
+    server_name docs.example.com;
+
+    location / {
+        proxy_pass http://localhost:4321;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+Terminate TLS however you already do (certbot, your CDN); the app needs nothing special.
+
+## Passing the client IP
+
+Rate limiting buckets by client IP. Behind a proxy, every request arrives from the proxy's address unless you forward the real one and tell Readsmith which header to trust:
+
+1. Make the proxy set a header only it controls: `X-Real-IP` above, or your CDN's equivalent such as `CF-Connecting-IP`.
+2. Set `READSMITH_TRUSTED_IP_HEADER` to that header's name.
+
+<Danger>
+Never point `READSMITH_TRUSTED_IP_HEADER` at a header clients can set themselves. If the app is reachable without the proxy, an attacker forges the header and every request gets a fresh rate-limit bucket.
+</Danger>
+
+## Behind a CDN
+
+A CDN in front works well: the pages are static and cache cleanly. Two notes:
+
+- Let `/llms.txt`, `/skill.md`, and `/.well-known/*` through untouched; agents fetch them directly.
+- Search and Ask AI are `POST` requests under `/_readsmith/`; exclude them from caching.
+
+## One host, several sites
+
+Run one app container per site, each with its own content, stores, and port, and route by hostname at the proxy. Containers share nothing, which is exactly the property that keeps two sites from overwriting each other's artifacts.

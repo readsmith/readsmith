@@ -1,0 +1,67 @@
+---
+title: Security
+description: "What the defaults protect out of the box: a strict Content-Security-Policy, rate limits, safe IP handling, and no secrets in config."
+---
+
+# Security
+
+A docs site is a public app, so the defaults assume the public internet: a strict Content-Security-Policy, rate limits on everything that costs money or compute, and a hard rule that secrets live in the environment, never in config.
+
+## Content-Security-Policy
+
+Every response carries a strict CSP: content and assets from `'self'`, no external frames, no object embeds. Most sites never touch it. When yours embeds something, add sources in config:
+
+```yaml title="docs.yaml"
+security:
+  csp:
+    imgSrc:
+      - https://img.example-status.com
+    frameSrc:
+      - https://www.youtube-nocookie.com
+```
+
+Sources add to the policy; nothing can remove or replace the baseline. Malformed tokens (whitespace, `;`) are dropped rather than trusted, so a config typo cannot open `script-src`. Operators can add sources at image build time with the `READSMITH_CSP_*` variables; they are read at build, not at container start.
+
+## Rate limits
+
+On by default, sized for a public deployment, applied per client IP:
+
+| Surface | Default |
+| --- | --- |
+| Ask AI | 10 requests per minute |
+| Search | 60 per minute |
+| MCP | 60 per minute |
+
+Ask AI spends your model credits, so it gets the tight bucket. Adjust in `docs.yaml` under `ai.limits`, or at deploy time with the `READSMITH_RATE_LIMIT_*` variables, which win. Behind a proxy, set `READSMITH_TRUSTED_IP_HEADER` so buckets follow real clients; the [reverse proxy guide](/self-host/reverse-proxy#passing-the-client-ip) covers the one way to get this wrong.
+
+## Secrets
+
+- Model keys are environment-only. `docs.yaml` has no key fields at all, so a committed config cannot leak one.
+- Keys never reach the client: answers stream through the server, and hydration payloads carry no configuration.
+- `.env` stays out of version control; `.env.example` documents the shape with no values worth stealing.
+
+## Content trust
+
+Author-supplied HTML in pages runs through a trust-tiered sanitizer. A site you build yourself runs at owner trust; the tiers exist so multi-author and hosted setups can be stricter without a different pipeline.
+
+## What to verify after deploying
+
+<Steps>
+  <Step title="Headers">
+    ```bash
+    curl -sI https://docs.example.com | grep -iE "content-security-policy|x-frame-options"
+    ```
+    Both should be present on every response.
+  </Step>
+  <Step title="Rate limiting">
+    Send eleven quick Ask AI requests; the eleventh should answer `429` with a `Retry-After` header.
+  </Step>
+  <Step title="No secrets in the page">
+    ```bash
+    curl -s https://docs.example.com | grep -ci "api_key\|apikey"
+    ```
+    <Check>
+    Zero. Keys live in the server's environment and nowhere else.
+    </Check>
+  </Step>
+</Steps>
