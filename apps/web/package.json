@@ -25,6 +25,7 @@
     "@readsmith/ai": "workspace:*",
     "@readsmith/api": "workspace:*",
     "@readsmith/api-reference": "workspace:*",
+    "@readsmith/build": "workspace:*",
     "@readsmith/cache": "workspace:*",
     "@readsmith/components": "workspace:*",
     "@readsmith/config": "workspace:*",

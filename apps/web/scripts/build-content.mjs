@@ -1,18 +1,12 @@
 // Precompiles the content into an immutable bundle artifact (.readsmith/bundle.json),
-// run as a prebuild step. This is the "compile" layer: the whole pipeline (config
-// resolution, the P1-P7 MDX build, and OpenAPI ingest) happens here, once, so the
-// Next app is a pure serving shell that just reads the artifact. Keeping the
-// filesystem-heavy pipeline out of Next's route graph is what makes the build
-// deterministic and the serving layer trivial (and it is what the M3 search
-// ingest will read from).
-import { existsSync } from "node:fs";
-import { readFile, readdir } from "node:fs/promises";
-import { join, relative } from "node:path";
-import { normalizeDocument, parseAndBundle } from "@readsmith/api-reference";
-import { createRegistry, themeToCss } from "@readsmith/components";
-import { contentRootOf, resolveConfig } from "@readsmith/config";
-import { assembleSite } from "@readsmith/mdx";
-import { contentHash, normalizedSpecSchema } from "@readsmith/model";
+// run as a prebuild step. The compile itself lives in @readsmith/build (one
+// deterministic path, shared with any other caller that turns content into a
+// bundle); this script is the local caller: compile, report diagnostics, and
+// write the bytes through the same BundleStore port the serving shell reads.
+// Keeping the filesystem-heavy pipeline out of Next's route graph is what makes
+// the build deterministic and the serving layer trivial.
+import { join } from "node:path";
+import { compileSite } from "@readsmith/build";
 import { createBundleStore, resolveStorageConfig } from "@readsmith/storage";
 
 const CONTENT_DIR = process.env.READSMITH_CONTENT ?? join(process.cwd(), "content");
@@ -24,158 +18,9 @@ const store = createBundleStore(
 );
 const BUNDLE_KEY = "bundle.json";
 
-async function buildApiReference(config, contentRoot) {
-  if (!config.apiReference) return null;
-  const source = config.apiReference.spec;
-  const specPath = join(contentRoot, source);
-  let raw;
-  try {
-    raw = await readFile(specPath, "utf8");
-  } catch {
-    console.warn(`[readsmith] api reference: could not read spec at ${source}`);
-    return null;
-  }
-  const parsed = await parseAndBundle({ raw, path: specPath, source });
-  if (!parsed.doc) {
-    for (const d of parsed.diagnostics) console.warn(`  ${d.severity} ${d.code}: ${d.message}`);
-    return null;
-  }
-  const content = normalizeDocument(parsed.doc, source);
-  const hash = contentHash(raw);
-  const spec = {
-    specId: hash.slice(0, 16),
-    siteId: "default",
-    version: 1,
-    sourceHash: hash,
-    info: content.info,
-    servers: content.servers,
-    securitySchemes: content.securitySchemes,
-    tags: content.tags,
-    operations: content.operations,
-    schemas: content.schemas,
-  };
-  if (!normalizedSpecSchema.safeParse(spec).success) {
-    console.warn("[readsmith] api reference: normalized spec failed validation; skipping.");
-    return null;
-  }
-  const diagnostics = [...parsed.diagnostics, ...content.diagnostics];
-  const errors = diagnostics.filter((d) => d.severity === "error").length;
-  const warnings = diagnostics.filter((d) => d.severity === "warning").length;
-  console.log(
-    `[readsmith] api reference: ${spec.operations.length} operation(s), ${errors} error(s), ${warnings} warning(s)`,
-  );
-  return {
-    spec,
-    path: config.apiReference.path,
-    label: config.apiReference.label,
-    layout: config.apiReference.layout,
-  };
-}
-
-/**
- * Snippet sources: `snippets/**` under the content root, keyed by their path
- * relative to that directory (the `<Snippet file="...">` prop). Reserved from
- * page discovery by DEFAULT_EXCLUDE; read here, expanded at transform time.
- */
-async function readSnippets(contentRoot) {
-  const root = join(contentRoot, "snippets");
-  if (!existsSync(root)) return {};
-  const out = {};
-  const walk = async (dir, prefix) => {
-    const entries = (await readdir(dir, { withFileTypes: true })).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
-    for (const entry of entries) {
-      if (entry.name.startsWith(".")) continue;
-      const full = join(dir, entry.name);
-      const key = prefix ? `${prefix}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) await walk(full, key);
-      else if (/\.(md|mdx)$/i.test(entry.name)) out[key] = await readFile(full, "utf8");
-    }
-  };
-  await walk(root, "");
-  return out;
-}
-
-/**
- * Authored agent skills: `.readsmith/skills/<name>/SKILL.md` (or the
- * `.mintlify/skills/` migration fallback when that is absent), plus a root
- * `skill.md`. Files are read up to one nested level (scripts/, references/,
- * assets/); validation happens in assembly, this just reads text.
- */
-async function readSkills(contentRoot) {
-  const out = [];
-  let root = join(contentRoot, ".readsmith/skills");
-  if (!existsSync(root)) {
-    const mintlify = join(contentRoot, ".mintlify/skills");
-    root = existsSync(mintlify) ? mintlify : null;
-  }
-  if (root) {
-    const dirs = (await readdir(root, { withFileTypes: true }))
-      .filter((e) => e.isDirectory())
-      .sort((a, b) => a.name.localeCompare(b.name));
-    for (const dir of dirs) {
-      const skillRoot = join(root, dir.name);
-      const files = [];
-      const entries = (await readdir(skillRoot, { withFileTypes: true })).sort((a, b) =>
-        a.name.localeCompare(b.name),
-      );
-      for (const entry of entries) {
-        if (entry.isFile()) {
-          files.push({
-            path: entry.name,
-            content: await readFile(join(skillRoot, entry.name), "utf8"),
-          });
-        } else if (entry.isDirectory()) {
-          const nested = (await readdir(join(skillRoot, entry.name), { withFileTypes: true }))
-            .filter((e) => e.isFile())
-            .sort((a, b) => a.name.localeCompare(b.name));
-          for (const file of nested) {
-            files.push({
-              path: `${entry.name}/${file.name}`,
-              content: await readFile(join(skillRoot, entry.name, file.name), "utf8"),
-            });
-          }
-        }
-      }
-      out.push({ dir: dir.name, source: relative(contentRoot, skillRoot), files });
-    }
-  }
-  const rootFile = join(contentRoot, "skill.md");
-  if (existsSync(rootFile)) {
-    out.push({
-      dir: null,
-      source: "skill.md",
-      files: [{ path: "SKILL.md", content: await readFile(rootFile, "utf8") }],
-    });
-  }
-  return out;
-}
-
 async function main() {
-  const config = await resolveConfig(CONTENT_DIR);
-  // Shared with copy-assets: both must resolve the same content root.
-  const contentRoot = contentRootOf(CONTENT_DIR, config);
-  // The spec normalizes before assembly: hybrid `openapi:` pages bind to its
-  // operations during the P7 build.
-  const apiReference = await buildApiReference(config, contentRoot);
-  const build = await assembleSite({
-    config,
-    readPage: (path) => readFile(join(contentRoot, path), "utf8"),
-    // The spec powers <Operation op="..."/> embeds in any prose page.
-    registry: createRegistry({ apiSpec: apiReference?.spec ?? null }),
-    baseUrl: config.site.url,
-    apiReference: apiReference
-      ? {
-          spec: apiReference.spec,
-          source: config.apiReference.spec,
-          path: config.apiReference.path,
-          layout: config.apiReference.layout,
-          label: config.apiReference.label,
-        }
-      : null,
-    skills: await readSkills(contentRoot),
-    snippets: await readSnippets(contentRoot),
+  const { config, bundle, bundleJson, apiReferenceDiagnostics } = await compileSite({
+    contentDir: CONTENT_DIR,
   });
 
   // Config diagnostics (reserved paths, asset mounts, home page) matter as much as
@@ -184,6 +29,22 @@ async function main() {
     console.warn(`[readsmith] ${d.severity} ${d.code} (${d.source}): ${d.message}`);
   }
 
+  if (config.apiReference) {
+    if (bundle.apiReference) {
+      const errors = apiReferenceDiagnostics.filter((d) => d.severity === "error").length;
+      const warnings = apiReferenceDiagnostics.filter((d) => d.severity === "warning").length;
+      console.log(
+        `[readsmith] api reference: ${bundle.apiReference.spec.operations.length} operation(s), ${errors} error(s), ${warnings} warning(s)`,
+      );
+    } else {
+      console.warn("[readsmith] api reference: spec did not load");
+      for (const d of apiReferenceDiagnostics) {
+        console.warn(`  ${d.severity} ${d.code}: ${d.message}`);
+      }
+    }
+  }
+
+  const build = bundle.site.build;
   const errors = build.diagnostics.filter((d) => d.severity === "error").length;
   const warnings = build.diagnostics.filter((d) => d.severity === "warning").length;
   if (errors > 0 || warnings > 0) {
@@ -193,24 +54,7 @@ async function main() {
     }
   }
 
-  const site = {
-    build,
-    name: config.site.name,
-    branding: config.branding,
-    url: config.site.url,
-    description: config.site.description,
-    homeUrl: config.site.homeUrl,
-    logo: config.site.logo,
-    favicon: config.site.favicon,
-    // Precompiled per-site brand theme, injected into <head> by the shell.
-    themeCss: themeToCss(config.site.theme),
-    appearance: config.appearance,
-    apiReference: config.apiReference,
-    footer: config.footer,
-    ai: config.ai ?? null,
-  };
-
-  await store.put(BUNDLE_KEY, JSON.stringify({ site, apiReference }));
+  await store.put(BUNDLE_KEY, bundleJson);
   console.log(`[readsmith] wrote content bundle: ${build.pages.length} page(s) -> ${BUNDLE_KEY}`);
 }
 

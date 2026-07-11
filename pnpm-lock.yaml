@@ -59,6 +59,9 @@ importers:
       '@readsmith/api-reference':
         specifier: workspace:*
         version: link:../../packages/api-reference
+      '@readsmith/build':
+        specifier: workspace:*
+        version: link:../../packages/build
       '@readsmith/cache':
         specifier: workspace:*
         version: link:../../packages/cache
@@ -166,6 +169,24 @@ importers:
       zod:
         specifier: ^4.0.5
         version: 4.4.3
+
+  packages/build:
+    dependencies:
+      '@readsmith/api-reference':
+        specifier: workspace:*
+        version: link:../api-reference
+      '@readsmith/components':
+        specifier: workspace:*
+        version: link:../components
+      '@readsmith/config':
+        specifier: workspace:*
+        version: link:../config
+      '@readsmith/mdx':
+        specifier: workspace:*
+        version: link:../mdx
+      '@readsmith/model':
+        specifier: workspace:*
+        version: link:../model
 
   packages/cache:
     dependencies:
