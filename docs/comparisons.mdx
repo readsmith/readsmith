@@ -1,0 +1,35 @@
+---
+title: Comparisons
+description: Readsmith next to Mintlify, GitBook, and the documentation frameworks. What each is good at, and when to pick which.
+---
+
+# Comparisons
+
+Every documentation tool makes a different trade. This page lays the common choices side by side, and tells you honestly when another tool is the better fit.
+
+## At a glance
+
+| | Readsmith | Mintlify | GitBook | Starlight, Fumadocs |
+| --- | --- | --- | --- | --- |
+| Kind | Open-source platform | Hosted platform | Hosted platform | Open-source frameworks |
+| Source available | Yes, FSL | No | No | Yes, MIT |
+| Self-host | One compose file, full product | No | No | Yes, it is a framework you deploy |
+| Hosted offering | Coming, waitlist open | Yes | Yes | No |
+| OpenAPI reference | Generated, single page or per operation, hybrid prose | Generated | Generated | Via plugins |
+| Search | Built in, Postgres full-text plus vectors | Built in | Built in | Client-side (Pagefind) or bring your own |
+| Ask AI | Built in, your model keys, cited answers | Built in, their infrastructure | Built in, their infrastructure | Bring your own |
+| Agent outputs | llms.txt, per-page Markdown, MCP, Agent Skill | llms.txt, Markdown export, MCP, skill.md | llms.txt, MCP | Community plugins |
+| Config | Optional docs.yaml, Mintlify-compatible docs.json accepted | docs.json | App settings | Code |
+| Where your data lives | Your repository, your database, your domain | Their infrastructure | Their infrastructure | Wherever you deploy |
+
+## When to pick something else
+
+**Pick Mintlify** when you want a polished, fully managed platform today and are comfortable with your docs living on someone else's infrastructure. It is the category leader for a reason, and Readsmith accepts its `docs.json` shape precisely because migrating in either direction should be your choice, not a hostage situation.
+
+**Pick GitBook** when your writers live in a visual editor and Git is an implementation detail rather than the workflow.
+
+**Pick Starlight or Fumadocs** when documentation is a feature of an application you are already building in Astro or Next.js, and you want the docs to be code you fully control. They are excellent frameworks; you assemble the platform pieces (search infrastructure, AI, hosting) yourself.
+
+## When Readsmith fits
+
+You want the managed-platform experience (generated API reference, search, Ask AI, agent outputs) without giving up ownership: source in your repository, site on your domain, data in your database, AI on your own model keys. One compose file runs the whole product, and the hosted option is coming for teams who want the same platform with zero operations.

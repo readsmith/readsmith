@@ -19,7 +19,7 @@ export interface ApiAppOptions {
 }
 
 const scopedQuery = z.object({
-  query: z.string().min(1),
+  query: z.string().min(1).max(2000),
   version: z.string().optional(),
   locale: z.string().optional(),
 });

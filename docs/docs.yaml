@@ -1,0 +1,29 @@
+site:
+  name: Readsmith
+  url: https://docs.readsmith.dev
+  description: The open-source documentation platform. Precompiled MDX, a beautiful API reference, and agent-ready outputs from the first build.
+variables:
+  version: 0.1.0
+footer:
+  socials:
+    github: https://github.com/readsmith/readsmith
+tabs:
+  - tab: Guides
+    pages:
+      - index
+      - group: Start here
+        pages:
+          - what-is-readsmith
+          - quickstart
+          - comparisons
+  - tab: Components
+    pages:
+      - components/overview
+  - tab: Self-host
+    pages:
+      - self-host/deploy
+  - tab: Changelog
+    pages:
+      - changelog
+# The API tab (Readsmith's own HTTP surface, pages-mode reference) lands with
+# the authored openapi.json.

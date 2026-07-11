@@ -1,0 +1,57 @@
+---
+title: Components overview
+description: The component library available in every Readsmith page. Callouts, structure, code, and API elements, all usable in MDX.
+---
+
+# Components overview
+
+Every Readsmith page can use the built-in component library in MDX, no imports required. This page is the inventory; the gallery pages document each component in depth, and each gallery page renders the component it documents.
+
+## Callouts
+
+<Info>
+Five severities share one anatomy: `Note`, `Info`, `Tip`, `Warning`, and `Danger`, plus `Check` for confirmations. This paragraph sits in an `Info`.
+</Info>
+
+| Component | Use for |
+| --- | --- |
+| `<Note>` | Supplementary detail, safe to skip |
+| `<Info>` | Context the reader should have, like permissions |
+| `<Tip>` | Recommendations and best practices |
+| `<Warning>` | Actions that can go wrong or destroy data |
+| `<Danger>` | Actions that will hurt if misused |
+| `<Check>` | Success confirmation at the end of a procedure |
+
+## Structure
+
+| Component | Use for |
+| --- | --- |
+| `<Accordion>`, `<AccordionGroup>` | Optional detail the reader expands on demand |
+| `<Tabs>`, `<Tab>` | One choice among alternatives, like install paths |
+| `<Steps>`, `<Step>` | Numbered procedures |
+| `<Card>`, `<CardGroup>` | Linked navigation tiles |
+| `<Frame>` | Images and screenshots with a caption |
+
+## Code
+
+| Component | Use for |
+| --- | --- |
+| `<CodeGroup>` | The same snippet in several languages, tabbed |
+
+Fenced code blocks need no component: they are highlighted at build time with dual light and dark themes, and ship as static HTML.
+
+## Inline elements
+
+| Component | Use for |
+| --- | --- |
+| `<Badge>` | Small status labels inline with text |
+| `<Kbd>` | Keyboard keys, like <Kbd>Ctrl</Kbd> <Kbd>K</Kbd> |
+| `<Tooltip>` | A definition on hover |
+
+## Content types
+
+| Component | Use for |
+| --- | --- |
+| `<Update>` | Dated changelog entries |
+| `<Operation>` | One API operation, generated from your OpenAPI spec, embedded in any prose page |
+| `<Snippet>` | Shared content included from another file at build time |

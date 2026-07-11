@@ -1,0 +1,101 @@
+---
+title: Quickstart
+description: Clone the repository, run one compose command, and open a working documentation site. Then point it at your own docs.
+---
+
+# Quickstart
+
+By the end of this page you have a documentation site running locally and know where your own content goes.
+
+## Prerequisites
+
+- Docker with the Compose plugin, for the standard path
+- or Node.js 22+ and pnpm, for a local preview without containers
+
+## Run the site
+
+<Tabs>
+  <Tab title="Docker Compose">
+    <Steps>
+      <Step title="Clone the repository">
+        ```bash
+        git clone https://github.com/readsmith/readsmith
+        cd readsmith
+        ```
+      </Step>
+      <Step title="Create your environment file">
+        ```bash
+        cp .env.example .env
+        ```
+        Open `.env` and set `POSTGRES_PASSWORD`. Everything else has a working default.
+      </Step>
+      <Step title="Start the stack">
+        ```bash
+        docker compose up
+        ```
+        Two services start: the app and Postgres with pgvector. There is nothing else to run.
+      </Step>
+      <Step title="Open the site">
+        Visit `http://localhost:4321`. You are looking at the bundled sample content, served exactly the way your docs will be.
+        <Check>
+        A working docs site, zero external services.
+        </Check>
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Local preview (Node)">
+    <Steps>
+      <Step title="Clone and install">
+        ```bash
+        git clone https://github.com/readsmith/readsmith
+        cd readsmith
+        pnpm install
+        ```
+      </Step>
+      <Step title="Start the dev server">
+        ```bash
+        cd apps/web
+        pnpm dev
+        ```
+        The content compiles into a bundle, then the site serves at `http://localhost:4321`. Without a database the app runs docs-only: pages, navigation, and the agent outputs work; search and Ask AI stay off.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Point it at your docs
+
+Set `READSMITH_CONTENT` to the directory that holds your content, then restart. The directory can be as small as this:
+
+```text
+my-docs/
+├── index.md
+└── guides/
+    └── setup.md
+```
+
+No configuration file is required: pages are discovered, titles come from your headings, and the navigation builds itself from the folder structure. When you want control, add a `docs.yaml`:
+
+```yaml
+site:
+  name: My Project
+  description: What my project does.
+```
+
+Every key it accepts is in the settings reference.
+
+## Write your first page
+
+Create `index.md` in your content directory:
+
+```markdown
+# My Project
+
+Welcome. This page is served precompiled, with zero JavaScript.
+```
+
+Rebuild (or let the dev server pick it up) and the page is live, present in navigation, listed in `llms.txt`, and indexed for search.
+
+<Note>
+These docs run on Readsmith {version}. That number is interpolated at build time from a `variables` entry in `docs.yaml`, written as `{version}` in MDX pages or `{{version}}` in plain Markdown.
+</Note>

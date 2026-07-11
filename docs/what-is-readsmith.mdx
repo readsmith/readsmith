@@ -1,0 +1,50 @@
+---
+title: What is Readsmith
+description: An open-source documentation platform with precompiled MDX, a generated API reference, and agent-ready outputs. Self-hostable with one compose file.
+---
+
+# What is Readsmith
+
+Readsmith is an open-source documentation platform. Point it at a repository of Markdown or MDX and it builds a complete docs site: navigation, search, a generated API reference, and the machine-readable outputs that AI agents consume. It runs on your own infrastructure with one Docker Compose file, or, soon, on Readsmith Cloud.
+
+## Three ideas carry the whole product
+
+### The reading experience is the product
+
+Documentation is read far more often than it is written, so Readsmith spends its effort on the reading: a deliberate type scale set in Spectral and IBM Plex, a real reading measure, and first-class light and dark themes designed separately rather than inverted. Prose pages ship zero JavaScript; interactive pieces hydrate as islands only where a page asks for them.
+
+### Builds are precompiled and deterministic
+
+Every build produces an immutable bundle: static HTML, an island manifest, search chunks, and the agent outputs. The same input produces byte-identical output, which is what makes caching correct and rollbacks honest: rolling back a deploy repoints to a previous bundle, nothing rebuilds.
+
+### Agents are first-class readers
+
+The same build that renders pages for people projects them for machines:
+
+- `/llms.txt` and `/llms-full.txt`, a directory and a full-content export of every page
+- every page served as plain Markdown for agents that ask for it
+- an MCP server with live search and endpoint lookup
+- an Agent Skill at `/skill.md`, following the agentskills.io format, generated from your docs into your own repository where you review it like code
+
+## What you get out of the box
+
+- **Markdown and MDX authoring** with a component library: callouts, tabs, steps, cards, code groups, and more
+- **A generated API reference** from an OpenAPI spec: one page per operation or one continuous page, with authored prose and the generated contract living together
+- **Search and Ask AI** on your own model keys (OpenAI, Anthropic, Google, or a gateway); answers cite their sources
+- **Convention over configuration**: a repository of Markdown with no config still builds a working site, and a Mintlify-compatible `docs.json` is accepted for migration
+- **Self-hosting that respects you**: the app plus Postgres with pgvector is the entire stack; no external services, no telemetry you did not turn on
+
+## Who it is for
+
+Teams who want documentation they own: the source in their repository, the site on their domain, the data in their database, and a reading experience they are proud to ship. Readsmith is released under the Fair Source License (FSL): free to self-host with every feature, no gates.
+
+## Where to go next
+
+<CardGroup cols="2">
+  <Card title="Quickstart" href="/quickstart">
+    A running site in a few minutes with Docker Compose.
+  </Card>
+  <Card title="Comparisons" href="/comparisons">
+    How Readsmith relates to the tools you already know.
+  </Card>
+</CardGroup>

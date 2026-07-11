@@ -1,0 +1,35 @@
+---
+title: Deploy with Docker Compose
+description: The canonical Readsmith deployment. The app and Postgres with pgvector, one compose file, no external services.
+---
+
+# Deploy with Docker Compose
+
+Readsmith self-hosts as two containers: the app, and Postgres with the pgvector extension. That is the entire stack. There are no external services to sign up for, no build farm, and no telemetry you did not turn on.
+
+## The shape of a deployment
+
+```text
+docker-compose.yml
+├── app        the serving shell, your docs prebuilt inside
+└── db         Postgres 16 + pgvector: search, vectors, jobs
+```
+
+The compose file in the repository root is the reference deployment. It wires the database, a persistent storage volume for compiled artifacts, and the app port; you provide an `.env` created from `.env.example`.
+
+## Steps
+
+Follow the [Quickstart](/quickstart) for the clone-to-running walkthrough. In production you additionally:
+
+1. Set a real `POSTGRES_PASSWORD` in `.env` and keep the file out of version control.
+2. Point `READSMITH_CONTENT` at your documentation directory.
+3. Put a reverse proxy or a CDN in front of the app port, and serve your domain over TLS.
+4. Set model keys in the environment if you want search embeddings and Ask AI: the app degrades gracefully without them (full-text search stays on, semantic search and Ask AI turn off).
+
+## What runs without a database
+
+Without `DATABASE_URL` the app runs docs-only: pages, navigation, themes, the API reference, and every agent output (`llms.txt`, per-page Markdown, `skill.md`) work from the precompiled bundle alone. The database activates search, Ask AI, and background jobs.
+
+<Warning>
+Two sites must never share one storage root. Each deployment gets its own `READSMITH_STORAGE_ROOT`; sharing one directory makes the second site overwrite the first site's compiled bundle.
+</Warning>
