@@ -1,0 +1,39 @@
+---
+title: Pages and frontmatter
+description: How pages are discovered, how URLs form, and every frontmatter key Readsmith recognizes.
+---
+
+# Pages and frontmatter
+
+Every `.md` and `.mdx` file under your content root becomes a page. No registration step, no sidebar file to update: discovery is the default, and configuration is the exception.
+
+## Discovery and URLs
+
+- All `**/*.md` and `**/*.mdx` files are discovered, minus `node_modules`, `.git`, and the reserved `snippets/` directory. Add your own patterns with `content.exclude`; they merge with the defaults rather than replacing them.
+- The URL slug is the file path without its extension: `guides/setup.md` serves at `/guides/setup`.
+- `index` and `readme` files map to their directory: `guides/index.md` serves at `/guides`, and the root `index.md` is the home page.
+- Heading anchors use GitHub's slug algorithm, so deep links behave the way your repository's Markdown already does.
+
+## Recognized frontmatter
+
+Frontmatter is optional. A page without it takes its title from the first heading, or from the file name as a last resort.
+
+| Key | Type | Effect |
+| --- | --- | --- |
+| `title` | string | The page title: `<title>`, navigation, search results, and social metadata |
+| `description` | string | The one-line summary: metadata, `llms.txt`, and search snippets |
+| `sidebarTitle` | string | A shorter label for the sidebar, breadcrumbs, and prev/next links; `title` still names the document |
+| `hidden` | boolean | Unlisted: the page serves at its URL but leaves navigation, the sitemap, feeds, and the AI index |
+| `noindex` | boolean | Emits a robots noindex meta and drops the page from the sitemap |
+| `date` | string | Marks a dated entry: feeds the RSS feed and the sitemap's last-modified |
+| `openapi` | string | Turns the page into a hybrid API operation page |
+| `openapi-schema` | string | Turns the page into a data-model page |
+
+Two behaviors worth knowing:
+
+- `hidden: true` implies `noindex` unless you explicitly set `noindex: false`. An unlisted page almost never belongs in a search engine, so the safe default is chosen for you.
+- Every other frontmatter key is yours. Custom keys become variables in the page body, so `owner: Platform team` in frontmatter renders wherever the page writes `{{owner}}` (in `.md`) or `{owner}` (in `.mdx`).
+
+<Tip>
+Keep `title` under about sixty characters and always write a `description`. Both feed search results, social unfurls, and the agent outputs, so they are the highest-leverage two lines on any page.
+</Tip>

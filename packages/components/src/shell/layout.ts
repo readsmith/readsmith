@@ -18,6 +18,8 @@ export interface ShellSite {
   description?: string;
   /** Canonical base URL, used to build absolute "open in ChatGPT/Claude" links. */
   url?: string;
+  /** Where the header brand links. Defaults to "/" (the docs home). */
+  homeUrl?: string;
   /** Logo image URL, or a per-theme pair. When set, replaces the wordmark. */
   logo?: string | { light: string; dark: string };
   /** Top-level navigation tabs. When present, a tab bar renders below the header. */
@@ -204,9 +206,11 @@ function brandHtml(site: ShellSite): string {
 
 export function header(site: ShellSite): string {
   const brand = brandHtml(site);
+  const home = site.homeUrl ?? "/";
+  const homeRel = /^https?:\/\//.test(home) ? ' rel="noopener"' : "";
   return `<header class="rs-header">
   <button class="rs-icon-btn rs-header__burger" data-rs-nav-toggle aria-label="Open navigation" aria-expanded="false">${ICONS.menu}</button>
-  <a class="rs-brand" href="/">${brand}</a>
+  <a class="rs-brand" href="${esc(home)}"${homeRel}>${brand}</a>
   ${(site.links ?? [])
     .map((link) => `<a class="rs-headerlink" href="${esc(link.href)}">${esc(link.label)}</a>`)
     .join("")}

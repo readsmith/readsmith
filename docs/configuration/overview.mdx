@@ -1,0 +1,47 @@
+---
+title: Configuration overview
+description: Convention over configuration. A repo of Markdown with no config still builds; docs.yaml exists for when you want control.
+---
+
+# Configuration overview
+
+Readsmith is convention over configuration. A directory of Markdown with no config file at all builds a working site: pages are discovered, titles come from headings, and navigation follows your folder structure. Configuration exists to take control, one key at a time.
+
+## The config file
+
+Put one of these at your content directory's root:
+
+| File | Format |
+| --- | --- |
+| `docs.yaml` (or `docs.yml`) | Readsmith's native shape |
+| `docs.json` | Accepted in the Mintlify-compatible shape, for migration |
+
+The smallest useful config is two lines:
+
+```yaml title="docs.yaml"
+site:
+  name: My Project
+```
+
+`site.name` is the only required key anywhere. Everything else is optional and documented, key by key, in the [settings reference](/configuration/settings-reference).
+
+## When the config lives above the content
+
+A repository that keeps prose in a subdirectory points at it with `content.root`:
+
+```yaml title="docs.yaml"
+site:
+  name: My Project
+content:
+  root: docs
+```
+
+Run Readsmith at the repository root and it reads pages from `docs/`, which keeps paths in your config repository-relative and lets asset mounts reach sibling directories.
+
+## Where settings take effect
+
+Configuration is read at build time and compiled into the site bundle. Changing `docs.yaml` and rebuilding is the whole deployment story: there is no settings dashboard state that can drift from the file in your repository.
+
+<Tip>
+Start with no config. Add `site.name` and a `description` when you first deploy, navigation when the auto-built sidebar stops matching your mental model, and everything else the day you need it.
+</Tip>

@@ -121,6 +121,16 @@ describe("renderShellBody", () => {
     expect(html).toContain('src="/logo.svg"');
     expect(html).not.toContain("rs-wordmark");
   });
+
+  it("defaults the brand link to the docs home", () => {
+    const html = renderShellBody(site, page);
+    expect(html).toContain('class="rs-brand" href="/"');
+  });
+
+  it("points the brand at homeUrl when set, external gets rel=noopener", () => {
+    const html = renderShellBody({ ...site, homeUrl: "https://cruciblehq.dev" }, page);
+    expect(html).toContain('class="rs-brand" href="https://cruciblehq.dev" rel="noopener"');
+  });
 });
 
 describe("renderDocument", () => {

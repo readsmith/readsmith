@@ -1,0 +1,73 @@
+---
+title: Snippets and variables
+description: Write shared content once. Variables interpolate at build time and snippets include whole files, in plain Markdown or MDX.
+---
+
+# Snippets and variables
+
+Repeated prose drifts: the install block gets fixed in one place and goes stale in four others. Readsmith resolves both mechanisms at build time, so shared content stays in one file and every page that uses it ships the current version as static HTML.
+
+## Variables
+
+Declare values in `docs.yaml`:
+
+```yaml title="docs.yaml"
+variables:
+  version: 0.1.0
+  product: Readsmith
+```
+
+Reference them in prose: these docs run on Readsmith {version}, and that number came from the block above.
+
+The syntax differs by file type, because MDX treats braces as expressions:
+
+| File type | Syntax |
+| --- | --- |
+| `.md` | `{{version}}` |
+| `.mdx` | `{version}` |
+
+Two more facts:
+
+- A page's own frontmatter keys join the scope and win over `docs.yaml` on collision, so a page can override `version` locally.
+- Text inside code spans and fenced blocks is never interpolated. `{{version}}` in a code example renders literally, which is how this page shows you the syntax at all.
+- An unknown variable becomes a build warning (`missing-variable`), not silent empty output you discover in production.
+
+## Snippets
+
+Put shared files in the reserved `snippets/` directory at your content root. Files there are includable content, never pages of their own:
+
+```text
+docs/
+├── snippets/
+│   └── storage-root.md
+└── self-host/
+    └── deploy.mdx
+```
+
+Include one with the `Snippet` component, in `.md` or `.mdx` alike:
+
+```markdown
+<Snippet file="storage-root.md" />
+```
+
+This site uses that exact snippet inside the deployment guide's warning callout. Here is the same inclusion, live:
+
+<Info>
+<Snippet file="storage-root.md" />
+</Info>
+
+## Snippets take props
+
+Any extra attribute becomes a variable inside the included file:
+
+```markdown
+<Snippet file="greeting.md" name="Rex" />
+```
+
+where `snippets/greeting.md` writes `{{name}}`. Props win over globals inside the snippet's scope.
+
+<Tip>
+Write snippets as `.md` files. Snippet content interpolates with the `{{var}}` text syntax, and a plain-Markdown snippet also stays readable anywhere else it is rendered, including on GitHub.
+</Tip>
+
+Snippets nest, and the build guards the two ways that goes wrong: a cycle or excessive nesting is reported as a diagnostic instead of looping, and a `file` that matches nothing is a build warning pointing at the page that asked for it.

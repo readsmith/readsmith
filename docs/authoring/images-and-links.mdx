@@ -1,0 +1,66 @@
+---
+title: Images, assets, and links
+description: How files get served, how links resolve and get validated, and how to publish directories that live outside your docs folder.
+---
+
+# Images, assets, and links
+
+Readsmith treats your file tree as the source of truth: images ship from where they live, links resolve the way your repository already works, and everything is validated at build time.
+
+## Images and co-located assets
+
+Any non-content file inside the content root is published at its own path. Keep an image next to the page that uses it and reference it relatively:
+
+```markdown
+![The dashboard after setup](./dashboard-light.png)
+```
+
+Content files themselves (`.md`, `.mdx`, and the config file) are never served raw; they are inputs to the build.
+
+## Asset mounts: directories outside the content root
+
+Real repositories keep media next to code, not next to prose. Declare a mount to publish such a directory:
+
+```yaml title="docs.yaml"
+assets:
+  - from: ../demo
+    to: demo
+```
+
+`from` is relative to the content root and may escape it; it may never escape the repository root. The directory is copied whole and served under `/demo/...`. Declaring the mount is exactly what makes it public: nothing outside the content root is ever published by accident.
+
+<Warning>
+A mount copies the entire directory, not just the files your pages reference. Point mounts at media folders, not at folders that also hold scripts or data you would rather keep private.
+</Warning>
+
+## Links between pages
+
+Link pages the way GitHub renders them, with relative paths to the source file:
+
+```markdown
+See the [deploy guide](../self-host/deploy.mdx) and the
+[frontmatter table](./pages.mdx#recognized-frontmatter).
+```
+
+The build rewrites these to site URLs and validates every one: a link to a missing page is a `broken-link` warning, and a `#fragment` that matches no heading on the target page is a `broken-anchor` warning. Root-relative links like `/quickstart` work too.
+
+## Links that leave the docs
+
+A relative link that escapes the content root points at a real file that is not a docs page, like a repository's `SECURITY.md`. Tell Readsmith where your repository lives and those links resolve to the file on your forge instead of a dead href:
+
+```yaml title="docs.yaml"
+links:
+  repo: https://github.com/acme/widget
+  branch: main
+```
+
+## Promoting the README
+
+A repository whose README is the real front page can serve it at `/` without moving or duplicating the file:
+
+```yaml title="docs.yaml"
+content:
+  home: ../README.md
+```
+
+The README's repository-relative links keep working, and the docs home stays the file contributors already edit.

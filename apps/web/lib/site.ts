@@ -18,6 +18,8 @@ export interface Site {
   branding: boolean;
   url?: string;
   description?: string;
+  /** Where the header brand links; defaults to "/". */
+  homeUrl?: string;
   /** Per-theme pairs (config resolution fills both slots from a bare string). */
   logo?: { light: string; dark: string };
   favicon?: { light: string; dark: string };

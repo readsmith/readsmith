@@ -1,0 +1,70 @@
+---
+title: Navigation and tabs
+description: The sidebar builds itself from your file tree. Take control page by page, group by group, or with top-level tabs.
+---
+
+# Navigation and tabs
+
+With no configuration, the sidebar mirrors your folder structure: directories become groups, pages sort inside them, and the home page leads. Configuration replaces that ordering when you want to curate it.
+
+## Explicit navigation
+
+List slugs in the order you want, nesting groups freely:
+
+```yaml title="docs.yaml"
+navigation:
+  - index
+  - group: Start here
+    pages:
+      - what-is-readsmith
+      - quickstart
+  - group: Guides
+    pages:
+      - guides/setup
+      - group: Advanced
+        pages:
+          - guides/scaling
+```
+
+Rules the build enforces for you:
+
+- A slug that matches no page is reported at build time, not discovered by a reader.
+- Hidden pages never appear, even when listed.
+- Pages left out of an explicit `navigation` stay reachable at their URLs; they are unlisted from the sidebar only.
+
+## Tabs
+
+Tabs split large sites into top-level sections, each with its own sidebar:
+
+```yaml title="docs.yaml"
+tabs:
+  - tab: Guides
+    pages:
+      - index
+      - group: Start here
+        pages: [what-is-readsmith, quickstart]
+  - tab: Components
+    pages:
+      - components/overview
+```
+
+The active tab scopes the sidebar, breadcrumbs, and previous/next links, so readers move within a section rather than across the whole site. This site's own tab row is exactly this configuration.
+
+## The API reference joins the row
+
+With `apiReference.layout: pages`, the generated reference appears as its own tab, a complete catalog of every operation. An operation page you explicitly place in another tab keeps that home, and the catalog still lists it so the reference stays complete. With the single-page layout, the reference is linked from the header instead.
+
+## Labels
+
+The sidebar shows each page's `title`, unless the page sets a shorter `sidebarTitle`:
+
+```yaml
+---
+title: Deploying behind a corporate reverse proxy
+sidebarTitle: Reverse proxy
+---
+```
+
+<Tip>
+Start with auto-navigation and switch to explicit `navigation` or `tabs` only when the file tree stops telling the right story. Every slug you list is one you must keep in sync when files move.
+</Tip>

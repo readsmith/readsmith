@@ -1,0 +1,118 @@
+---
+title: Settings reference
+description: Every key docs.yaml accepts, with types, defaults, and what each one does.
+---
+
+# Settings reference
+
+Every key Readsmith's configuration accepts, in one place. All keys are optional except `site.name`. The same shape is accepted from `docs.yaml`, `docs.yml`, or a Mintlify-compatible `docs.json`.
+
+## site
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `site.name` | string | required | The site's name: header wordmark, metadata, agent outputs |
+| `site.url` | string | unset | Canonical base URL; enables absolute URLs in the sitemap, RSS, llms.txt, and page metadata |
+| `site.description` | string | unset | One-line description for metadata and the agent outputs |
+| `site.logo` | string or `{light, dark}` | unset | Header logo, served from your content; a pair switches with the theme, flash-free |
+| `site.favicon` | string or `{light, dark}` | unset | Favicon; a pair follows the visitor's OS scheme; without it Readsmith serves its default mark |
+| `site.author` | `{name, url?}` | unset | Emitted as JSON-LD author on pages |
+| `site.publisher` | `{name, url?}` | unset | Emitted as JSON-LD publisher on pages |
+| `site.theme` | object | unset | Brand color and font tokens; see [Theming](/configuration/theming) |
+
+## appearance
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `appearance.default` | `system`, `light`, `dark` | `system` | First-visit color scheme; a visitor's own toggle choice persists and wins |
+
+## content
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `content.root` | string | `.` | Directory that holds the pages, relative to where the config lives |
+| `content.include` | string[] | `**/*.md`, `**/*.mdx` | Glob patterns for page discovery |
+| `content.exclude` | string[] | see below | Extra ignore patterns; merged with the defaults, never replacing them |
+| `content.home` | string | unset | The page served at `/`; may escape the content root (`../README.md`), never the repository |
+
+Always excluded, regardless of `content.exclude`: `**/node_modules/**`, `**/.git/**`, and the reserved `snippets/**` directory.
+
+## navigation and tabs
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `navigation` | list | auto | Sidebar order: page slugs and `{group, pages}` nests; omit it to auto-build from the file tree |
+| `tabs` | list of `{tab, pages}` | unset | Top-level tabs; each scopes the sidebar to its own navigation |
+
+Details and examples: [Navigation and tabs](/configuration/navigation).
+
+## apiReference
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `apiReference.spec` | string | required to enable | Path to your OpenAPI file, relative to the content root |
+| `apiReference.path` | string | `/api-reference` | URL the reference mounts at |
+| `apiReference.label` | string | `API Reference` | Label for the tab or header link |
+| `apiReference.layout` | `single`, `pages` | `single` | One continuous page, or one page per operation with an overview at the root |
+
+## assets and links
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `assets` | list of `{from, to}` | unset | Directories to publish; `from` may escape the content root, never the repository |
+| `links.repo` | string | unset | Repository URL; relative links that leave the docs resolve to files on the forge |
+| `links.branch` | string | `main` | Branch used when building forge links |
+
+## variables
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `variables` | map | unset | Values available in every page: `{{name}}` in Markdown, `{name}` in MDX |
+
+## footer and branding
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `footer.socials` | map of platform to URL | unset | Social links in the content footer, e.g. `github`, `x` |
+| `branding` | boolean | `true` | Shows the "Powered by Readsmith" badge; set `false` to white-label |
+
+## security
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `security.csp.imgSrc` | string[] | unset | Extra Content-Security-Policy sources for images |
+| `security.csp.connectSrc` | string[] | unset | Extra sources for fetch and websocket connections |
+| `security.csp.fontSrc` | string[] | unset | Extra font sources |
+| `security.csp.frameSrc` | string[] | unset | Extra frame sources (embeds) |
+| `security.csp.frameAncestors` | string[] | unset | Who may frame your docs |
+
+Sources add to the strict default policy; they never replace it. Tokens containing whitespace or `;` are dropped.
+
+## mcp
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `mcp.path` | string | `/mcp` | The MCP endpoint's public alias; the canonical endpoint always answers regardless |
+
+## ai
+
+The `ai` block configures search, Ask AI, and MCP behavior. API keys are never written here; they come from the environment.
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `ai.chat.provider` | `openai`, `anthropic`, `google`, `gateway` | unset | Chat model provider for Ask AI |
+| `ai.chat.model` | string | unset | Chat model id |
+| `ai.embedding.provider` | `openai`, `google`, `gateway` | unset | Embedding provider for semantic search |
+| `ai.embedding.model` | string | unset | Embedding model id |
+| `ai.search.rrfK` | integer | `60` | Rank-fusion constant for hybrid search |
+| `ai.search.topK` | integer | `8` | Results returned per search |
+| `ai.askAi.enabled` | boolean | `true` | Turns the Ask AI answerer on or off (search stays independent) |
+| `ai.askAi.maxSteps` | integer | `4` | Tool-use steps the answerer may take |
+| `ai.askAi.maxOutputTokens` | integer | `1024` | Answer length ceiling |
+| `ai.askAi.timeoutMs` | integer | `30000` | Per-question time budget |
+| `ai.analytics.retentionDays` | integer | `90` | How long Ask AI question records are kept |
+| `ai.limits.ask` | `{limit, windowMs}` | `10` per minute | Rate limit for Ask AI requests |
+| `ai.limits.search` | `{limit, windowMs}` | `60` per minute | Rate limit for search requests |
+| `ai.limits.mcp` | `{limit, windowMs}` | `60` per minute | Rate limit for MCP requests |
+
+Environment variables override `ai.limits` at deploy time, and a missing embedding key degrades search to keyword-only rather than breaking it.

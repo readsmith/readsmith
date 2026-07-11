@@ -1,0 +1,74 @@
+---
+title: Code blocks
+description: Fenced code with build-time highlighting, titles, and line emphasis. Dual light and dark themes, zero JavaScript.
+---
+
+# Code blocks
+
+Code is highlighted at build time with Shiki and ships as static HTML, themed for light and dark at once. There is no highlighter running in the browser and no flash of unstyled code.
+
+## The basics
+
+Fence your code and name the language:
+
+````markdown
+```ts
+export function greet(name: string): string {
+  return `Hello, ${name}`;
+}
+```
+````
+
+renders as:
+
+```ts
+export function greet(name: string): string {
+  return `Hello, ${name}`;
+}
+```
+
+Always tag the language. Untagged blocks render as plain text and read worse in both themes.
+
+## Titles
+
+Add a `title` to label the block with its file name:
+
+```yaml title="docs.yaml"
+site:
+  name: My Project
+```
+
+## Line emphasis
+
+Highlight the lines the prose is talking about with a brace range in the fence meta:
+
+```ts {2,4-5}
+const pets = await store.list();
+const rex = pets.find((p) => p.name === "Rex");
+if (!rex) {
+  throw new Error("Rex is missing");
+}
+console.log(rex.species);
+```
+
+The meta accepts single lines and ranges, combined freely: `{1,3-5}`.
+
+## Several languages, one example
+
+When the same request exists in more than one language, wrap the blocks in a `<CodeGroup>` and readers pick their tab:
+
+<CodeGroup>
+
+```bash title="cURL"
+curl https://api.example.com/v1/pets
+```
+
+```ts title="TypeScript"
+const pets = await fetch("https://api.example.com/v1/pets").then((r) => r.json());
+```
+
+</CodeGroup>
+
+<Tip>
+Inline code uses single backticks and follows the reading theme automatically: `READSMITH_CONTENT` renders as a quiet chip, not a shout.
+</Tip>

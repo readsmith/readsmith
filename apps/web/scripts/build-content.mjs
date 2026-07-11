@@ -73,6 +73,31 @@ async function buildApiReference(config, contentRoot) {
 }
 
 /**
+ * Snippet sources: `snippets/**` under the content root, keyed by their path
+ * relative to that directory (the `<Snippet file="...">` prop). Reserved from
+ * page discovery by DEFAULT_EXCLUDE; read here, expanded at transform time.
+ */
+async function readSnippets(contentRoot) {
+  const root = join(contentRoot, "snippets");
+  if (!existsSync(root)) return {};
+  const out = {};
+  const walk = async (dir, prefix) => {
+    const entries = (await readdir(dir, { withFileTypes: true })).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      const full = join(dir, entry.name);
+      const key = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) await walk(full, key);
+      else if (/\.(md|mdx)$/i.test(entry.name)) out[key] = await readFile(full, "utf8");
+    }
+  };
+  await walk(root, "");
+  return out;
+}
+
+/**
  * Authored agent skills: `.readsmith/skills/<name>/SKILL.md` (or the
  * `.mintlify/skills/` migration fallback when that is absent), plus a root
  * `skill.md`. Files are read up to one nested level (scripts/, references/,
@@ -150,6 +175,7 @@ async function main() {
         }
       : null,
     skills: await readSkills(contentRoot),
+    snippets: await readSnippets(contentRoot),
   });
 
   // Config diagnostics (reserved paths, asset mounts, home page) matter as much as
@@ -173,6 +199,7 @@ async function main() {
     branding: config.branding,
     url: config.site.url,
     description: config.site.description,
+    homeUrl: config.site.homeUrl,
     logo: config.site.logo,
     favicon: config.site.favicon,
     // Precompiled per-site brand theme, injected into <head> by the shell.

@@ -12,12 +12,18 @@
   display: flex;
   gap: 2px;
   padding: 0 var(--rs-space-2);
-  border-bottom: 1px solid var(--rs-rule);
+  /* The hairline is an inset shadow, not a border: the selected tab's 2px
+   * indicator paints over it without a negative margin, whose 1px overflow
+   * draws a vertical scrollbar on classic-scrollbar desktops. */
+  box-shadow: inset 0 -1px 0 var(--rs-rule);
   overflow-x: auto;
+  scrollbar-width: none;
+}
+.rs-codegroup__list::-webkit-scrollbar {
+  display: none;
 }
 
 .rs-codegroup__tab {
-  margin-bottom: -1px;
   padding: 9px 10px;
   font-family: var(--rs-font-mono);
   font-size: 0.75rem;

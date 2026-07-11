@@ -41,7 +41,7 @@ export interface RenderedPage {
 
 /** Render the page at `slug` into the shell, or null when no such page exists. */
 export async function renderDocPage(slug: string): Promise<RenderedPage | null> {
-  const { build, name, branding, url, logo, apiReference, footer } = await getSite();
+  const { build, name, branding, url, logo, homeUrl, apiReference, footer } = await getSite();
   const page = build.pages.find((p) => p.slug === slug);
   if (!page) return null;
 
@@ -56,7 +56,17 @@ export async function renderDocPage(slug: string): Promise<RenderedPage | null> 
       : bar;
   const links =
     !bar && apiReference ? [{ label: apiReference.label, href: apiReference.path }] : undefined;
-  const site: ShellSite = { name, nav, tabs, poweredBy: branding, url, logo, links, footer };
+  const site: ShellSite = {
+    name,
+    nav,
+    tabs,
+    poweredBy: branding,
+    url,
+    logo,
+    homeUrl,
+    links,
+    footer,
+  };
 
   // Hybrid operation and data-model pages render their generated sections from
   // the normalized spec; the bundle is memoized, so the read is cheap.

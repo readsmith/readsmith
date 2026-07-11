@@ -1,0 +1,37 @@
+---
+title: Markdown and MDX
+description: What plain Markdown gives you, what MDX adds, and how the two syntaxes differ in Readsmith.
+---
+
+# Markdown and MDX
+
+Readsmith builds both `.md` and `.mdx` files through the same pipeline. Plain Markdown is a first-class citizen, not a downgrade: it renders with the same typography, the same code highlighting, and the same agent outputs.
+
+## What works in plain Markdown
+
+Everything CommonMark and GitHub-flavored Markdown give you: headings, lists, tables, task lists, links, images, blockquotes, and fenced code. On top of that, two Readsmith features work in `.md` without any MDX:
+
+- `{{variable}}` interpolation from your `docs.yaml` variables and the page's own frontmatter
+- `<Snippet file="..." />` inclusion of shared content
+
+This matters for repositories that render on GitHub too: a plain `.md` file degrades gracefully there, while MDX component tags show up as raw text. If your docs are dual-published, prefer `.md` for shared files and keep MDX for site-only pages.
+
+## What MDX adds
+
+`.mdx` pages can use the full [component library](/components/overview): callouts, tabs, steps, cards, code groups, and the rest. Components need no imports; the library is available in every page.
+
+MDX also changes one syntax rule: braces are expressions. Inside an `.mdx` page:
+
+- `{version}` resolves a variable (from `docs.yaml` variables or the page frontmatter)
+- `{"literal text"}` renders a literal string
+- `{/* a comment */}` renders nothing
+
+The double-brace `{{version}}` form belongs to plain Markdown only; in MDX it parses as an expression and the build warns.
+
+## Raw HTML
+
+Inline HTML in Markdown is handled with a trust-tiered sanitizer. Sites you build yourself run at owner trust, where your HTML passes through; the tiers exist so hosted and multi-author setups can be stricter without a different pipeline.
+
+<Note>
+Whichever syntax a page uses, the output is the same: precompiled static HTML with zero page JavaScript. Components render at build time; nothing hydrates unless a page includes an interactive island.
+</Note>

@@ -125,3 +125,14 @@ describe("resolveConfig: a repository-shaped checkout", () => {
     expect(config.pages.map((p) => p.slug).sort()).toEqual(["", "cli", "policy"]);
   });
 });
+
+// Spec readsmith-docs (slice 2 platform fix): snippets/ is reserved for
+// <Snippet> sources and never discovered as pages.
+describe("snippets/ is reserved from page discovery", () => {
+  it("excludes snippets/** by default", async () => {
+    const config = await resolveConfig(join(fixtures, "snippets-reserved"));
+    const slugs = config.pages.map((p) => p.slug);
+    expect(slugs).toEqual([""]);
+    expect(config.content.exclude).toContain("snippets/**");
+  });
+});

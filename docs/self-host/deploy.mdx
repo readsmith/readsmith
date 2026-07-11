@@ -31,5 +31,5 @@ Follow the [Quickstart](/quickstart) for the clone-to-running walkthrough. In pr
 Without `DATABASE_URL` the app runs docs-only: pages, navigation, themes, the API reference, and every agent output (`llms.txt`, per-page Markdown, `skill.md`) work from the precompiled bundle alone. The database activates search, Ask AI, and background jobs.
 
 <Warning>
-Two sites must never share one storage root. Each deployment gets its own `READSMITH_STORAGE_ROOT`; sharing one directory makes the second site overwrite the first site's compiled bundle.
+<Snippet file="storage-root.md" />
 </Warning>

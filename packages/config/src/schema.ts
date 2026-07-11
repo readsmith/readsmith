@@ -128,6 +128,10 @@ export const configInputSchema = z.object({
     url: z.string().optional(),
     /** One-line site description, used in metadata and the agent outputs. */
     description: z.string().optional(),
+    /** Where the header brand (logo + name) links. Defaults to "/" (the docs
+     * home). Set an absolute URL to point at a marketing site, so the docs
+     * and the product cross-link both ways. */
+    homeUrl: z.string().optional(),
     /** Logo image URL (served from content), or a { light, dark } pair.
      * Replaces the wordmark in the header. */
     logo: siteImageSchema.optional(),
@@ -236,6 +240,8 @@ export interface ResolvedConfig {
     name: string;
     url?: string;
     description?: string;
+    /** Where the header brand links; defaults to "/" in the shell. */
+    homeUrl?: string;
     /** Resolved to a per-theme pair; a bare string filled both slots. */
     logo?: SiteImage;
     favicon?: SiteImage;
@@ -276,8 +282,10 @@ export const DEFAULT_INCLUDE = ["**/*.md", "**/*.mdx"];
  * Always excluded. A user's `content.exclude` is merged on top of these, never
  * substituted for them: writing `exclude: ["SECURITY.md"]` must not silently
  * re-enable a walk of `node_modules`.
+ * `snippets/` is the reserved home of `<Snippet>` sources (the Mintlify
+ * convention too): included content, never pages of its own.
  */
-export const DEFAULT_EXCLUDE = ["**/node_modules/**", "**/.git/**"];
+export const DEFAULT_EXCLUDE = ["**/node_modules/**", "**/.git/**", "snippets/**"];
 
 /** Files never copied as assets: they are content, or they are the config itself. */
 export const ASSET_SKIP_EXT = new Set([".md", ".mdx"]);

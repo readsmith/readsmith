@@ -260,6 +260,7 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
       name: input?.site.name ?? defaultSiteName(root),
       url: input?.site.url,
       description: input?.site.description,
+      homeUrl: input?.site.homeUrl,
       logo: resolveSiteImage(input?.site.logo, "logo", diagnostics),
       favicon: resolveSiteImage(input?.site.favicon, "favicon", diagnostics),
       author: input?.site.author,

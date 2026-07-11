@@ -1,0 +1,73 @@
+---
+title: Theming and appearance
+description: "Rebrand the site from config: accent colors as light and dark pairs, fonts, logos, and the first-visit color scheme."
+---
+
+# Theming and appearance
+
+Readsmith ships one deliberate theme with first-class light and dark modes. Theming means adjusting its tokens from config, not forking a stylesheet: set a color once and both modes stay designed.
+
+## Accent colors
+
+The one theming decision most sites make. A good accent is one hue at two values, so tokens accept a light and dark pair:
+
+```yaml title="docs.yaml"
+site:
+  theme:
+    accent:
+      light: "#C0400A"
+      dark: "#FF6A1F"
+    accentHover:
+      light: "#9C3308"
+      dark: "#FF8442"
+```
+
+A single string is also accepted and used in both modes. Values are sanitized before they reach CSS.
+
+## Every theme token
+
+| Token | Governs |
+| --- | --- |
+| `accent`, `accentHover`, `accentWash` | Links and interactive highlights: the color, its hover, and its tinted background |
+| `paper` | The page ground |
+| `surface`, `surface2` | Raised panels and cards |
+| `ink`, `inkMuted`, `inkFaint` | Text, secondary text, and hints |
+| `rule`, `ruleStrong` | Hairlines and stronger borders |
+| `fontSans`, `fontHeading`, `fontMono`, `fontWordmark` | Font stacks; point these at faces the shell already loads |
+
+Unset tokens fall through to the defaults, so most sites set two or three and stop.
+
+## Logo and favicon
+
+Both accept one image or a per-theme pair. The pair is the recommended form: a logo drawn for white paper usually disappears on true black.
+
+```yaml title="docs.yaml"
+site:
+  logo:
+    light: /logo-light.svg
+    dark: /logo-dark.svg
+  favicon: /favicon.svg
+```
+
+Logo files are served from your content; the theme cascade switches the pair with no flash and no JavaScript. Without a favicon, Readsmith serves its own mark so browser tabs are never blank.
+
+## First-visit appearance
+
+```yaml title="docs.yaml"
+appearance:
+  default: dark
+```
+
+`system` (the default) follows the visitor's OS. `light` or `dark` pins the first visit; a visitor's own toggle choice is stored and wins on return visits.
+
+## The badge
+
+The footer shows a small "Powered by Readsmith" badge. Self-hosting includes the right to turn it off:
+
+```yaml title="docs.yaml"
+branding: false
+```
+
+<Note>
+Theming covers brand, not layout. The type scale, the reading measure, and the component anatomy are the product's opinion; that opinion is why the default looks the way it does.
+</Note>

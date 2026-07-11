@@ -16,6 +16,19 @@ tabs:
           - what-is-readsmith
           - quickstart
           - comparisons
+      - group: Authoring
+        pages:
+          - authoring/pages
+          - authoring/markdown
+          - authoring/code-blocks
+          - authoring/snippets-and-variables
+          - authoring/images-and-links
+      - group: Configuration
+        pages:
+          - configuration/overview
+          - configuration/settings-reference
+          - configuration/navigation
+          - configuration/theming
   - tab: Components
     pages:
       - components/overview
