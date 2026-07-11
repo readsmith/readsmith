@@ -25,7 +25,7 @@
   --rs-surface-2: rgba(22, 24, 29, 0.07);
   --rs-ink: #16181d;
   --rs-ink-muted: #565b63;
-  --rs-ink-faint: #767c84;
+  --rs-ink-faint: #666c73;
   --rs-rule: rgba(22, 24, 29, 0.1);
   --rs-rule-strong: rgba(22, 24, 29, 0.17);
   --rs-accent: #0c6e6e;
@@ -114,7 +114,7 @@
     --rs-surface-2: rgba(255, 255, 255, 0.09);
     --rs-ink: #e6e6e6;
     --rs-ink-muted: #9e9e9e;
-    --rs-ink-faint: #6f6f6f;
+    --rs-ink-faint: #848484;
     --rs-rule: rgba(255, 255, 255, 0.1);
     --rs-rule-strong: rgba(255, 255, 255, 0.17);
     --rs-accent: #48b0a6;
@@ -141,7 +141,7 @@
   --rs-surface-2: rgba(255, 255, 255, 0.09);
   --rs-ink: #e6e6e6;
   --rs-ink-muted: #9e9e9e;
-  --rs-ink-faint: #6f6f6f;
+  --rs-ink-faint: #848484;
   --rs-rule: rgba(255, 255, 255, 0.1);
   --rs-rule-strong: rgba(255, 255, 255, 0.17);
   --rs-accent: #48b0a6;
@@ -167,7 +167,7 @@
   --rs-surface-2: rgba(22, 24, 29, 0.07);
   --rs-ink: #16181d;
   --rs-ink-muted: #565b63;
-  --rs-ink-faint: #767c84;
+  --rs-ink-faint: #666c73;
   --rs-rule: rgba(22, 24, 29, 0.1);
   --rs-rule-strong: rgba(22, 24, 29, 0.17);
   --rs-accent: #0c6e6e;

@@ -183,6 +183,11 @@ export function parseLineHighlights(meta?: string): { lines: Set<number>; invali
 function lineHighlightTransformer(lines: Set<number>): ShikiTransformer {
   return {
     name: "readsmith:line-highlight",
+    pre(node) {
+      // A code block that overflows becomes a scroll region; without a focus
+      // stop, keyboard users cannot scroll it (axe: scrollable-region-focusable).
+      node.properties.tabindex = "0";
+    },
     line(node, lineNumber) {
       if (!lines.has(lineNumber)) return;
       const cls = node.properties.class;

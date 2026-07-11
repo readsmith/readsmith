@@ -295,7 +295,7 @@ export function renderOperationConsole(op: Operation, spec: NormalizedSpec): str
     const example = responseExample(success, spec);
     const ok = success.status.startsWith("2");
     const body = example
-      ? `<figure class="rs-code" data-lang="json"><pre class="shiki"><code>${esc(
+      ? `<figure class="rs-code" data-lang="json"><pre class="shiki" tabindex="0"><code>${esc(
           example,
         )}</code></pre></figure>`
       : '<div class="rs-console__empty">No response body.</div>';

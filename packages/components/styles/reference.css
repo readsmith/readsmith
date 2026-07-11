@@ -21,7 +21,7 @@
   --rs-con-rule: rgba(255, 255, 255, 0.1);
   --rs-con-ink: #e6e6e6;
   --rs-con-muted: #9e9e9e;
-  --rs-con-faint: #6f6f6f;
+  --rs-con-faint: #848484;
   --rs-con-accent: #56b8ad;
   /* readable text over a con-accent fill (send button hover) */
   --rs-con-accent-contrast: #0a0a0a;

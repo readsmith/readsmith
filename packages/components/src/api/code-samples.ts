@@ -149,7 +149,7 @@ export function renderCodeSamples(samples: CodeSample[], reqline = ""): string {
           i === 0 ? "" : " hidden"
         }><figcaption class="rs-code__bar"><span class="rs-code__lang">${esc(
           s.label,
-        )}</span></figcaption><pre class="shiki"><code>${esc(s.source)}</code></pre></figure>`,
+        )}</span></figcaption><pre class="shiki" tabindex="0"><code>${esc(s.source)}</code></pre></figure>`,
     )
     .join("");
   return `<div class="rs-codegroup" data-rs-group="rs-api-lang" data-island="CodeGroup"><div class="rs-codegroup__list" role="tablist">${reqline}${tabs}</div><div class="rs-codegroup__panels">${panels}</div></div>`;
