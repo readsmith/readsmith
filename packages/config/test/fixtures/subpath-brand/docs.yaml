@@ -1,0 +1,7 @@
+site:
+  name: Subpath Brand
+  url: https://example.dev/docs
+  logo: /brand/logo.svg
+  favicon:
+    light: /brand/favicon-light.png
+    dark: https://cdn.example.dev/favicon-dark.png

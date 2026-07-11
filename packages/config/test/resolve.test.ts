@@ -102,6 +102,20 @@ describe("resolveConfig: tabbed repo", () => {
     const r = await resolveConfig(join(fixtures, "configured"));
     expect(r.tabs).toBeUndefined();
   });
+
+  // Spec subpath-hosting SP-3: site-root-relative brand assets carry the base
+  // path derived from site.url; external URLs pass through untouched.
+  it("prefixes root-relative logo and favicon paths on a subpath site", async () => {
+    const r = await resolveConfig(join(fixtures, "subpath-brand"));
+    expect(r.site.logo).toEqual({
+      light: "/docs/brand/logo.svg",
+      dark: "/docs/brand/logo.svg",
+    });
+    expect(r.site.favicon).toEqual({
+      light: "/docs/brand/favicon-light.png",
+      dark: "https://cdn.example.dev/favicon-dark.png",
+    });
+  });
 });
 
 // Hybrid-authoring spec HA-10/HA-18: apiReference.layout resolution.

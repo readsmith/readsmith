@@ -16,6 +16,7 @@ import {
   type SiteImage,
   type SiteImageInput,
 } from "./schema.js";
+import { siteBasePath } from "./url.js";
 
 /**
  * Normalize a brand image (logo, favicon) to a per-theme pair. A bare string
@@ -27,9 +28,14 @@ function resolveSiteImage(
   input: SiteImageInput | undefined,
   name: string,
   diagnostics: Diagnostic[],
+  basePath = "",
 ): SiteImage | undefined {
+  // Site-root-relative brand assets carry the base path like every other
+  // served path (spec subpath-hosting SP-3, "the icons metadata"); external
+  // URLs pass through untouched.
+  const prefix = (u: string) => (basePath && u.startsWith("/") ? `${basePath}${u}` : u);
   if (input === undefined) return undefined;
-  if (typeof input === "string") return { light: input, dark: input };
+  if (typeof input === "string") return { light: prefix(input), dark: prefix(input) };
   const light = input.light ?? input.dark;
   const dark = input.dark ?? input.light;
   if (light === undefined || dark === undefined) {
@@ -51,7 +57,7 @@ function resolveSiteImage(
       source: "docs.yaml",
     });
   }
-  return { light, dark };
+  return { light: prefix(light), dark: prefix(dark) };
 }
 
 /**
@@ -261,8 +267,13 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
       url: input?.site.url,
       description: input?.site.description,
       homeUrl: input?.site.homeUrl,
-      logo: resolveSiteImage(input?.site.logo, "logo", diagnostics),
-      favicon: resolveSiteImage(input?.site.favicon, "favicon", diagnostics),
+      logo: resolveSiteImage(input?.site.logo, "logo", diagnostics, siteBasePath(input?.site.url)),
+      favicon: resolveSiteImage(
+        input?.site.favicon,
+        "favicon",
+        diagnostics,
+        siteBasePath(input?.site.url),
+      ),
       author: input?.site.author,
       publisher: input?.site.publisher,
       theme: input?.site.theme ?? {},
