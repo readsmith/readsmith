@@ -172,6 +172,9 @@ importers:
       '@readsmith/model':
         specifier: workspace:*
         version: link:../model
+      hast-util-from-html:
+        specifier: ^2.0.3
+        version: 2.0.3
       hastscript:
         specifier: ^9.0.1
         version: 9.0.1

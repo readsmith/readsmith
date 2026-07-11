@@ -81,7 +81,8 @@ async function main() {
   const build = await assembleSite({
     config,
     readPage: (path) => readFile(join(contentRoot, path), "utf8"),
-    registry: createRegistry(),
+    // The spec powers <Operation op="..."/> embeds in any prose page.
+    registry: createRegistry({ apiSpec: apiReference?.spec ?? null }),
     baseUrl: config.site.url,
     apiReference: apiReference
       ? {
@@ -119,6 +120,7 @@ async function main() {
     favicon: config.site.favicon,
     // Precompiled per-site brand theme, injected into <head> by the shell.
     themeCss: themeToCss(config.site.theme),
+    appearance: config.appearance,
     apiReference: config.apiReference,
     footer: config.footer,
     ai: config.ai ?? null,

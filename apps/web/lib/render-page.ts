@@ -58,8 +58,9 @@ export async function renderDocPage(slug: string): Promise<RenderedPage | null> 
     !bar && apiReference ? [{ label: apiReference.label, href: apiReference.path }] : undefined;
   const site: ShellSite = { name, nav, tabs, poweredBy: branding, url, logo, links, footer };
 
-  // Hybrid operation pages render their generated sections from the normalized
-  // spec; the bundle is memoized, so this is a cheap read for doc pages too.
-  const apiSpec = page.kind === "api-operation" ? (await getApiReference())?.spec : undefined;
+  // Hybrid operation and data-model pages render their generated sections from
+  // the normalized spec; the bundle is memoized, so the read is cheap.
+  const needsSpec = page.kind === "api-operation" || page.kind === "api-schema";
+  const apiSpec = needsSpec ? (await getApiReference())?.spec : undefined;
   return { page, html: renderShellBody(site, page, { apiSpec: apiSpec ?? null }) };
 }

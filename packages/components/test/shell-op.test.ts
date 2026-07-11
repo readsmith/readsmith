@@ -140,3 +140,65 @@ describe("renderNav method badges", () => {
     expect(html).toContain(">Setup</a>");
   });
 });
+
+describe("renderShellBody for api-schema pages", () => {
+  const schemaSpec: NormalizedSpec = {
+    ...spec,
+    schemas: {
+      Pet: {
+        type: ["object"],
+        description: "A registered pet.",
+        required: ["name"],
+        properties: { name: { type: ["string"] } },
+      },
+    },
+  };
+  const schemaPage: ShellPage = {
+    title: "Pet",
+    url: "/models/pet",
+    slug: "models/pet",
+    html: "<p>Model notes.</p>",
+    toc: [],
+    breadcrumbs: [],
+    kind: "api-schema",
+    apiSchema: { ref: "Pet", name: "Pet" },
+  };
+
+  it("stays doc-shaped and renders the fields via the SchemaViewer", () => {
+    const html = renderShellBody(site, schemaPage, { apiSpec: schemaSpec });
+    expect(html).not.toContain("rs-shell--op");
+    expect(html).not.toContain("rs-op__console");
+    expect(html).toContain("rs-schema-page");
+    expect(html).toContain("A registered pet.");
+    expect(html).toContain("Model notes.");
+    expect(html).toContain("rs-schema");
+    const order = ["rs-op__title", "A registered pet.", "Model notes.", "rs-schema__key"].map(
+      (needle) => html.indexOf(needle),
+    );
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it("degrades an unresolved schema to a danger callout, keeping the prose", () => {
+    const broken: ShellPage = { ...schemaPage, apiSchema: { ref: "Ghost", name: null } };
+    const html = renderShellBody(site, broken, { apiSpec: schemaSpec });
+    expect(html).toContain("rs-callout--danger");
+    expect(html).toContain("Ghost");
+    expect(html).toContain("Model notes.");
+  });
+});
+
+describe("themeInitScript", () => {
+  it("leaves system mode to the CSS media queries", async () => {
+    const { themeInitScript } = await import("../src/shell/layout.js");
+    expect(themeInitScript()).not.toContain("||");
+    expect(themeInitScript("system")).not.toContain("||");
+  });
+
+  it("pins a configured default until the visitor chooses", async () => {
+    const { themeInitScript } = await import("../src/shell/layout.js");
+    const script = themeInitScript("dark");
+    expect(script).toContain("localStorage.getItem('rs-theme')||'dark'");
+    expect(script).toContain("data-theme");
+  });
+});

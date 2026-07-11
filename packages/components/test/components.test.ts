@@ -144,3 +144,63 @@ describe("code group", () => {
     expect(registry.CodeGroup?.island).toBe(true);
   });
 });
+
+describe("operation embeds", () => {
+  const spec = {
+    specId: "s",
+    siteId: "default",
+    version: 1,
+    sourceHash: "h",
+    info: { title: "Pets", version: "1" },
+    servers: [{ url: "https://api.example.com/v1" }],
+    securitySchemes: {},
+    tags: [],
+    operations: [
+      {
+        id: "listPets",
+        method: "get" as const,
+        path: "/pets",
+        summary: "List pets",
+        deprecated: false,
+        tags: ["Pets"],
+        parameters: [
+          {
+            name: "limit",
+            in: "query" as const,
+            required: false,
+            schema: { type: ["integer" as const] },
+          },
+        ],
+        responses: [{ status: "200", description: "OK" }],
+      },
+    ],
+    schemas: {},
+  };
+
+  function embedOf(props: Record<string, unknown>, withSpec = true): Element {
+    const reg = createRegistry(withSpec ? { apiSpec: spec } : {});
+    const entry = reg.Operation;
+    if (!entry?.render) throw new Error("no Operation component");
+    return entry.render({ name: "Operation", props, children: [] }) as Element;
+  }
+
+  function html(el: Element): string {
+    // Enough structure probing for assertions without a serializer.
+    return JSON.stringify(el);
+  }
+
+  it("renders the bar, sections, and console for a resolved op", () => {
+    const el = embedOf({ op: "GET /pets" });
+    const s = html(el);
+    expect(classes(el)).toContain("rs-op-embed");
+    expect(s).toContain("rs-op__id");
+    expect(s).toContain("rs-console");
+    expect(s).toContain("query parameters");
+  });
+
+  it("degrades to a danger callout without a spec or on a miss", () => {
+    expect(classes(embedOf({ op: "GET /pets" }, false))).toContain("rs-callout--danger");
+    expect(classes(embedOf({ op: "DELETE /nope" }))).toContain("rs-callout--danger");
+    expect(classes(embedOf({}))).toContain("rs-callout--danger");
+  });
+});

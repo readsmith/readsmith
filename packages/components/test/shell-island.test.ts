@@ -197,3 +197,26 @@ describe("mobile nav", () => {
     expect(document.querySelector<HTMLElement>("[data-rs-scrim]")?.hidden).toBe(false);
   });
 });
+
+describe("Ask-AI header toggle", () => {
+  it("opens on first click, closes on the second, and tracks aria-expanded", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({ search: false, askAi: false }) })),
+    );
+    const btn = document.querySelector<HTMLElement>("[data-rs-ask-open]");
+    const panel = document.querySelector<HTMLElement>("[data-rs-ask]");
+    expect(panel?.hidden).toBe(true);
+    expect(btn?.getAttribute("aria-expanded")).toBe("false");
+
+    btn?.click();
+    expect(panel?.hidden).toBe(false);
+    expect(document.body.classList.contains("is-asking")).toBe(true);
+    expect(btn?.getAttribute("aria-expanded")).toBe("true");
+
+    btn?.click();
+    expect(panel?.hidden).toBe(true);
+    expect(document.body.classList.contains("is-asking")).toBe(false);
+    expect(btn?.getAttribute("aria-expanded")).toBe("false");
+  });
+});

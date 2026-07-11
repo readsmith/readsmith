@@ -34,6 +34,24 @@ export function findOperation(
 /** Bounds ref expansion: a branch never revisits a named schema, and depth is capped. */
 const MAX_DEPTH = 6;
 
+/**
+ * The markdown projection of one named component schema (a data-model page's
+ * generated half): name, description, and the full field walk with the same
+ * rules as the operation projection. Empty string when the name is unknown.
+ */
+export function schemaToMarkdown(name: string, spec: OperationContext): string {
+  const schema = spec.schemas[name];
+  if (!schema) return "";
+  const out = [`\`${name}\``, ""];
+  if (schema.description) out.push(schema.description.trim(), "");
+  // Seed the seen-set with the schema itself, so self-references collapse.
+  out.push(...schemaLines(schema, spec, 0, new Set([name])), "");
+  return `${out
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()}\n`;
+}
+
 export function operationToMarkdown(op: Operation, spec: OperationContext): string {
   const out: string[] = [`\`${op.method.toUpperCase()} ${op.path}\``, ""];
   if (op.deprecated) out.push("**Deprecated.**", "");

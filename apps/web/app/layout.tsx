@@ -11,14 +11,11 @@ import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "@readsmith/components/styles.css";
 import { getSite } from "@/lib/site";
+import { themeInitScript } from "@readsmith/components";
 import type { ReactNode } from "react";
 
-// Set the theme before first paint from the persisted choice, so there is no flash.
-const THEME_INIT =
-  "(function(){try{var t=localStorage.getItem('rs-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();";
-
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const { themeCss } = await getSite();
+  const { themeCss, appearance } = await getSite();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -27,8 +24,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized color tokens, built at compile time
           <style id="rs-site-theme" dangerouslySetInnerHTML={{ __html: themeCss }} />
         ) : null}
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline theme init */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+        {/* Sets the theme before first paint (persisted choice, then the site's
+            configured default), so there is no flash. */}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: enum-parameterized inline theme init */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript(appearance?.default) }} />
       </head>
       <body>{children}</body>
     </html>

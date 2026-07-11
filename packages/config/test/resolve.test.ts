@@ -126,3 +126,16 @@ describe("resolveConfig: apiReference layout", () => {
     });
   });
 });
+
+// appearance.default: first-visit color scheme (visual-refresh spec VR-41).
+describe("resolveConfig: appearance", () => {
+  it("defaults to system", async () => {
+    const r = await resolveConfig(join(fixtures, "minimal"));
+    expect(r.appearance).toEqual({ default: "system" });
+  });
+
+  it("passes an explicit dark default through", async () => {
+    const r = await resolveConfig(join(fixtures, "apiref-pages"));
+    expect(r.appearance).toEqual({ default: "dark" });
+  });
+});

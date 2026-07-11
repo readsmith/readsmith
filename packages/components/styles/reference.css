@@ -72,10 +72,11 @@ html:has(.rs-apiref) {
   color: var(--rs-hallmark-ink);
 }
 
-/* shell: nav + one flowing main */
+/* shell: nav + one flowing main (caps and centers on ultrawide, like .rs-shell) */
 .rs-apiref {
   display: grid;
   grid-template-columns: 262px minmax(0, 1fr);
+  padding-inline: max(0px, calc((100% - var(--rs-shell-max)) / 2));
 }
 /* Fixed-height sticky column (so the divider runs full height and the nav stays
  * pinned); the nav list scrolls inside it only when it is taller than the column,
@@ -612,4 +613,21 @@ html:has(.rs-apiref) {
     padding-left: 20px;
     padding-right: 20px;
   }
+}
+
+/* Inline operation embeds (<Operation op="GET /x" /> in prose): the console
+ * stacks below the sections at prose width, and the prose inline-code chip
+ * styling is reset inside so schema keys and chips wear their own dress. */
+.rs-op-embed {
+  margin: 26px 0;
+}
+.rs-op-embed .rs-console {
+  margin-top: 18px;
+  max-height: none;
+}
+.rs-op-embed :not(pre) > code {
+  background: none;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
 }

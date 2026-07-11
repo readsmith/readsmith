@@ -309,6 +309,52 @@ export function renderOperationConsole(op: Operation, spec: NormalizedSpec): str
   return `<div class="rs-console"><div class="rs-console__label">Request</div><div class="rs-console__card">${samples}</div>${responseCard}</div>`;
 }
 
+/** The page-side binding of a data-model page (mirrors mdx PageSchemaApi). */
+export interface SchemaPageApi {
+  ref: string;
+  /** The resolved component-schema name, or null when nothing matched. */
+  name: string | null;
+}
+
+export interface SchemaPageData {
+  title: string;
+  /** The authored MDX body, already rendered (may be empty). */
+  html: string;
+  apiSchema?: SchemaPageApi;
+}
+
+/**
+ * The content column of a data-model page: title, the schema's description,
+ * the authored prose, then the fields via the SchemaViewer. Doc-shaped (no
+ * console rail: a model has no request to make). An unresolved name degrades
+ * to a danger callout and keeps the prose.
+ */
+export function renderSchemaMain(
+  page: SchemaPageData,
+  spec: NormalizedSpec | null | undefined,
+): string {
+  const name = page.apiSchema?.name;
+  const schema = spec && name ? spec.schemas[name] : undefined;
+  const prose = page.html.trim()
+    ? `<article class="rs-prose rs-op__prose">${page.html}</article>`
+    : "";
+
+  if (!spec || !name || !schema) {
+    return `<div class="rs-schema-page"><h1 class="rs-op__title">${esc(page.title)}</h1>
+<div class="rs-callout rs-callout--danger" role="note"><div class="rs-callout__body"><p class="rs-callout__title">Schema unavailable</p><p>The schema reference <code>${esc(
+      page.apiSchema?.ref ?? "",
+    )}</code> could not be resolved from the configured OpenAPI spec, so the field reference is missing.</p></div></div>
+${prose}</div>`;
+  }
+
+  const lede = schema.description ? `<p class="rs-op__lede">${esc(schema.description)}</p>` : "";
+  const fields = renderSchema(schema, { schemas: spec.schemas });
+  return `<div class="rs-schema-page"><h1 class="rs-op__title">${esc(page.title)}</h1>
+${lede}
+${prose}
+<div class="rs-op__section">${sectionHead("Fields", `<span class="rs-chip">${esc(name)}</span>`)}${fields}</div></div>`;
+}
+
 /** The page-side binding a hybrid operation page carries (mirrors mdx PageApi). */
 export interface OperationPageApi {
   ref: string;

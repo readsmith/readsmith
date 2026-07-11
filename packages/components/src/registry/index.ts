@@ -1,4 +1,5 @@
 import type { ComponentRegistry } from "@readsmith/mdx";
+import type { NormalizedSpec } from "@readsmith/model";
 import { accordion, accordionGroup } from "./accordion.js";
 import { callout, calloutOfKind } from "./callout.js";
 import { card, cardGroup } from "./card.js";
@@ -6,8 +7,14 @@ import { update } from "./changelog.js";
 import { codeGroup } from "./codegroup.js";
 import { frame } from "./frame.js";
 import { badge, kbd, tooltip } from "./inline.js";
+import { operationEmbed } from "./operation.js";
 import { step, steps } from "./steps.js";
 import { tab, tabs } from "./tabs.js";
+
+export interface RegistryOptions {
+  /** The site's normalized API spec; powers `<Operation op="GET /x" />` embeds. */
+  apiSpec?: NormalizedSpec | null;
+}
 
 /**
  * Build the Readsmith component registry for the P6 render pipeline. Each entry
@@ -15,8 +22,10 @@ import { tab, tabs } from "./tabs.js";
  * JS; islands (tabs, code groups) are marked so the pipeline lists them in the
  * hydration manifest and the client runtime enhances them.
  */
-export function createRegistry(): ComponentRegistry {
+export function createRegistry(options: RegistryOptions = {}): ComponentRegistry {
   return {
+    // API reference embeds
+    Operation: { render: operationEmbed(options.apiSpec) },
     // callouts
     Callout: { render: callout },
     Note: { render: calloutOfKind("note") },

@@ -29,7 +29,7 @@
   top: 12px;
 }
 
-/* header */
+/* header (contents align with the capped shell; the bar itself stays full-bleed) */
 .rs-header {
   position: sticky;
   top: 0;
@@ -38,7 +38,7 @@
   align-items: center;
   gap: 12px;
   height: var(--rs-header-height);
-  padding: 0 20px;
+  padding: 0 max(20px, calc((100% - var(--rs-shell-max)) / 2 + 20px));
   border-bottom: 1px solid var(--rs-rule);
   background: color-mix(in srgb, var(--rs-paper) 85%, transparent);
   backdrop-filter: saturate(1.4) blur(10px);
@@ -87,7 +87,7 @@
   display: flex;
   gap: 4px;
   height: var(--rs-tabbar-height);
-  padding: 0 20px;
+  padding: 0 max(20px, calc((100% - var(--rs-shell-max)) / 2 + 20px));
   overflow-x: auto;
   scrollbar-width: none;
   border-bottom: 1px solid var(--rs-rule);
@@ -192,10 +192,24 @@
 }
 
 /* Reading layout: nav pinned left, TOC pinned right, content fills the middle.
- * The measure is fixed (tokens.css); big screens gain margins, not line length. */
+ * On ultrawide screens the shell caps and centers (the padding formula keeps
+ * the sticky header's background full-bleed while its contents align), and the
+ * measure widens moderately so dense pages breathe without prose sprawling. */
 .rs-shell {
   display: grid;
   grid-template-columns: 288px minmax(0, 1fr) 256px;
+  padding-inline: max(0px, calc((100% - var(--rs-shell-max)) / 2));
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --rs-measure: 46rem;
+  }
+}
+@media (min-width: 1536px) {
+  :root {
+    --rs-measure: 50rem;
+  }
 }
 
 /* Hybrid operation pages: the assay console rail replaces the TOC column and
@@ -223,11 +237,14 @@
 .rs-op__prose {
   margin: 24px 0 4px;
 }
-/* method badges on docs-nav rows (hybrid pages borrow the apinav grammar) */
-.rs-nav__link--api {
-  display: flex;
-  align-items: center;
-  gap: 9px;
+/* Data-model pages: doc-shaped, so the generated block shares the measure. */
+.rs-schema-page {
+  width: 100%;
+  max-width: var(--rs-measure);
+  flex: 1 0 auto;
+}
+.rs-schema-page h1.rs-op__title {
+  margin: 4px 0 0;
 }
 
 .rs-nav-col {
@@ -300,6 +317,14 @@
   background: var(--rs-active-wash);
   /* faux-bold: activation never reflows the label */
   text-shadow: -0.2px 0 currentColor, 0.2px 0 currentColor;
+}
+/* Method badges on docs-nav rows (hybrid pages borrow the apinav grammar).
+ * Compound selector: must beat the base link's `display: block` regardless of
+ * source order, or the badge and label run together. */
+.rs-nav__link.rs-nav__link--api {
+  display: flex;
+  align-items: center;
+  gap: 9px;
 }
 
 /* content column */

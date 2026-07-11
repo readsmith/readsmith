@@ -1,6 +1,11 @@
 import type { Breadcrumb, FinalNavNode, NavLink, TocNode } from "@readsmith/mdx";
 import type { NormalizedSpec } from "@readsmith/model";
-import { type OperationPageApi, renderOperationMain } from "../api/operation.js";
+import {
+  type OperationPageApi,
+  type SchemaPageApi,
+  renderOperationMain,
+  renderSchemaMain,
+} from "../api/operation.js";
 import { renderNav } from "./nav.js";
 import { renderToc } from "./toc.js";
 import { HALLMARK_SVG, ICONS, esc, socialIcon } from "./util.js";
@@ -44,10 +49,13 @@ export interface ShellPage {
   breadcrumbs: Breadcrumb[];
   prev?: NavLink;
   next?: NavLink;
-  /** "api-operation" pages swap the TOC for the assay console rail. */
-  kind?: "doc" | "api-operation";
+  /** "api-operation" pages swap the TOC for the assay console rail;
+   * "api-schema" pages stay doc-shaped with a generated fields section. */
+  kind?: "doc" | "api-operation" | "api-schema";
   /** The operation binding of a hybrid page (mirrors the mdx PageApi shape). */
   api?: OperationPageApi & { method?: string; path?: string };
+  /** The schema binding of a data-model page. */
+  apiSchema?: SchemaPageApi;
 }
 
 export interface ShellBodyOptions {
@@ -63,11 +71,21 @@ export interface DocumentOptions {
   lang?: string;
   /** The normalized spec hybrid operation pages render their sections from. */
   apiSpec?: NormalizedSpec | null;
+  /** First-visit color scheme; "system" (default) follows the visitor's OS. */
+  defaultMode?: "system" | "light" | "dark";
 }
 
-/** Sets the theme before first paint from the persisted choice, so there is no flash. */
-const THEME_INIT =
-  "(function(){try{var t=localStorage.getItem('rs-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();";
+/**
+ * The inline script that sets the theme before first paint, so there is no
+ * flash: the visitor's persisted choice wins; otherwise a site-configured
+ * default mode ("light" / "dark") pins that scheme, and "system" leaves it to
+ * the CSS media queries. The parameter is enum-typed, so the interpolation
+ * cannot carry anything but those literals.
+ */
+export function themeInitScript(defaultMode: "system" | "light" | "dark" = "system"): string {
+  const fallback = defaultMode === "system" ? "" : `||'${defaultMode}'`;
+  return `(function(){try{var t=localStorage.getItem('rs-theme')${fallback};if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`;
+}
 
 /**
  * The reading shell body: skip link, header, three-column layout (nav, content,
@@ -86,6 +104,7 @@ export function renderShellBody(
   options: ShellBodyOptions = {},
 ): string {
   const isOp = page.kind === "api-operation" && page.api !== undefined;
+  const isSchema = page.kind === "api-schema" && page.apiSchema !== undefined;
   // The tag stands in for missing breadcrumbs, so the eyebrow never goes blank.
   const crumbPage =
     isOp && page.breadcrumbs.length === 0 && page.api?.tag
@@ -93,7 +112,9 @@ export function renderShellBody(
       : page;
   const content = isOp
     ? renderOperationMain(page, options.apiSpec)
-    : `<article class="rs-prose">${page.html}</article>`;
+    : isSchema
+      ? renderSchemaMain(page, options.apiSpec)
+      : `<article class="rs-prose">${page.html}</article>`;
   return `<a class="rs-skip" href="#rs-content">Skip to content</a>
 ${header(site)}
 ${tabbar(site)}
@@ -156,7 +177,7 @@ export function renderDocument(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(page.title)} · ${esc(site.name)}</title>
 ${desc ? `<meta name="description" content="${esc(desc)}">\n` : ""}<link rel="stylesheet" href="${esc(style)}">
-<script>${THEME_INIT}</script>
+<script>${themeInitScript(options.defaultMode)}</script>
 </head>
 <body>
 ${renderShellBody(site, page, { apiSpec: options.apiSpec })}
@@ -176,7 +197,7 @@ export function header(site: ShellSite): string {
     .map((link) => `<a class="rs-headerlink" href="${esc(link.href)}">${esc(link.label)}</a>`)
     .join("")}
   <span class="rs-header__spacer"></span>
-  <button class="rs-headerlink rs-headerlink--ask" data-rs-ask-open aria-label="Ask AI">${ICONS.sparkle}<span>Ask AI</span></button>
+  <button class="rs-headerlink rs-headerlink--ask" data-rs-ask-open aria-expanded="false" aria-label="Ask AI">${ICONS.sparkle}<span>Ask AI</span></button>
   <button class="rs-search" data-rs-palette-open aria-label="Search or ask AI">${ICONS.search}<span>Search or ask AI</span><kbd class="rs-kbd">⌘K</kbd></button>
   ${site.github ? `<a class="rs-icon-btn" href="${esc(site.github)}" aria-label="GitHub repository" rel="noopener">${ICONS.github}</a>` : ""}
   <button class="rs-icon-btn" data-rs-theme-toggle aria-label="Toggle light and dark">${ICONS.theme}</button>

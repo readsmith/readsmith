@@ -550,6 +550,7 @@ function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
   const openPanel = (query?: string): void => {
     panel.hidden = false;
     body.classList.add("is-asking");
+    openBtn?.setAttribute("aria-expanded", "true");
     if (!scroll.innerHTML.trim()) scroll.innerHTML = '<div class="rs-ask__empty"></div>';
     input.focus();
     void getCaps().then((c) => {
@@ -561,10 +562,17 @@ function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
   const closePanel = (): void => {
     panel.hidden = true;
     body.classList.remove("is-asking");
+    openBtn?.setAttribute("aria-expanded", "false");
     openBtn?.focus();
   };
 
-  openBtn?.addEventListener("click", () => openPanel());
+  // The header button is a toggle: a second click closes the panel. Closing
+  // mid-stream is safe (the panel only hides; a running answer keeps writing
+  // and is there on reopen).
+  openBtn?.addEventListener("click", () => {
+    if (panel.hidden) openPanel();
+    else closePanel();
+  });
   addEventListener("rs:ask", (event) => {
     if (!panel.isConnected) return; // ignore a listener left over from a stale mount
     openPanel((event as CustomEvent<{ query: string }>).detail?.query);

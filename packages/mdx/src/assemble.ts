@@ -3,6 +3,7 @@ import {
   type OperationContext,
   findOperation,
   operationToMarkdown,
+  schemaToMarkdown,
 } from "@readsmith/api-reference";
 import { type Diagnostic, type Operation, contentHash } from "@readsmith/model";
 import GithubSlugger from "github-slugger";
@@ -180,11 +181,22 @@ export interface PageModel {
   breadcrumbs: Breadcrumb[];
   prev?: NavLink;
   next?: NavLink;
-  /** What the page is; "api-operation" pages carry `api` and a console layout. */
-  kind: "doc" | "api-operation";
+  /** What the page is; "api-operation" pages carry `api` and a console layout,
+   * "api-schema" pages carry `apiSchema` and a generated fields section. */
+  kind: "doc" | "api-operation" | "api-schema";
   /** Present when `kind` is "api-operation". */
   api?: PageApi;
+  /** Present when `kind` is "api-schema". */
+  apiSchema?: PageSchemaApi;
   diagnostics: Diagnostic[];
+}
+
+/** Data-model binding: which component schema an `openapi-schema:` page documents. */
+export interface PageSchemaApi {
+  /** The frontmatter reference as written (trimmed), for example "Pet". */
+  ref: string;
+  /** The resolved component-schema name, or null when nothing matched. */
+  name: string | null;
 }
 
 export type FinalNavNode =
@@ -619,19 +631,25 @@ function applyApiBindings(
   apiReference: ApiReferenceInput | null,
 ): Map<string, PageModel> {
   const claimed = new Map<string, PageModel>();
+  const claimedSchemas = new Map<string, PageModel>();
   for (const model of models) {
     const fail = (severity: Diagnostic["severity"], code: string, message: string): void => {
       model.diagnostics.push({ severity, code, message, source: model.path });
     };
 
-    // Data-model pages are a planned follow-up; say so instead of silently
-    // rendering the page as plain prose.
-    if (model.frontmatter["openapi-schema"] !== undefined) {
+    // Data-model pages: `openapi-schema: "Pet"` (optionally with the Mintlify
+    // file token). When a page carries BOTH keys, the operation wins and the
+    // schema key is diagnosed: one page, one generated subject.
+    const rawSchema = model.frontmatter["openapi-schema"];
+    if (rawSchema !== undefined && model.frontmatter.openapi !== undefined) {
       fail(
         "warning",
-        "openapi-schema-unsupported",
-        "`openapi-schema` pages are not supported yet; the page renders as plain prose.",
+        "openapi-schema-conflict",
+        "This page has both `openapi` and `openapi-schema`; the operation wins and the schema key is ignored.",
       );
+    } else if (rawSchema !== undefined) {
+      bindSchemaPage(model, rawSchema, apiReference, claimedSchemas, fail);
+      continue;
     }
 
     const raw = model.frontmatter.openapi;
@@ -713,6 +731,98 @@ function applyApiBindings(
   return claimed;
 }
 
+/**
+ * Bind an `openapi-schema:` page to its component schema (HA-15): kind, title
+ * and description fallbacks from the schema, and the field projection appended
+ * to rawMd plus a synthetic search chunk. One schema, one page.
+ */
+function bindSchemaPage(
+  model: PageModel,
+  raw: unknown,
+  apiReference: ApiReferenceInput | null,
+  claimedSchemas: Map<string, PageModel>,
+  fail: (severity: Diagnostic["severity"], code: string, message: string) => void,
+): void {
+  if (typeof raw !== "string" || !raw.trim()) {
+    fail(
+      "error",
+      "invalid-openapi-schema-ref",
+      'The `openapi-schema` frontmatter must be a string like "Pet".',
+    );
+    return;
+  }
+  const parts = raw.trim().split(/\s+/);
+  const [file, name] = parts.length === 2 ? parts : parts.length === 1 ? [undefined, parts[0]] : [];
+  if (!name) {
+    fail(
+      "error",
+      "invalid-openapi-schema-ref",
+      `Could not parse openapi-schema reference "${raw.trim()}" (expected "SchemaName" or "spec-file SchemaName").`,
+    );
+    return;
+  }
+
+  model.kind = "api-schema";
+  model.apiSchema = { ref: raw.trim(), name: null };
+
+  if (!apiReference) {
+    fail(
+      "error",
+      "openapi-not-configured",
+      "This page references an OpenAPI schema, but no `apiReference` spec is configured.",
+    );
+    return;
+  }
+  if (file !== undefined && fileToken(file) !== fileToken(apiReference.source)) {
+    fail(
+      "warning",
+      "openapi-file-mismatch",
+      `The spec file "${file}" does not match the configured "${apiReference.source}"; token ignored (one spec per site for now).`,
+    );
+  }
+  const schema = apiReference.spec.schemas[name];
+  if (!schema) {
+    fail(
+      "error",
+      "unknown-schema",
+      `No component schema named "${name}" exists in the configured spec.`,
+    );
+    return;
+  }
+  const prior = claimedSchemas.get(name);
+  if (prior !== undefined) {
+    fail(
+      "error",
+      "duplicate-schema-page",
+      `Schema "${name}" is already documented by "${prior.path}"; one schema, one page.`,
+    );
+    return;
+  }
+  claimedSchemas.set(name, model);
+  model.apiSchema.name = name;
+
+  if (typeof model.frontmatter.title !== "string" || !model.frontmatter.title.trim()) {
+    model.title = schema.title?.trim() || name;
+  }
+  if (model.description === undefined && schema.description) {
+    model.description = firstSentence(schema.description);
+  }
+
+  const projection = schemaToMarkdown(name, apiReference.spec);
+  model.rawMd = model.rawMd.trim() ? `${model.rawMd.trim()}\n\n${projection}` : projection;
+  model.chunks = [
+    ...model.chunks,
+    {
+      id: contentHash({ path: model.path, apiSchema: name }),
+      page_id: model.path,
+      path: model.url,
+      header_path: [model.title],
+      anchor: "",
+      text: projection,
+    },
+  ];
+}
+
 interface RefNav {
   label: string;
   url: string;
@@ -725,7 +835,12 @@ interface RefNav {
   foreign: Set<string>;
 }
 
-/** Every page slug placed explicitly in the configured navigation. */
+/**
+ * Every page slug placed explicitly in the navigation that is actually
+ * rendered: the tabs when configured, else the flat nav. With tabs present the
+ * flat nav is an unused fallback (often the auto-discovered FULL tree), and
+ * counting it would mark every page as "explicitly placed".
+ */
 function collectNavSlugs(config: SiteConfig): Set<string> {
   const slugs = new Set<string>();
   const walk = (nodes: NavNode[]): void => {
@@ -734,8 +849,11 @@ function collectNavSlugs(config: SiteConfig): Set<string> {
       else walk(node.children);
     }
   };
-  walk(config.nav);
-  for (const tab of config.tabs ?? []) walk(tab.nav);
+  if (config.tabs && config.tabs.length > 0) {
+    for (const tab of config.tabs) walk(tab.nav);
+  } else {
+    walk(config.nav);
+  }
   return slugs;
 }
 

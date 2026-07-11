@@ -69,8 +69,13 @@
   --rs-leading-body: 1.7;
   --rs-leading-heading: 1.25;
   --rs-leading-code: 1.7;
-  /* Fixed reading measure (~680px). Big screens get margins, not longer lines. */
+  /* The reading measure (~680px base). It widens moderately at the shell
+   * breakpoints (see shell.css) and never exceeds ~800px: dense reference
+   * content gets room on big screens without prose losing readability. */
   --rs-measure: 42.5rem;
+  /* The whole shell (header contents, columns) caps and centers on ultrawide
+   * screens, so the middle column never floats in acres of empty paper. */
+  --rs-shell-max: 1680px;
 
   /* spacing (4px base) */
   --rs-space-1: 4px;

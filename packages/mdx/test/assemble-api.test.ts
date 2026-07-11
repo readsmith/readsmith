@@ -386,13 +386,97 @@ describe("pages mode (HA-11/12/13)", () => {
   });
 });
 
-describe("openapi-schema pages (HA-15, deferred)", () => {
-  it("diagnoses the unsupported key instead of silently ignoring it", async () => {
-    const f = fixture({ "m.mdx": '---\nopenapi-schema: "Pet"\n---\n\nBody.\n' });
+describe("openapi-schema pages (HA-15)", () => {
+  it("binds a data-model page with fallbacks and the field projection", async () => {
+    const f = fixture({
+      "m.mdx": '---\nopenapi-schema: "Pet"\n---\n\nAuthored notes about the model.\n',
+    });
     const build = await assembleSite(inputOf(f));
-    expect(build.diagnostics).toMatchObject([
-      { severity: "warning", code: "openapi-schema-unsupported" },
+    const page = build.pages[0];
+    expect(page?.kind).toBe("api-schema");
+    expect(page?.apiSchema).toEqual({ ref: "Pet", name: "Pet" });
+    // No frontmatter title and no schema title: the name names the page.
+    expect(page?.title).toBe("Pet");
+    expect(page?.html).toContain("Authored notes about the model.");
+    expect(page?.rawMd).toContain("- `name` string · required · min length: 1");
+    expect(build.llmsFullTxt).toContain("- `name` string · required · min length: 1");
+    expect(build.diagnostics).toHaveLength(0);
+  });
+
+  it("accepts the file-token form and diagnoses unknown or duplicate schemas", async () => {
+    const ok = await assembleSite(
+      inputOf(fixture({ "m.mdx": '---\nopenapi-schema: "openapi.json Pet"\n---\n\nB.\n' })),
+    );
+    expect(ok.pages[0]?.apiSchema?.name).toBe("Pet");
+    expect(ok.diagnostics).toHaveLength(0);
+
+    const unknown = await assembleSite(
+      inputOf(fixture({ "m.mdx": '---\nopenapi-schema: "Ghost"\n---\n\nB.\n' })),
+    );
+    expect(unknown.pages[0]?.kind).toBe("api-schema");
+    expect(unknown.pages[0]?.apiSchema?.name).toBeNull();
+    expect(unknown.diagnostics).toMatchObject([{ severity: "error", code: "unknown-schema" }]);
+
+    const dup = await assembleSite(
+      inputOf(
+        fixture({
+          "a.mdx": '---\nopenapi-schema: "Pet"\n---\n\nA.\n',
+          "b.mdx": '---\nopenapi-schema: "Pet"\n---\n\nB.\n',
+        }),
+      ),
+    );
+    expect(dup.pages[1]?.apiSchema?.name).toBeNull();
+    expect(dup.diagnostics).toMatchObject([
+      { severity: "error", code: "duplicate-schema-page", source: "b.mdx" },
     ]);
-    expect(build.pages[0]?.kind).toBe("doc");
+  });
+
+  it("lets the operation win when a page carries both keys", async () => {
+    const f = fixture({
+      "m.mdx": '---\nopenapi: "GET /pets"\nopenapi-schema: "Pet"\n---\n\nB.\n',
+    });
+    const build = await assembleSite(inputOf(f));
+    expect(build.pages[0]?.kind).toBe("api-operation");
+    expect(build.pages[0]?.api?.operationId).toBe("listPets");
+    expect(build.pages[0]?.apiSchema).toBeUndefined();
+    expect(build.diagnostics).toMatchObject([
+      { severity: "warning", code: "openapi-schema-conflict" },
+    ]);
+  });
+});
+
+describe("authored pages outside the tabs (crucible regression)", () => {
+  it("homes an unplaced authored page in the reference tab with relations", async () => {
+    // The flat config.nav is the auto-discovered FULL tree (it includes the
+    // authored page), but tabs are configured and do not place it: the page
+    // must still get reference-tab relations, not be treated as explicit.
+    const f = fixture({
+      "index.md": "# Home\n",
+      "api/create-pet.mdx": '---\nopenapi: "POST /pets"\n---\n\nAuthored.\n',
+    });
+    f.config.tabs = [{ label: "Guides", nav: [{ type: "page", slug: "index" }] }];
+    const build = await assembleSite(
+      inputOf(f, {
+        apiReference: {
+          spec: pagesSpec(),
+          source: "openapi.json",
+          path: "/api-reference",
+          layout: "pages",
+          label: "API Reference",
+        },
+      }),
+    );
+
+    const authored = build.pages.find((p) => p.slug === "api/create-pet");
+    // createPet has no summary in the fixture: the METHOD /path fallback names it.
+    expect(authored?.breadcrumbs.map((b) => b.label)).toEqual(["Pets", "POST /pets"]);
+    expect(authored?.prev?.slug).toBe("api-reference/listpets");
+    const tab = build.tabs?.at(-1);
+    const group = tab?.nav.find((n) => n.type === "group");
+    if (group?.type !== "group") throw new Error("no group");
+    expect(group.children.map((c) => (c.type === "page" ? c.slug : ""))).toEqual([
+      "api-reference/listpets",
+      "api/create-pet",
+    ]);
   });
 });

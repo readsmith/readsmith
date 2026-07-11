@@ -118,6 +118,10 @@ export const configInputSchema = z.object({
     publisher: z.object({ name: z.string().min(1), url: z.string().optional() }).optional(),
     theme: themeSchema.optional(),
   }),
+  /** First-visit color scheme (Mintlify-compatible shape). "system" (default)
+   * follows the visitor's OS; "light"/"dark" pin that mode until the visitor
+   * toggles, which persists their own choice. */
+  appearance: z.object({ default: z.enum(["system", "light", "dark"]).optional() }).optional(),
   /** Content-Security-Policy sources this site needs beyond `'self'`. */
   security: z
     .object({
@@ -216,6 +220,8 @@ export interface ResolvedConfig {
     publisher?: { name: string; url?: string };
     theme: SiteTheme;
   };
+  /** First-visit color scheme; "system" follows the visitor's OS. */
+  appearance: { default: "system" | "light" | "dark" };
   /** Resolved CSP extensions (always present, possibly empty). */
   security: { csp: CspExtensions };
   content: { root: string; include: string[]; exclude: string[]; home?: string };

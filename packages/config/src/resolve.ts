@@ -227,6 +227,7 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
       publisher: input?.site.publisher,
       theme: input?.site.theme ?? {},
     },
+    appearance: { default: input?.appearance?.default ?? "system" },
     security: { csp: input?.security?.csp ?? {} },
     content: { root: contentRel, include, exclude, home: input?.content?.home },
     assets,

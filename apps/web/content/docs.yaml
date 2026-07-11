@@ -18,6 +18,7 @@ tabs:
       - group: Endpoints
         pages:
           - api/create-pet
+          - api/pet-model
   - tab: Architecture
     pages:
       - architecture

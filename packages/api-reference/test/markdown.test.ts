@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findOperation, operationToMarkdown } from "../src/markdown.js";
+import { findOperation, operationToMarkdown, schemaToMarkdown } from "../src/markdown.js";
 import { normalizeDocument } from "../src/normalize.js";
 
 const src = "openapi.yaml";
@@ -153,5 +153,20 @@ describe("operationToMarkdown", () => {
     const opB = findOperation(b, "post", "/pets");
     if (!opA || !opB) return;
     expect(operationToMarkdown(opA, a)).toBe(operationToMarkdown(opB, b));
+  });
+});
+
+describe("schemaToMarkdown", () => {
+  it("projects a named schema with fields, cycles collapsed", () => {
+    const spec = fixture();
+    const md = schemaToMarkdown("Pet", spec);
+    expect(md).toContain("`Pet`");
+    expect(md).toContain("- `name` string · required · min length: 1");
+    expect(md).toContain(
+      '- `species` string · optional · default: `"dog"` · options: `"dog"`, `"cat"`',
+    );
+    // Pet.friend refers back to Pet: collapsed, not recursed.
+    expect(md).toContain("(recursive)");
+    expect(schemaToMarkdown("Ghost", spec)).toBe("");
   });
 });

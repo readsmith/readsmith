@@ -5,3 +5,5 @@ apiReference:
   layout: pages
   path: /reference
   label: API
+appearance:
+  default: dark

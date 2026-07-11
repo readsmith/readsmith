@@ -20,8 +20,11 @@ export {
   renderOperationConsole,
   renderOperationMain,
   renderOperationSections,
+  renderSchemaMain,
   type OperationPageApi,
   type OperationPageData,
+  type SchemaPageApi,
+  type SchemaPageData,
 } from "./operation.js";
 
 export interface ReferenceOptions {
