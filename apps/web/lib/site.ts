@@ -18,8 +18,9 @@ export interface Site {
   branding: boolean;
   url?: string;
   description?: string;
-  logo?: string;
-  favicon?: string;
+  /** Per-theme pairs (config resolution fills both slots from a bare string). */
+  logo?: { light: string; dark: string };
+  favicon?: { light: string; dark: string };
   /** Precompiled per-site brand theme CSS (see @readsmith/components themeToCss). */
   themeCss?: string;
   /** First-visit color scheme; "system" follows the visitor's OS. */

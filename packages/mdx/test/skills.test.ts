@@ -1,0 +1,159 @@
+import { h } from "hastscript";
+import { describe, expect, it } from "vitest";
+import {
+  type AssembleInput,
+  type AuthoredSkill,
+  type SiteConfig,
+  assembleSite,
+} from "../src/assemble.js";
+import type { ComponentRegistry } from "../src/render.js";
+
+const registry: ComponentRegistry = {
+  Callout: { render: ({ children }) => h("aside", { className: ["callout"] }, children) },
+};
+
+function inputOf(skills?: AuthoredSkill[], extra: Partial<AssembleInput> = {}): AssembleInput {
+  const config: SiteConfig = {
+    site: { name: "Pets API Docs", description: "Docs for the Pets API." },
+    pages: [{ path: "index.md", slug: "" }],
+    nav: [{ type: "page", slug: "" }],
+  };
+  return {
+    config,
+    readPage: () => "---\ntitle: Home\n---\n\n# Home\n\nWelcome.\n",
+    registry,
+    skills,
+    ...extra,
+  };
+}
+
+function skill(
+  dir: string | null,
+  source: string,
+  content: string,
+  extras: [string, string][] = [],
+): AuthoredSkill {
+  return {
+    dir,
+    source,
+    files: [{ path: "SKILL.md", content }, ...extras.map(([path, c]) => ({ path, content: c }))],
+  };
+}
+
+const GOOD =
+  "---\nname: pets\ndescription: Use when integrating the Pets API.\n---\n\n# Pets\n\nInstructions.\n";
+
+// Spec agent-skills SK-1/SK-2/SK-4 (AC-2 build half): authored round-trip + validation.
+describe("authored skills", () => {
+  it("carries valid skills into the build verbatim, SKILL.md first, extras sorted", async () => {
+    const build = await assembleSite(
+      inputOf([
+        skill("pets", ".readsmith/skills/pets", GOOD, [
+          ["references/z.md", "Z"],
+          ["references/a.md", "A"],
+        ]),
+      ]),
+    );
+    expect(build.skills).toHaveLength(1);
+    const s = build.skills[0];
+    expect(s?.name).toBe("pets");
+    expect(s?.description).toBe("Use when integrating the Pets API.");
+    expect(s?.files.map((f) => f.path)).toEqual(["SKILL.md", "references/a.md", "references/z.md"]);
+    expect(s?.files[0]?.content).toBe(GOOD);
+    expect(build.diagnostics).toHaveLength(0);
+  });
+
+  it("drops invalid names with a diagnostic (uppercase, consecutive hyphens, dir mismatch)", async () => {
+    const cases: [AuthoredSkill, string][] = [
+      [skill("pets", "s/pets", "---\nname: Pets\ndescription: d\n---\n"), "skill-invalid-name"],
+      [skill("a--b", "s/a--b", "---\nname: a--b\ndescription: d\n---\n"), "skill-invalid-name"],
+      [skill("dir", "s/dir", "---\nname: other\ndescription: d\n---\n"), "skill-invalid-name"],
+    ];
+    for (const [authored, code] of cases) {
+      const build = await assembleSite(inputOf([authored]));
+      expect(build.diagnostics).toMatchObject([{ severity: "error", code }]);
+      // The fallback fills in, so the surface never goes empty.
+      expect(build.skills.map((s) => s.name)).toEqual(["pets-api-docs"]);
+    }
+  });
+
+  it("drops overlong descriptions and missing or unparseable frontmatter", async () => {
+    const long = "x".repeat(1025);
+    const overlong = await assembleSite(
+      inputOf([skill("pets", "s/pets", `---\nname: pets\ndescription: ${long}\n---\n`)]),
+    );
+    expect(overlong.diagnostics).toMatchObject([
+      { severity: "error", code: "skill-invalid-description" },
+    ]);
+
+    const missing = await assembleSite(inputOf([skill("pets", "s/pets", "# No frontmatter\n")]));
+    expect(missing.diagnostics).toMatchObject([{ severity: "error", code: "skill-frontmatter" }]);
+
+    const noSkillMd = await assembleSite(
+      inputOf([{ dir: "pets", source: "s/pets", files: [{ path: "notes.md", content: "x" }] }]),
+    );
+    expect(noSkillMd.diagnostics).toMatchObject([{ severity: "error", code: "skill-frontmatter" }]);
+  });
+
+  it("keeps the first of two same-named skills and diagnoses the duplicate", async () => {
+    const build = await assembleSite(
+      inputOf([
+        skill(null, "skill.md", "---\nname: pets\ndescription: root\n---\n"),
+        skill("pets", ".readsmith/skills/pets", GOOD),
+      ]),
+    );
+    // Sorted by source: ".readsmith/skills/pets" precedes "skill.md".
+    expect(build.skills.map((s) => s.name)).toEqual(["pets"]);
+    expect(build.skills[0]?.description).toBe("Use when integrating the Pets API.");
+    expect(build.diagnostics).toMatchObject([
+      { severity: "error", code: "duplicate-skill", source: "skill.md" },
+    ]);
+  });
+
+  it("names a frontmatter-less root skill.md after the site (Mintlify parity)", async () => {
+    const build = await assembleSite(inputOf([skill(null, "skill.md", "# My own skill\n")]));
+    expect(build.skills).toHaveLength(1);
+    expect(build.skills[0]?.name).toBe("pets-api-docs");
+    expect(build.skills[0]?.description).toBe("Docs for the Pets API.");
+    expect(build.skills[0]?.files[0]?.content).toBe("# My own skill\n");
+    expect(build.diagnostics).toHaveLength(0);
+  });
+
+  it("notes the .mintlify migration dir and drops oversized extra files", async () => {
+    const big = "x".repeat(262145);
+    const build = await assembleSite(
+      inputOf([skill("pets", ".mintlify/skills/pets", GOOD, [["assets/big.txt", big]])]),
+    );
+    expect(build.skills[0]?.files.map((f) => f.path)).toEqual(["SKILL.md"]);
+    expect(build.diagnostics).toMatchObject([
+      { severity: "info", code: "skills-mintlify-dir" },
+      { severity: "warning", code: "skill-file-too-large" },
+    ]);
+  });
+});
+
+// Spec agent-skills SK-3 (AC-3 build half): the mechanical fallback.
+describe("fallback skill", () => {
+  it("synthesizes a spec-valid fallback when no skills are authored", async () => {
+    const build = await assembleSite(inputOf(undefined, { baseUrl: "https://pets.dev" }));
+    expect(build.skills).toHaveLength(1);
+    const s = build.skills[0];
+    expect(s?.name).toBe("pets-api-docs");
+    expect(s?.description).toContain("Use when working with Pets API Docs");
+    const md = s?.files[0]?.content ?? "";
+    expect(md).toContain("readsmith-generated: fallback");
+    expect(md).toContain("[Home](https://pets.dev/)");
+  });
+});
+
+// Spec agent-skills SK-4 / AC-6: skills participate in the deterministic hash.
+describe("determinism", () => {
+  it("hashes identically for identical skills and differently when one changes", async () => {
+    const a = await assembleSite(inputOf([skill("pets", "s/pets", GOOD)]));
+    const b = await assembleSite(inputOf([skill("pets", "s/pets", GOOD)]));
+    const c = await assembleSite(inputOf([skill("pets", "s/pets", `${GOOD}\nMore.\n`)]));
+    expect(a.bundleHash).toBe(b.bundleHash);
+    expect(JSON.stringify(a.skills)).toBe(JSON.stringify(b.skills));
+    expect(c.bundleHash).not.toBe(a.bundleHash);
+  });
+});

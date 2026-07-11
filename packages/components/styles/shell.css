@@ -65,6 +65,25 @@
   width: auto;
   display: block;
 }
+/* Per-theme logo variants: both are in the DOM, the cascade shows exactly one
+ * (no flash, no JS; mirrors the token cascade: media query, then data-theme). */
+.rs-brand__logo--dark {
+  display: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .rs-brand__logo--light {
+    display: none;
+  }
+  :root:not([data-theme="light"]) .rs-brand__logo--dark {
+    display: block;
+  }
+}
+:root[data-theme="dark"] .rs-brand__logo--light {
+  display: none;
+}
+:root[data-theme="dark"] .rs-brand__logo--dark {
+  display: block;
+}
 .rs-header__spacer {
   flex: 1;
 }

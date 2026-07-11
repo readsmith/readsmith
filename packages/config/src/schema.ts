@@ -96,6 +96,26 @@ export const themeSchema = z.object({
 export type SiteTheme = z.infer<typeof themeSchema>;
 
 /**
+ * A brand image (logo, favicon): one URL for both themes, or a per-theme pair
+ * (the Mintlify-compatible shape). A first-class dark theme makes a single
+ * asset wrong in one mode, so the pair is the recommended form.
+ */
+export const siteImageSchema = z.union([
+  z.string().min(1),
+  z.object({
+    light: z.string().min(1).optional(),
+    dark: z.string().min(1).optional(),
+  }),
+]);
+export type SiteImageInput = z.infer<typeof siteImageSchema>;
+
+/** The resolved form: always a pair (a bare string fills both slots). */
+export interface SiteImage {
+  light: string;
+  dark: string;
+}
+
+/**
  * The user-authored site config (our `docs.yaml` shape). Everything except
  * `site.name` is optional. When `navigation` is omitted the site auto-discovers
  * all content files and builds navigation from the file tree.
@@ -108,10 +128,12 @@ export const configInputSchema = z.object({
     url: z.string().optional(),
     /** One-line site description, used in metadata and the agent outputs. */
     description: z.string().optional(),
-    /** Logo image URL (served from content). Replaces the wordmark in the header. */
-    logo: z.string().optional(),
-    /** Favicon URL (served from content). Wired into page metadata. */
-    favicon: z.string().optional(),
+    /** Logo image URL (served from content), or a { light, dark } pair.
+     * Replaces the wordmark in the header. */
+    logo: siteImageSchema.optional(),
+    /** Favicon URL (served from content), or a { light, dark } pair.
+     * Wired into page metadata. */
+    favicon: siteImageSchema.optional(),
     /** Emitted as the JSON-LD `author`, when set. */
     author: z.object({ name: z.string().min(1), url: z.string().optional() }).optional(),
     /** Emitted as the JSON-LD `publisher`, when set. */
@@ -214,8 +236,9 @@ export interface ResolvedConfig {
     name: string;
     url?: string;
     description?: string;
-    logo?: string;
-    favicon?: string;
+    /** Resolved to a per-theme pair; a bare string filled both slots. */
+    logo?: SiteImage;
+    favicon?: SiteImage;
     author?: { name: string; url?: string };
     publisher?: { name: string; url?: string };
     theme: SiteTheme;

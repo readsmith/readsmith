@@ -43,6 +43,10 @@ describe("reservedPathConflicts", () => {
     }
   });
 
+  it("errors on pages under .well-known (agent-skills discovery)", () => {
+    expect(reservedPathConflicts([page(".well-known/x.md", ".well-known/x")])).toHaveLength(1);
+  });
+
   it("warns, not errors, when a page takes /mcp: the page wins and nothing breaks", () => {
     const [d] = reservedPathConflicts([page("mcp.md", "mcp")]);
     expect(d?.severity).toBe("warning");

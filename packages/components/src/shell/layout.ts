@@ -18,8 +18,8 @@ export interface ShellSite {
   description?: string;
   /** Canonical base URL, used to build absolute "open in ChatGPT/Claude" links. */
   url?: string;
-  /** Logo image URL. When set, replaces the wordmark in the header. */
-  logo?: string;
+  /** Logo image URL, or a per-theme pair. When set, replaces the wordmark. */
+  logo?: string | { light: string; dark: string };
   /** Top-level navigation tabs. When present, a tab bar renders below the header. */
   tabs?: ShellTab[];
   /** Header links, for example a cross-link between the docs and the API reference. */
@@ -186,10 +186,24 @@ ${options.scriptHref ? `<script type="module" src="${esc(options.scriptHref)}"><
 </html>`;
 }
 
+/**
+ * The brand slot: wordmark, a single logo, or a per-theme pair. A pair renders
+ * BOTH images and lets the theme cascade show exactly one, so switching themes
+ * never flashes and needs no JS.
+ */
+function brandHtml(site: ShellSite): string {
+  const logo = site.logo;
+  if (!logo) return `${HALLMARK_SVG}<span class="rs-wordmark">${esc(site.name)}</span>`;
+  const alt = esc(site.name);
+  if (typeof logo === "string" || logo.light === logo.dark) {
+    const src = typeof logo === "string" ? logo : logo.light;
+    return `<img class="rs-brand__logo" src="${esc(src)}" alt="${alt}" />`;
+  }
+  return `<img class="rs-brand__logo rs-brand__logo--light" src="${esc(logo.light)}" alt="${alt}" /><img class="rs-brand__logo rs-brand__logo--dark" src="${esc(logo.dark)}" alt="${alt}" />`;
+}
+
 export function header(site: ShellSite): string {
-  const brand = site.logo
-    ? `<img class="rs-brand__logo" src="${esc(site.logo)}" alt="${esc(site.name)}" />`
-    : `${HALLMARK_SVG}<span class="rs-wordmark">${esc(site.name)}</span>`;
+  const brand = brandHtml(site);
   return `<header class="rs-header">
   <button class="rs-icon-btn rs-header__burger" data-rs-nav-toggle aria-label="Open navigation" aria-expanded="false">${ICONS.menu}</button>
   <a class="rs-brand" href="/">${brand}</a>

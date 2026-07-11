@@ -18,6 +18,10 @@ export const RESERVED_PATHS = [
   "/llms.txt",
   "/llms-full.txt",
   "/skill.md",
+  // Agent-skills discovery (index.json, per-skill files, the agent-skills
+  // alias). Page discovery cannot currently produce a dot-slug; the
+  // reservation makes that a contract instead of a coincidence.
+  "/.well-known",
   "/robots.txt",
   "/rss.xml",
   "/sitemap.xml",

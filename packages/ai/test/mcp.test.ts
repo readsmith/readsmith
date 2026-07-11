@@ -106,3 +106,45 @@ describe("MCP server", () => {
     await client.close();
   });
 });
+
+// Spec agent-skills SK-20 / AC-4: skills ride along as readable resources.
+describe("skill resources", () => {
+  const skills = [
+    {
+      name: "pets",
+      description: "Use when integrating the Pets API.",
+      files: [
+        { path: "SKILL.md", content: "# Pets skill\n" },
+        { path: "references/extra.md", content: "Extra reference.\n" },
+      ],
+    },
+  ];
+
+  it("lists one resource per skill file with HTTP-mirroring URIs", async () => {
+    const client = await connect(baseDeps({ skills, siteUrl: "https://docs.example.com/" }));
+    const { resources } = await client.listResources();
+    expect(resources.map((r) => r.uri)).toEqual([
+      "https://docs.example.com/.well-known/skills/pets/SKILL.md",
+      "https://docs.example.com/.well-known/skills/pets/references/extra.md",
+    ]);
+    expect(resources[0]?.description).toBe("Use when integrating the Pets API.");
+    expect(resources[0]?.mimeType).toBe("text/markdown");
+    await client.close();
+  });
+
+  it("reads back the same bytes the HTTP route serves", async () => {
+    const client = await connect(baseDeps({ skills, siteUrl: "https://docs.example.com" }));
+    const read = await client.readResource({
+      uri: "https://docs.example.com/.well-known/skills/pets/SKILL.md",
+    });
+    expect(read.contents[0]).toMatchObject({ mimeType: "text/markdown", text: "# Pets skill\n" });
+    await client.close();
+  });
+
+  it("falls back to a readsmith:// scheme when the site has no canonical URL", async () => {
+    const client = await connect(baseDeps({ skills }));
+    const { resources } = await client.listResources();
+    expect(resources[0]?.uri).toBe("readsmith://site/.well-known/skills/pets/SKILL.md");
+    await client.close();
+  });
+});

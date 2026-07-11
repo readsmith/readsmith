@@ -28,25 +28,27 @@ function baseUrl(url: string | undefined): URL | undefined {
 }
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  const { build, name, url, description, favicon } = await getSite();
+  const { build, name, url, description } = await getSite();
   const base = baseUrl(url);
-  const icons = favicon ? { icon: favicon } : undefined;
+  // Icons come from the root layout's metadata (site favicon or the default
+  // hallmark); per-field merging keeps them without re-declaring here.
   const slug = ((await params).slug ?? []).join("/");
   const page = build.pages.find((p) => p.slug === slug);
-  if (!page) return { title: name, metadataBase: base, icons };
+  if (!page) return { title: name, metadataBase: base };
 
   const title = `${page.title} · ${name}`;
   const desc = page.description ?? description;
+  // A pages-mode mirror canonicalizes to the authored page it duplicates.
+  const canonical = page.canonicalOf ?? page.url;
   return {
     metadataBase: base,
     title,
     description: desc,
-    icons,
-    alternates: { canonical: page.url },
+    alternates: { canonical },
     // Dropping a page from the sitemap does not stop a crawler that finds it via
     // an inbound link. Only the robots meta does.
     ...(page.noindex ? { robots: { index: false, follow: false } } : {}),
-    openGraph: { title, description: desc, siteName: name, type: "article", url: page.url },
+    openGraph: { title, description: desc, siteName: name, type: "article", url: canonical },
     twitter: { card: "summary_large_image", title, description: desc },
   };
 }

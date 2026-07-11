@@ -5,8 +5,9 @@
 // filesystem-heavy pipeline out of Next's route graph is what makes the build
 // deterministic and the serving layer trivial (and it is what the M3 search
 // ingest will read from).
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { readFile, readdir } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { normalizeDocument, parseAndBundle } from "@readsmith/api-reference";
 import { createRegistry, themeToCss } from "@readsmith/components";
 import { contentRootOf, resolveConfig } from "@readsmith/config";
@@ -71,6 +72,61 @@ async function buildApiReference(config, contentRoot) {
   };
 }
 
+/**
+ * Authored agent skills: `.readsmith/skills/<name>/SKILL.md` (or the
+ * `.mintlify/skills/` migration fallback when that is absent), plus a root
+ * `skill.md`. Files are read up to one nested level (scripts/, references/,
+ * assets/); validation happens in assembly, this just reads text.
+ */
+async function readSkills(contentRoot) {
+  const out = [];
+  let root = join(contentRoot, ".readsmith/skills");
+  if (!existsSync(root)) {
+    const mintlify = join(contentRoot, ".mintlify/skills");
+    root = existsSync(mintlify) ? mintlify : null;
+  }
+  if (root) {
+    const dirs = (await readdir(root, { withFileTypes: true }))
+      .filter((e) => e.isDirectory())
+      .sort((a, b) => a.name.localeCompare(b.name));
+    for (const dir of dirs) {
+      const skillRoot = join(root, dir.name);
+      const files = [];
+      const entries = (await readdir(skillRoot, { withFileTypes: true })).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
+      for (const entry of entries) {
+        if (entry.isFile()) {
+          files.push({
+            path: entry.name,
+            content: await readFile(join(skillRoot, entry.name), "utf8"),
+          });
+        } else if (entry.isDirectory()) {
+          const nested = (await readdir(join(skillRoot, entry.name), { withFileTypes: true }))
+            .filter((e) => e.isFile())
+            .sort((a, b) => a.name.localeCompare(b.name));
+          for (const file of nested) {
+            files.push({
+              path: `${entry.name}/${file.name}`,
+              content: await readFile(join(skillRoot, entry.name, file.name), "utf8"),
+            });
+          }
+        }
+      }
+      out.push({ dir: dir.name, source: relative(contentRoot, skillRoot), files });
+    }
+  }
+  const rootFile = join(contentRoot, "skill.md");
+  if (existsSync(rootFile)) {
+    out.push({
+      dir: null,
+      source: "skill.md",
+      files: [{ path: "SKILL.md", content: await readFile(rootFile, "utf8") }],
+    });
+  }
+  return out;
+}
+
 async function main() {
   const config = await resolveConfig(CONTENT_DIR);
   // Shared with copy-assets: both must resolve the same content root.
@@ -93,6 +149,7 @@ async function main() {
           label: config.apiReference.label,
         }
       : null,
+    skills: await readSkills(contentRoot),
   });
 
   // Config diagnostics (reserved paths, asset mounts, home page) matter as much as

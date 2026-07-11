@@ -11,6 +11,20 @@ import { type SearchDeps, hybridSearch } from "./retrieval.js";
  * v1.1) - which is also the prompt-injection ceiling: an agent can only read.
  */
 
+/** One file of an agent skill (structural mirror of the bundle's Skill type). */
+export interface McpSkillFile {
+  path: string;
+  content: string;
+}
+
+/** An agent skill exposed as MCP resources (spec agent-skills SK-20). */
+export interface McpSkill {
+  name: string;
+  description: string;
+  /** `files[0]` is SKILL.md. */
+  files: McpSkillFile[];
+}
+
 export interface McpDeps {
   search: SearchDeps;
   siteId: string;
@@ -18,6 +32,10 @@ export interface McpDeps {
   filters: SearchFilters;
   /** The ingested API reference, or null when there is none (endpoint tools omitted). */
   spec?: Pick<NormalizedSpec, "operations"> | null;
+  /** The site's agent skills; each file becomes a readable MCP resource. */
+  skills?: McpSkill[];
+  /** Canonical site URL; resource URIs mirror the HTTP discovery paths. */
+  siteUrl?: string;
   serverName?: string;
   version?: string;
 }
@@ -118,6 +136,36 @@ export function createMcpServer(deps: McpDeps): McpServer {
         };
       },
     );
+  }
+
+  // Agent skills as resources: a connected client discovers and reads them
+  // without installing anything (the Mintlify pattern). URIs mirror the HTTP
+  // discovery paths when the site has a canonical URL, so the same string works
+  // in a browser; a URL-less self-host gets a readsmith:// scheme instead.
+  const base = deps.siteUrl?.replace(/\/+$/, "") || "readsmith://site";
+  for (const skill of deps.skills ?? []) {
+    for (const file of skill.files) {
+      const uri = `${base}/.well-known/skills/${skill.name}/${file.path}`;
+      const isSkillMd = file.path === "SKILL.md";
+      server.registerResource(
+        `${skill.name}/${file.path}`,
+        uri,
+        {
+          title: isSkillMd ? skill.name : `${skill.name}: ${file.path}`,
+          ...(isSkillMd ? { description: skill.description } : {}),
+          mimeType: file.path.endsWith(".md") ? "text/markdown" : "text/plain",
+        },
+        async () => ({
+          contents: [
+            {
+              uri,
+              mimeType: file.path.endsWith(".md") ? "text/markdown" : "text/plain",
+              text: file.content,
+            },
+          ],
+        }),
+      );
+    }
   }
 
   return server;

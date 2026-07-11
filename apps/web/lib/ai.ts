@@ -152,6 +152,10 @@ async function build(): Promise<AiServices | null> {
       siteId: SITE_ID,
       filters: DEFAULT_FILTERS,
       spec: mcpSpec,
+      // Skills ride along as resources: connected agents discover and read
+      // them without installing anything (spec agent-skills SK-20).
+      skills: site.build.skills ?? [],
+      siteUrl: site.url,
     });
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: () => globalThis.crypto.randomUUID(),

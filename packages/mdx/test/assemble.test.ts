@@ -90,7 +90,7 @@ describe("assembleSite", () => {
     expect(build.llmsTxt).toContain("# Docs");
     expect(build.llmsTxt).toContain("[Setup](/guide/setup)");
     expect(build.llmsFullTxt).toContain("# Usage");
-    expect(build.skillMd).toContain("name: Docs");
+    expect(build.skills[0]?.files[0]?.content).toContain("name: docs");
     expect(build.searchChunks.length).toBeGreaterThan(0);
   });
 });
@@ -203,7 +203,7 @@ describe("agent readiness and search handoff", () => {
     // Hidden page excluded from every projection.
     expect(build.llmsTxt).not.toContain("Secret");
     expect(build.llmsFullTxt).not.toContain("Hidden.");
-    expect(build.skillMd).not.toContain("Secret");
+    expect(build.skills[0]?.files[0]?.content).not.toContain("Secret");
     expect(build.searchChunks.every((c) => c.page_id !== "secret.md")).toBe(true);
   });
 

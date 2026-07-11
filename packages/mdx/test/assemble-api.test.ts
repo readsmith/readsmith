@@ -309,7 +309,7 @@ describe("pages mode (HA-11/12/13)", () => {
     expect(list?.breadcrumbs.map((b) => b.label)).toEqual(["Pets", "List pets"]);
   });
 
-  it("lists explicitly placed pages in the reference catalog without moving their home", async () => {
+  it("mirrors explicitly placed pages into the reference catalog without moving their home", async () => {
     const f = fixture({
       "index.md": "# Home\n",
       "api/create-pet.mdx": '---\nopenapi: "POST /pets"\n---\n\nAuthored.\n',
@@ -325,26 +325,36 @@ describe("pages mode (HA-11/12/13)", () => {
     ];
     const build = await assembleSite(inputOf(f, { apiReference: pagesRef }));
 
-    // createPet is claimed: not synthesized, but its row IS in the catalog,
-    // pointing at the authored page's own URL.
-    expect(build.pages.some((p) => p.slug === "api-reference/createpet")).toBe(false);
+    // createPet is claimed AND explicitly placed: the catalog row is a MIRROR
+    // at the reference slug, so opening it never leaves the reference tab.
+    const mirror = build.pages.find((p) => p.slug === "api-reference/createpet");
+    expect(mirror?.canonicalOf).toBe("/api/create-pet");
+    expect(mirror?.html).toContain("Authored.");
     const tab = build.tabs?.at(-1);
     const group = tab?.nav.find((n) => n.type === "group");
     if (group?.type !== "group") throw new Error("no group");
     expect(group.children.map((c) => (c.type === "page" ? c.slug : ""))).toEqual([
       "api-reference/listpets",
-      "api/create-pet",
+      "api-reference/createpet",
     ]);
-    // The page's HOME stays where the nav put it: Guides-tab relations intact.
+    // The authored page's HOME stays where the nav put it: Guides relations.
     const authored = build.pages.find((p) => p.slug === "api/create-pet");
     expect(authored?.prev?.slug).toBe("index");
     expect(authored?.breadcrumbs.at(-1)?.url).toBe("/api/create-pet");
-    // The reference chain links TO the page without owning it.
+    // The mirror owns the reference chain and breadcrumbs.
+    expect(mirror?.prev?.slug).toBe("api-reference/listpets");
+    expect(mirror?.breadcrumbs.at(-1)?.url).toBe("/api-reference/createpet");
     const list = build.pages.find((p) => p.slug === "api-reference/listpets");
-    expect(list?.next?.slug).toBe("api/create-pet");
-    // The overview still links to the authored page's own URL.
+    expect(list?.next?.slug).toBe("api-reference/createpet");
+    // The overview links to the mirror: reference context stays reference.
     const overview = build.pages.find((p) => p.slug === "api-reference");
-    expect(overview?.html).toContain('href="/api/create-pet"');
+    expect(overview?.html).toContain('href="/api-reference/createpet"');
+    // Listing surfaces show the page ONCE, as the authored original.
+    expect(build.sitemap).toContain("/api/create-pet");
+    expect(build.sitemap).not.toContain("/api-reference/createpet");
+    expect(build.llmsTxt).not.toContain("/api-reference/createpet");
+    expect(mirror?.chunks).toHaveLength(0);
+    expect(mirror?.jsonLd).toBeNull();
   });
 
   it("appends the reference nav to the main sidebar on a tabless site", async () => {

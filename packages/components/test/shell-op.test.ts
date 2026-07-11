@@ -202,3 +202,33 @@ describe("themeInitScript", () => {
     expect(script).toContain("data-theme");
   });
 });
+
+describe("brand logo variants", () => {
+  const base: ShellPage = {
+    title: "Home",
+    url: "/",
+    slug: "",
+    html: "<p>x</p>",
+    toc: [],
+    breadcrumbs: [],
+  };
+
+  it("renders one image for a string logo or an identical pair (AC-8.1)", () => {
+    const one = renderShellBody({ name: "X", nav: [], logo: "/logo.svg" }, base);
+    expect(one.match(/rs-brand__logo/g)?.length).toBe(1);
+    const same = renderShellBody(
+      { name: "X", nav: [], logo: { light: "/l.svg", dark: "/l.svg" } },
+      base,
+    );
+    expect(same.match(/<img class="rs-brand__logo"/g)?.length).toBe(1);
+  });
+
+  it("renders both variants for a pair, cascade-toggled (AC-8.2)", () => {
+    const html = renderShellBody(
+      { name: "X", nav: [], logo: { light: "/light.svg", dark: "/dark.svg" } },
+      base,
+    );
+    expect(html).toContain('rs-brand__logo rs-brand__logo--light" src="/light.svg"');
+    expect(html).toContain('rs-brand__logo rs-brand__logo--dark" src="/dark.svg"');
+  });
+});

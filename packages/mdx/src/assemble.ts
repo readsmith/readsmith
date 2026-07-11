@@ -10,6 +10,7 @@ import GithubSlugger from "github-slugger";
 import type { Root } from "mdast";
 import { toString as mdastToString } from "mdast-util-to-string";
 import { visit } from "unist-util-visit";
+import { parse as parseYaml } from "yaml";
 import { parse } from "./parse.js";
 import { type Chunk, type TocNode, project } from "./projections.js";
 import {
@@ -99,6 +100,38 @@ export interface AssembleInput {
    * file tokens like `openapi: "openapi.json GET /pets"`).
    */
   apiReference?: ApiReferenceInput | null;
+  /**
+   * Authored agent skills read from the content repo (`.readsmith/skills/`,
+   * `.mintlify/skills/` as migration fallback, or a root `skill.md`). Assembly
+   * validates them against the agentskills.io constraints and synthesizes the
+   * mechanical fallback when none survive.
+   */
+  skills?: AuthoredSkill[];
+}
+
+/** One file inside a skill, path relative to the skill's root. */
+export interface SkillFile {
+  path: string;
+  content: string;
+}
+
+/** A validated agent skill, ready to serve at `/.well-known/skills/<name>/`. */
+export interface Skill {
+  name: string;
+  description: string;
+  /** `files[0]` is always SKILL.md; the rest sort by path. */
+  files: SkillFile[];
+}
+
+/** An authored skill as read from the content repo, before validation. */
+export interface AuthoredSkill {
+  /** Directory name under the skills root, or null for a root-level `skill.md`
+   * (whose name may fall back to the site instead of a directory). */
+  dir: string | null;
+  /** Diagnostic source, e.g. ".readsmith/skills/payments" or "skill.md". */
+  source: string;
+  /** Files relative to the skill root; must include "SKILL.md". */
+  files: SkillFile[];
 }
 
 /** The API-reference wiring assembly consumes (the resolved config's shape). */
@@ -181,6 +214,13 @@ export interface PageModel {
   breadcrumbs: Breadcrumb[];
   prev?: NavLink;
   next?: NavLink;
+  /**
+   * Pages-mode mirror: the URL of the authored page this page duplicates so the
+   * reference tab can show it without a tab jump. Mirrors render like any page
+   * but are excluded from the sitemap, feeds, and the AI index, and the serving
+   * layer points rel=canonical at this URL.
+   */
+  canonicalOf?: string;
   /** What the page is; "api-operation" pages carry `api` and a console layout,
    * "api-schema" pages carry `apiSchema` and a generated fields section. */
   kind: "doc" | "api-operation" | "api-schema";
@@ -226,7 +266,9 @@ export interface SiteBuild {
   rss: string;
   llmsTxt: string;
   llmsFullTxt: string;
-  skillMd: string;
+  /** Agent skills: authored ones that passed validation, or the mechanical
+   * fallback. Never empty; `/skill.md` and the discovery index serve these. */
+  skills: Skill[];
   searchChunks: Chunk[];
   diagnostics: Diagnostic[];
   /** Stable hash of the whole build; identical inputs yield an identical hash. */
@@ -338,11 +380,12 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
       applyNavRelations(tabNav, bySlug);
       return { label: tab.label, url: firstPageUrl(tabNav) ?? "/", nav: tabNav };
     });
-    // Pages mode: the reference joins the tab row as its own tab. Rows whose
-    // home is an explicit placement elsewhere keep that home's relations.
+    // Pages mode: the reference joins the tab row as its own tab. Explicitly
+    // placed pages appear via their mirrors, which take relations here while
+    // the authored originals keep their home tab's.
     if (refNav) {
       const tabNav = finalizeNav(refNav.nodes, bySlug);
-      applyNavRelations(tabNav, bySlug, refNav.foreign);
+      applyNavRelations(tabNav, bySlug);
       tabs.push({ label: refNav.label, url: refNav.url, nav: tabNav });
     }
   } else {
@@ -351,7 +394,9 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
     applyNavRelations(nav, bySlug);
   }
 
-  const visible = models.filter((m) => !m.hidden);
+  // Mirrors serve and sit in the nav, but every listing surface shows a page
+  // once: the authored original speaks for both copies.
+  const visible = models.filter((m) => !m.hidden && !m.canonicalOf);
   // The sitemap is the one output that invites a crawler, so it honors `noindex`
   // in addition to `hidden`. The feeds and the AI index track `hidden` alone.
   const indexable = visible.filter((m) => !m.noindex);
@@ -367,17 +412,18 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
     publisher: config.site.publisher,
   };
   for (const model of models) {
-    model.jsonLd = buildJsonLd(jsonLdSite, model, base);
+    // A mirror emits none: its rel=canonical already names the page that does.
+    model.jsonLd = model.canonicalOf ? null : buildJsonLd(jsonLdSite, model, base);
   }
 
   const sitemap = buildSitemap(indexable, base);
   const rss = buildRss(config, visible, base);
   const llmsTxt = buildLlmsTxt(config, visible, base);
   const llmsFullTxt = buildLlmsFullTxt(config, visible, base);
-  const skillMd = buildSkillMd(config, visible, base);
+  const skillsResult = assembleSkills(input.skills ?? [], config, visible, base);
   const searchChunks = visible.flatMap((m) => m.chunks);
 
-  const diagnostics = models.flatMap((m) => m.diagnostics);
+  const diagnostics = [...models.flatMap((m) => m.diagnostics), ...skillsResult.diagnostics];
   const ok = !(input.failOnError && diagnostics.some((d) => d.severity === "error"));
 
   const bundleHash = contentHash({
@@ -398,7 +444,7 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
     rss,
     llmsTxt,
     llmsFullTxt,
-    skillMd,
+    skills: skillsResult.skills,
   });
 
   return {
@@ -409,7 +455,7 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
     rss,
     llmsTxt,
     llmsFullTxt,
-    skillMd,
+    skills: skillsResult.skills,
     searchChunks,
     diagnostics,
     bundleHash,
@@ -827,12 +873,6 @@ interface RefNav {
   label: string;
   url: string;
   nodes: NavNode[];
-  /**
-   * Slugs listed in the reference tab whose HOME is an explicit nav placement
-   * elsewhere: their rows are links, but the reference chain must not take
-   * over their breadcrumbs, prev/next, or active-tab context.
-   */
-  foreign: Set<string>;
 }
 
 /**
@@ -912,8 +952,10 @@ function buildOverviewMarkdown(
  * authored page claims (deterministic github-slugger slugs from the operation
  * id, collisions diagnosed), plus a pipeline-rendered overview at the
  * reference root (skipped when an authored page owns that slug). Returns the
- * reference nav subtree; pages an author placed explicitly in the configured
- * navigation stay where they were put and are not duplicated here.
+ * reference nav subtree. A page the author placed explicitly in the configured
+ * navigation keeps that home, and (with tabs) is MIRRORED at its reference
+ * slug: the catalog row must open inside the reference tab, not jump the
+ * reader to another tab's context.
  */
 async function applyPagesMode(
   input: AssembleInput,
@@ -927,6 +969,8 @@ async function applyPagesMode(
   const refPath = (ref.path ?? "/api-reference").replace(/\/+$/, "");
   const refSlug = refPath.replace(/^\//, "");
   const label = ref.label ?? "API Reference";
+  const hasTabs = (input.config.tabs?.length ?? 0) > 0;
+  const explicit = collectNavSlugs(input.config);
 
   const slugger = new GithubSlugger();
   const seenBases = new Set<string>();
@@ -934,13 +978,46 @@ async function applyPagesMode(
 
   for (const op of spec.operations) {
     const claimedModel = claims.get(op.id);
-    if (claimedModel) {
+    // A claimed page without an explicit placement (or on a tabless site) is
+    // simply homed in the reference tree at its own URL; no mirror needed.
+    if (claimedModel && !(hasTabs && explicit.has(claimedModel.slug))) {
       urlByOp.set(op.id, claimedModel.url);
       continue;
     }
     const base = new GithubSlugger().slug(op.id);
     const opSlug = slugger.slug(op.id); // deduplicates deterministically
     const slug = `${refSlug}/${opSlug}`;
+    if (claimedModel) {
+      // The mirror: the same rendered page, re-homed under the reference slug
+      // so the reference tab's relations and active-tab context apply. It is
+      // excluded from the sitemap, feeds, and the AI index (canonicalOf), and
+      // carries no chunks so nothing is indexed twice.
+      const mirror: PageModel = {
+        ...claimedModel,
+        path: `${slug}.generated`,
+        slug,
+        url: `/${slug}`,
+        canonicalOf: claimedModel.url,
+        chunks: [],
+        breadcrumbs: [],
+        prev: undefined,
+        next: undefined,
+        diagnostics: [],
+      };
+      if (seenBases.has(base)) {
+        mirror.diagnostics.push({
+          severity: "error",
+          code: "operation-slug-collision",
+          message: `Operation slug "${base}" collides with another operation; serving this one at "${opSlug}".`,
+          source: mirror.path,
+        });
+      }
+      seenBases.add(base);
+      models.push(mirror);
+      built.push({ model: mirror, links: [], rebuilt: true });
+      urlByOp.set(op.id, mirror.url);
+      continue;
+    }
     const model: PageModel = {
       path: `${slug}.generated`,
       slug,
@@ -1006,13 +1083,9 @@ async function applyPagesMode(
 
   // The nav subtree: overview first, then tag groups with EVERY operation (the
   // reference is a catalog; a missing row reads as an undocumented endpoint).
-  // Explicit nav placement decides a page's HOME: with tabs, such pages still
-  // get a reference row (marked foreign, so the reference chain never takes
-  // over their breadcrumbs or prev/next); on a tabless site they are excluded,
-  // because there the row would duplicate inside one sidebar column.
-  const hasTabs = (input.config.tabs?.length ?? 0) > 0;
-  const explicit = collectNavSlugs(input.config);
-  const foreign = new Set<string>();
+  // Explicitly placed pages appear here through their mirrors (built above), so
+  // every row stays inside the reference tab. On a tabless site the explicit
+  // row is excluded instead: it would duplicate inside one sidebar column.
   const nodes: NavNode[] = [];
   if (models.some((m) => m.slug === refSlug) && !explicit.has(refSlug)) {
     nodes.push({ type: "page", slug: refSlug });
@@ -1022,15 +1095,12 @@ async function applyPagesMode(
     for (const op of group.operations) {
       const slug = urlByOp.get(op.id)?.replace(/^\//, "");
       if (!slug) continue;
-      if (explicit.has(slug)) {
-        if (!hasTabs) continue;
-        foreign.add(slug);
-      }
+      if (!hasTabs && explicit.has(slug)) continue;
       children.push({ type: "page", slug });
     }
     if (children.length > 0) nodes.push({ type: "group", label: group.tag, children });
   }
-  return { label, url: refPath, nodes, foreign };
+  return { label, url: refPath, nodes };
 }
 
 function errorPage(page: SitePage, message: string): BuiltPage {
@@ -1191,17 +1261,8 @@ function firstPageUrl(nav: FinalNavNode[]): string | undefined {
   return undefined;
 }
 
-/**
- * Compute prev/next and breadcrumbs from the finalized nav order. Slugs in
- * `skip` stay in the order (neighbors still link TO them) but are not assigned
- * relations themselves: their home is another nav context that already owns
- * their breadcrumbs and chain.
- */
-function applyNavRelations(
-  nav: FinalNavNode[],
-  bySlug: Map<string, PageModel>,
-  skip?: ReadonlySet<string>,
-): void {
+/** Compute prev/next and breadcrumbs from the finalized nav order. */
+function applyNavRelations(nav: FinalNavNode[], bySlug: Map<string, PageModel>): void {
   const order: { slug: string; trail: Breadcrumb[] }[] = [];
   const walk = (nodes: FinalNavNode[], trail: Breadcrumb[]): void => {
     for (const node of nodes) {
@@ -1219,7 +1280,7 @@ function applyNavRelations(
 
   for (let i = 0; i < order.length; i++) {
     const entry = order[i];
-    if (!entry || skip?.has(entry.slug)) continue;
+    if (!entry) continue;
     const model = bySlug.get(entry.slug);
     if (!model) continue;
     model.breadcrumbs = entry.trail;
@@ -1296,12 +1357,180 @@ function buildLlmsFullTxt(config: SiteConfig, pages: PageModel[], base: string):
   return `${parts.join("\n")}\n`;
 }
 
-function buildSkillMd(config: SiteConfig, pages: PageModel[], base: string): string {
-  const description = config.site.description ?? `Documentation for ${config.site.name}.`;
+/** agentskills.io name rule: 1-64 lowercase alphanumerics and single hyphens. */
+const SKILL_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SKILL_NAME_MAX = 64;
+const SKILL_DESCRIPTION_MAX = 1024;
+const SKILL_COMPATIBILITY_MAX = 500;
+/** Per-file cap: keeps a stray binary or fixture dump out of the bundle. */
+const SKILL_FILE_MAX_BYTES = 262144;
+
+/** Squeeze an arbitrary display name into a spec-valid skill name. */
+function skillNameOf(display: string): string {
+  const squeezed = display
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, SKILL_NAME_MAX)
+    .replace(/-+$/, "");
+  return squeezed || "docs";
+}
+
+/** Frontmatter of a SKILL.md, or null when the file has no parseable block. */
+function skillFrontmatter(content: string): Record<string, unknown> | null {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(content);
+  if (!match || typeof match[1] !== "string") return null;
+  try {
+    const parsed: unknown = parseYaml(match[1]);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validate authored skills against the agentskills.io constraints and fall back
+ * to the mechanical skill when none survive (SK-1..SK-3). A violation drops the
+ * skill with an error diagnostic; the build itself continues. Deterministic:
+ * authored input is processed in source order after sorting, and the result is
+ * sorted by name.
+ */
+function assembleSkills(
+  authored: AuthoredSkill[],
+  config: SiteConfig,
+  pages: PageModel[],
+  base: string,
+): { skills: Skill[]; diagnostics: Diagnostic[] } {
+  const diagnostics: Diagnostic[] = [];
+  const skills: Skill[] = [];
+  const seen = new Set<string>();
+  const sorted = [...authored].sort((a, b) => a.source.localeCompare(b.source));
+
+  if (sorted.some((s) => s.source.startsWith(".mintlify/"))) {
+    diagnostics.push({
+      severity: "info",
+      code: "skills-mintlify-dir",
+      message:
+        'Skills were read from ".mintlify/skills/" (migration fallback). Move them to ".readsmith/skills/" when convenient.',
+      source: ".mintlify/skills",
+    });
+  }
+
+  for (const entry of sorted) {
+    const err = (code: string, message: string): void => {
+      diagnostics.push({ severity: "error", code, message, source: entry.source });
+    };
+    const skillFile = entry.files.find((f) => f.path === "SKILL.md");
+    if (!skillFile) {
+      err("skill-frontmatter", "Skill has no SKILL.md file.");
+      continue;
+    }
+    if (skillFile.content.length > SKILL_FILE_MAX_BYTES) {
+      err("skill-file-too-large", `SKILL.md exceeds ${SKILL_FILE_MAX_BYTES} bytes.`);
+      continue;
+    }
+    const fm = skillFrontmatter(skillFile.content);
+    // The root-level skill.md may lean on the site for identity (Mintlify
+    // parity); a directory skill must carry its own frontmatter.
+    const isRoot = entry.dir === null;
+    if (!fm && !isRoot) {
+      err("skill-frontmatter", "SKILL.md must start with YAML frontmatter (name, description).");
+      continue;
+    }
+    const rawName = fm?.name;
+    const rawDescription = fm?.description;
+    let name: string;
+    if (typeof rawName === "string" && rawName.length > 0) {
+      if (rawName.length > SKILL_NAME_MAX || !SKILL_NAME_RE.test(rawName)) {
+        err(
+          "skill-invalid-name",
+          `Skill name "${rawName}" must be 1-${SKILL_NAME_MAX} chars of lowercase letters, digits, and single hyphens.`,
+        );
+        continue;
+      }
+      if (!isRoot && rawName !== entry.dir) {
+        err(
+          "skill-invalid-name",
+          `Skill name "${rawName}" must match its directory name "${entry.dir}".`,
+        );
+        continue;
+      }
+      name = rawName;
+    } else if (isRoot) {
+      name = skillNameOf(config.site.name);
+    } else {
+      err("skill-frontmatter", "Skill frontmatter is missing the required `name`.");
+      continue;
+    }
+    let description: string;
+    if (typeof rawDescription === "string" && rawDescription.length > 0) {
+      if (rawDescription.length > SKILL_DESCRIPTION_MAX) {
+        err(
+          "skill-invalid-description",
+          `Skill description exceeds ${SKILL_DESCRIPTION_MAX} characters.`,
+        );
+        continue;
+      }
+      description = rawDescription;
+    } else if (isRoot) {
+      description = config.site.description ?? `Documentation for ${config.site.name}.`;
+    } else {
+      err("skill-frontmatter", "Skill frontmatter is missing the required `description`.");
+      continue;
+    }
+    const compatibility = fm?.compatibility;
+    if (typeof compatibility === "string" && compatibility.length > SKILL_COMPATIBILITY_MAX) {
+      err(
+        "skill-frontmatter",
+        `Skill \`compatibility\` exceeds ${SKILL_COMPATIBILITY_MAX} characters.`,
+      );
+      continue;
+    }
+    if (seen.has(name)) {
+      err("duplicate-skill", `A skill named "${name}" already exists; this one is dropped.`);
+      continue;
+    }
+    const extras = entry.files
+      .filter((f) => f.path !== "SKILL.md")
+      .filter((f) => {
+        if (f.content.length <= SKILL_FILE_MAX_BYTES) return true;
+        diagnostics.push({
+          severity: "warning",
+          code: "skill-file-too-large",
+          message: `Skill file "${f.path}" exceeds ${SKILL_FILE_MAX_BYTES} bytes and is not served.`,
+          source: entry.source,
+        });
+        return false;
+      })
+      .sort((a, b) => a.path.localeCompare(b.path));
+    seen.add(name);
+    skills.push({ name, description, files: [skillFile, ...extras] });
+  }
+
+  if (skills.length === 0) skills.push(fallbackSkill(config, pages, base));
+  skills.sort((a, b) => a.name.localeCompare(b.name));
+  return { skills, diagnostics };
+}
+
+/**
+ * The mechanical fallback (SK-3): a page directory under a spec-valid name, so
+ * a zero-config site still presents something an agent can load. The
+ * `readsmith-generated: fallback` marker is what the skill generator's
+ * overwrite gate looks for.
+ */
+function fallbackSkill(config: SiteConfig, pages: PageModel[], base: string): Skill {
+  const name = skillNameOf(config.site.name);
+  const siteDescription = config.site.description ?? `Documentation for ${config.site.name}.`;
+  const trigger = ` Use when working with ${config.site.name} or answering questions from its documentation.`;
+  const description = (siteDescription + trigger).slice(0, SKILL_DESCRIPTION_MAX);
   const lines = [
     "---",
-    `name: ${config.site.name}`,
+    `name: ${name}`,
     `description: ${description}`,
+    "metadata:",
+    "  readsmith-generated: fallback",
     "---",
     "",
     `# ${config.site.name}`,
@@ -1314,7 +1543,11 @@ function buildSkillMd(config: SiteConfig, pages: PageModel[], base: string): str
       `- [${p.title}](${absUrl(base, p.url)})${p.description ? `: ${p.description}` : ""}`,
     );
   }
-  return `${lines.join("\n")}\n`;
+  return {
+    name,
+    description,
+    files: [{ path: "SKILL.md", content: `${lines.join("\n")}\n` }],
+  };
 }
 
 function pickTitle(

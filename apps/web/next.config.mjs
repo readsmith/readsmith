@@ -50,8 +50,17 @@ async function mcpRewrites() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    // `beforeFiles` so the alias resolves ahead of the static docs pages.
-    return { beforeFiles: await mcpRewrites(), afterFiles: [], fallback: [] };
+    // `beforeFiles` so the aliases resolve ahead of the static docs pages.
+    // `agent-skills` is the alternate spelling some skills clients probe.
+    const agentSkillsAlias = {
+      source: "/.well-known/agent-skills/:path*",
+      destination: "/.well-known/skills/:path*",
+    };
+    return {
+      beforeFiles: [...(await mcpRewrites()), agentSkillsAlias],
+      afterFiles: [],
+      fallback: [],
+    };
   },
   async headers() {
     const headers = securityHeaders({

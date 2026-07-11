@@ -1,0 +1,7 @@
+site:
+  name: Brand
+  logo:
+    light: /logo-light.svg
+    dark: /logo-dark.svg
+  favicon:
+    dark: /favicon-dark.svg

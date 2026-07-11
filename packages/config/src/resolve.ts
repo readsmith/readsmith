@@ -13,7 +13,46 @@ import {
   DEFAULT_INCLUDE,
   type PageRef,
   type ResolvedConfig,
+  type SiteImage,
+  type SiteImageInput,
 } from "./schema.js";
+
+/**
+ * Normalize a brand image (logo, favicon) to a per-theme pair. A bare string
+ * serves both themes; a one-sided pair falls back to the present side with a
+ * warning (the site renders, but one theme wears the wrong asset until the
+ * other lands); an empty object is treated as unset, with a warning.
+ */
+function resolveSiteImage(
+  input: SiteImageInput | undefined,
+  name: string,
+  diagnostics: Diagnostic[],
+): SiteImage | undefined {
+  if (input === undefined) return undefined;
+  if (typeof input === "string") return { light: input, dark: input };
+  const light = input.light ?? input.dark;
+  const dark = input.dark ?? input.light;
+  if (light === undefined || dark === undefined) {
+    diagnostics.push({
+      severity: "warning",
+      code: "site-image-empty",
+      message: `site.${name} is an empty object; set a URL string or a { light, dark } pair.`,
+      source: "docs.yaml",
+    });
+    return undefined;
+  }
+  if (input.light === undefined || input.dark === undefined) {
+    const missing = input.light === undefined ? "light" : "dark";
+    const present = missing === "light" ? "dark" : "light";
+    diagnostics.push({
+      severity: "warning",
+      code: "site-image-variant-missing",
+      message: `site.${name} has no ${missing} variant; the ${present} one serves both themes.`,
+      source: "docs.yaml",
+    });
+  }
+  return { light, dark };
+}
 
 /**
  * Resolve a site from a repository root: load and validate the config (or apply
@@ -221,8 +260,8 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
       name: input?.site.name ?? defaultSiteName(root),
       url: input?.site.url,
       description: input?.site.description,
-      logo: input?.site.logo,
-      favicon: input?.site.favicon,
+      logo: resolveSiteImage(input?.site.logo, "logo", diagnostics),
+      favicon: resolveSiteImage(input?.site.favicon, "favicon", diagnostics),
       author: input?.site.author,
       publisher: input?.site.publisher,
       theme: input?.site.theme ?? {},

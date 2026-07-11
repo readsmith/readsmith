@@ -92,10 +92,10 @@ describe("resolveConfig: tabbed repo", () => {
     ]);
   });
 
-  it("passes through the logo and favicon", async () => {
+  it("resolves string logo and favicon to per-theme pairs", async () => {
     const r = await resolveConfig(join(fixtures, "tabbed"));
-    expect(r.site.logo).toBe("/brand/logo.svg");
-    expect(r.site.favicon).toBe("/brand/favicon.png");
+    expect(r.site.logo).toEqual({ light: "/brand/logo.svg", dark: "/brand/logo.svg" });
+    expect(r.site.favicon).toEqual({ light: "/brand/favicon.png", dark: "/brand/favicon.png" });
   });
 
   it("leaves tabs undefined when the config omits them", async () => {
@@ -137,5 +137,23 @@ describe("resolveConfig: appearance", () => {
   it("passes an explicit dark default through", async () => {
     const r = await resolveConfig(join(fixtures, "apiref-pages"));
     expect(r.appearance).toEqual({ default: "dark" });
+  });
+});
+
+// Pre-launch hardening item 8: logo/favicon light-dark variants.
+describe("resolveConfig: brand image variants", () => {
+  it("resolves a string logo to the same asset for both themes (AC-8.1)", async () => {
+    const r = await resolveConfig(join(fixtures, "brand-images-string"));
+    expect(r.site.logo).toEqual({ light: "/logo.svg", dark: "/logo.svg" });
+    expect(r.diagnostics).toEqual([]);
+  });
+
+  it("passes a full pair through, and fills a one-sided pair with a warning (AC-8.2/8.3)", async () => {
+    const r = await resolveConfig(join(fixtures, "brand-images"));
+    expect(r.site.logo).toEqual({ light: "/logo-light.svg", dark: "/logo-dark.svg" });
+    expect(r.site.favicon).toEqual({ light: "/favicon-dark.svg", dark: "/favicon-dark.svg" });
+    expect(r.diagnostics).toMatchObject([
+      { severity: "warning", code: "site-image-variant-missing" },
+    ]);
   });
 });
