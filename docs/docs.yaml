@@ -21,6 +21,7 @@ tabs:
           - authoring/pages
           - authoring/markdown
           - authoring/code-blocks
+          - authoring/diagrams
           - authoring/snippets-and-variables
           - authoring/images-and-links
       - group: Configuration
@@ -52,6 +53,7 @@ tabs:
           - components/steps
           - components/cards
           - components/code-groups
+          - components/diagrams
           - components/frames
           - components/inline
           - components/updates

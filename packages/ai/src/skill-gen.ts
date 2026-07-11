@@ -227,7 +227,9 @@ function reducePrompt(input: SkillGenInput, merged: Extraction): string {
     "   ## Verification checklist - `- [ ]` items an agent checks before declaring success",
     "   ## Resources - deep links into the docs; end with the llms.txt pointer",
     "",
-    `Budgets: at most ${SKILL_LINE_MAX - 20} lines and roughly 4000 tokens. Dense beats long.`,
+    // The character target sits well under the hard gate (SKILL_CHAR_MAX) so
+    // a slightly verbose draft still passes instead of bouncing to repair.
+    `Budgets: at most ${SKILL_LINE_MAX - 20} lines and ${SKILL_CHAR_MAX - 3500} characters. Dense beats long: when material will not fit, drop the least load-bearing rows rather than compressing prose into fragments.`,
     "Style: never use em dashes; use commas, colons, or parentheses instead. In tables, leave a cell empty or write (none) rather than a dash placeholder.",
     `Link ONLY to these documentation URLs, EXACTLY as written (plus the machine-readable directory, whose ONLY correct URL is ${llmsUrl}):`,
     urls,
