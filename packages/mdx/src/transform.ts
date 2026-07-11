@@ -61,10 +61,63 @@ export interface TransformResult {
  */
 export function transform(body: Root, ctx: TransformContext): TransformResult {
   const diagnostics: Diagnostic[] = [];
+  resolveGitHubAlerts(body);
   assignHeadingSlugs(body);
   resolveLinks(body, ctx, diagnostics);
   resolveImages(body, ctx, diagnostics);
   return { body, diagnostics };
+}
+
+/** GitHub alert marker to callout kind. IMPORTANT maps to info (both are the
+ * "read this" accent); CAUTION to danger (both mean consequences). */
+const ALERT_KINDS: Record<string, string> = {
+  NOTE: "note",
+  TIP: "tip",
+  IMPORTANT: "info",
+  WARNING: "warning",
+  CAUTION: "danger",
+};
+
+/**
+ * GitHub-flavored alerts (`> [!NOTE]` blockquotes) become callouts, so the
+ * same source renders as a native alert on github.com and as a first-class
+ * callout here: docs that live in a repository never have to choose. Works in
+ * plain `.md` and `.mdx` alike (the render stage dispatches the synthesized
+ * component node regardless of source format).
+ */
+export function resolveGitHubAlerts(body: Root): void {
+  visit(body, "blockquote", (node, index, parent) => {
+    if (!parent || index === undefined) return;
+    const [first, ...blocks] = node.children;
+    if (!first || first.type !== "paragraph") return;
+    const [lead, ...inline] = first.children;
+    if (!lead || lead.type !== "text") return;
+    const match = lead.value.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*?(?:\n|$)/);
+    if (!match) return;
+
+    // Strip the marker line; whatever follows it (same paragraph or later
+    // blocks) is the callout body.
+    const remainder = lead.value.slice(match[0].length);
+    let leadInline = inline;
+    if (!remainder && leadInline[0]?.type === "break") leadInline = leadInline.slice(1);
+    const leadChildren = remainder
+      ? [{ type: "text", value: remainder } as (typeof first.children)[number], ...leadInline]
+      : leadInline;
+    const children = [
+      ...(leadChildren.length ? [{ ...first, children: leadChildren }] : []),
+      ...blocks,
+    ];
+
+    parent.children[index] = {
+      type: "mdxJsxFlowElement",
+      name: "Callout",
+      attributes: [
+        { type: "mdxJsxAttribute", name: "type", value: ALERT_KINDS[match[1] ?? ""] ?? "note" },
+      ],
+      children,
+      position: node.position,
+    } as unknown as (typeof parent.children)[number];
+  });
 }
 
 /**

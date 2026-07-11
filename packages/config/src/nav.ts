@@ -108,12 +108,18 @@ export function buildExplicitNav(
 
 function buildLookup(pages: PageRef[]): Map<string, string> {
   const map = new Map<string, string>();
+  // Specificity must hold ACROSS pages, not per page: write every page's
+  // basename first, then every path, then every slug, so one page's bare
+  // basename ("cli/apps.md" answering to "apps") can never clobber another
+  // page's exact path or slug ("apps.md" at slug "apps").
   for (const page of pages) {
     const pathNoExt = page.path.replace(/\.(md|mdx)$/i, "");
-    const base = pathNoExt.split("/").pop() ?? pathNoExt;
-    // Most specific keys win: set less specific first, then override.
-    map.set(base, page.slug);
-    map.set(pathNoExt, page.slug);
+    map.set(pathNoExt.split("/").pop() ?? pathNoExt, page.slug);
+  }
+  for (const page of pages) {
+    map.set(page.path.replace(/\.(md|mdx)$/i, ""), page.slug);
+  }
+  for (const page of pages) {
     map.set(page.slug, page.slug);
   }
   return map;

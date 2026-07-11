@@ -25,6 +25,64 @@ describe("assignHeadingSlugs", () => {
   });
 });
 
+// GitHub-flavored alerts become callouts: one source renders natively on
+// github.com AND as a first-class callout here (the dual-render contract).
+describe("resolveGitHubAlerts", () => {
+  const alertNode = (body: unknown): { type: string; name?: string; attributes?: unknown[] } => {
+    const node = (body as { children: { type: string; name?: string; attributes?: unknown[] }[] })
+      .children[0];
+    if (!node) throw new Error("empty document body");
+    return node;
+  };
+
+  it("converts every alert kind in plain .md, mapping to callout types", () => {
+    const cases: Array<[string, string]> = [
+      ["NOTE", "note"],
+      ["TIP", "tip"],
+      ["IMPORTANT", "info"],
+      ["WARNING", "warning"],
+      ["CAUTION", "danger"],
+    ];
+    for (const [marker, kind] of cases) {
+      const { body } = parse({ path: "a.md", raw: `> [!${marker}]\n> The body text.\n` });
+      transform(body, { path: "a.md" });
+      const node = alertNode(body);
+      expect(node.type).toBe("mdxJsxFlowElement");
+      expect(node.name).toBe("Callout");
+      expect(node.attributes).toMatchObject([{ name: "type", value: kind }]);
+    }
+  });
+
+  it("keeps multi-block bodies and strips only the marker line", () => {
+    const raw = "> [!WARNING]\n> First line.\n>\n> Second paragraph with `code`.\n";
+    const { body } = parse({ path: "a.md", raw });
+    transform(body, { path: "a.md" });
+    const node = alertNode(body) as unknown as { children: { type: string }[] };
+    expect(node.children).toHaveLength(2);
+    expect(node.children.every((c) => c.type === "paragraph")).toBe(true);
+  });
+
+  it("leaves ordinary blockquotes and lookalikes alone", () => {
+    const plain = parse({ path: "a.md", raw: "> Just a quote.\n" });
+    transform(plain.body, { path: "a.md" });
+    expect(plain.body.children[0]?.type).toBe("blockquote");
+
+    const unknown = parse({ path: "a.md", raw: "> [!DANGER]\n> Not a GitHub marker.\n" });
+    transform(unknown.body, { path: "a.md" });
+    expect(unknown.body.children[0]?.type).toBe("blockquote");
+
+    const inlinePrefix = parse({ path: "a.md", raw: "> [!NOTE] same-line text\n" });
+    transform(inlinePrefix.body, { path: "a.md" });
+    expect(inlinePrefix.body.children[0]?.type).toBe("blockquote");
+  });
+
+  it("works in .mdx too", () => {
+    const { body } = parse({ path: "a.mdx", raw: "> [!TIP]\n> Try the CLI.\n" });
+    transform(body, { path: "a.mdx" });
+    expect(alertNode(body).name).toBe("Callout");
+  });
+});
+
 // P2 spec AC-3 / TG-2 / TG-4: internal link resolution and broken-link reporting.
 describe("resolveLinks", () => {
   const resolvePage = (target: string): string | null => {

@@ -103,6 +103,27 @@ describe("resolveConfig: tabbed repo", () => {
     expect(r.tabs).toBeUndefined();
   });
 
+  // A nested page whose BASENAME collides with a top-level slug must not
+  // steal that slug's nav entry: exact path/slug references always win over
+  // basename convenience (the "apps" vs "cli/apps" regression).
+  it("resolves an exact slug ref even when a nested page shares its basename", async () => {
+    const { buildExplicitNav } = await import("../src/nav.js");
+    const pages = [
+      { path: "apps.md", slug: "apps" },
+      { path: "cli/apps.md", slug: "cli/apps" },
+    ];
+    const { nav, diagnostics } = buildExplicitNav(
+      ["apps", { group: "CLI", pages: ["cli/apps"] }],
+      pages,
+    );
+    expect(diagnostics).toEqual([]);
+    expect(nav[0]).toEqual({ type: "page", slug: "apps" });
+    expect(nav[1]).toMatchObject({
+      type: "group",
+      children: [{ type: "page", slug: "cli/apps" }],
+    });
+  });
+
   // Spec subpath-hosting SP-3: site-root-relative brand assets carry the base
   // path derived from site.url; external URLs pass through untouched.
   it("prefixes root-relative logo and favicon paths on a subpath site", async () => {
