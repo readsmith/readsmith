@@ -15,6 +15,21 @@ export const HALLMARK_SVG =
   '<path d="M11 16.2 L14.6 20 L21.3 11.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
   "</svg>";
 
+/**
+ * The header lockup's mark: stroked with a gradient whose stops glint in
+ * sequence (.rs-ms1-3 in shell.css), so a light travels the hallmark in step
+ * with the wordmark's chrome sweep. The gradient id is fixed: render at most
+ * one per page (the header brand); the footer badge keeps the plain mark.
+ */
+export const HALLMARK_SVG_SHIMMER =
+  '<svg class="rs-mark" viewBox="0 0 32 32" aria-hidden="true">' +
+  '<defs><linearGradient id="rs-mark-metal" x1="0" y1="0" x2="1" y2="0.35">' +
+  '<stop class="rs-ms1" offset="0"/><stop class="rs-ms2" offset="0.55"/><stop class="rs-ms3" offset="1"/>' +
+  "</linearGradient></defs>" +
+  '<path d="M16 2.5 L27.5 9 V23 L16 29.5 L4.5 23 V9 Z" fill="none" stroke="url(#rs-mark-metal)" stroke-width="1.6" stroke-linejoin="round"/>' +
+  '<path d="M11 16.2 L14.6 20 L21.3 11.6" fill="none" stroke="url(#rs-mark-metal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+  "</svg>";
+
 /** Small line icons used in the header and menus. */
 export const ICONS = {
   search:

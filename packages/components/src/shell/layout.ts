@@ -8,7 +8,7 @@ import {
 } from "../api/operation.js";
 import { renderNav } from "./nav.js";
 import { renderToc } from "./toc.js";
-import { HALLMARK_SVG, ICONS, esc, socialIcon } from "./util.js";
+import { HALLMARK_SVG, HALLMARK_SVG_SHIMMER, ICONS, esc, socialIcon } from "./util.js";
 
 export interface ShellSite {
   name: string;
@@ -199,7 +199,7 @@ ${options.scriptHref ? `<script type="module" src="${esc(options.scriptHref)}"><
  */
 function brandHtml(site: ShellSite): string {
   const logo = site.logo;
-  if (!logo) return `${HALLMARK_SVG}<span class="rs-wordmark">${esc(site.name)}</span>`;
+  if (!logo) return `${HALLMARK_SVG_SHIMMER}<span class="rs-wordmark">${esc(site.name)}</span>`;
   const alt = esc(site.name);
   if (typeof logo === "string" || logo.light === logo.dark) {
     const src = typeof logo === "string" ? logo : logo.light;

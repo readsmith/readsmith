@@ -60,6 +60,90 @@
   font-weight: 500;
   font-size: 1.15rem;
 }
+/* Chrome shimmer on the header lockup (matches the readsmith.dev brand
+ * treatment): a static metal body plus a sweeping sheen, both clipped to the
+ * glyphs; graphite in light, silver in dark. The footer badge stays plain. */
+.rs-brand .rs-wordmark {
+  background-image: linear-gradient(
+      105deg,
+      transparent 42%,
+      var(--rs-metal-sheen) 50%,
+      transparent 58%
+    ), linear-gradient(180deg, var(--rs-metal-hi) 0%, var(--rs-metal) 55%, var(--rs-metal-lo) 100%);
+  background-size: 250% 100%, 100% 100%;
+  background-position: 135% 0, 0 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: rs-chrome-sweep 6s ease-in-out infinite;
+}
+@keyframes rs-chrome-sweep {
+  0% {
+    background-position: 135% 0, 0 0;
+  }
+  24% {
+    background-position: -135% 0, 0 0;
+  }
+  100% {
+    background-position: -135% 0, 0 0;
+  }
+}
+/* The mark's glint: fixed gradient stops whose colors brighten in sequence,
+ * so the highlight travels the strokes in step with the wordmark sweep. */
+.rs-ms1 {
+  stop-color: var(--rs-hallmark-ink);
+  animation: rs-glint-1 6s ease-in-out infinite;
+}
+.rs-ms2 {
+  stop-color: var(--rs-hallmark);
+  animation: rs-glint-2 6s ease-in-out infinite;
+}
+.rs-ms3 {
+  stop-color: var(--rs-hallmark-ink);
+  animation: rs-glint-3 6s ease-in-out infinite;
+}
+@keyframes rs-glint-1 {
+  0%,
+  14%,
+  100% {
+    stop-color: var(--rs-hallmark-ink);
+  }
+  5% {
+    stop-color: var(--rs-mark-glint);
+  }
+}
+@keyframes rs-glint-2 {
+  0%,
+  18%,
+  100% {
+    stop-color: var(--rs-hallmark);
+  }
+  9% {
+    stop-color: var(--rs-mark-glint);
+  }
+}
+@keyframes rs-glint-3 {
+  0%,
+  22%,
+  100% {
+    stop-color: var(--rs-hallmark-ink);
+  }
+  13% {
+    stop-color: var(--rs-mark-glint);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rs-brand .rs-wordmark {
+    animation: none;
+    background-position: -135% 0, 0 0;
+  }
+  .rs-ms1,
+  .rs-ms2,
+  .rs-ms3 {
+    animation: none;
+  }
+}
 .rs-brand__logo {
   height: 26px;
   width: auto;
