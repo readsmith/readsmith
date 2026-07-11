@@ -5,53 +5,44 @@ description: The component library available in every Readsmith page. Callouts, 
 
 # Components overview
 
-Every Readsmith page can use the built-in component library in MDX, no imports required. This page is the inventory; the gallery pages document each component in depth, and each gallery page renders the component it documents.
+Every Readsmith page can use the built-in component library in MDX, no imports required. This page is the map; each gallery page documents one component in depth and renders it live.
 
 ## Callouts
 
 <Info>
-Five severities share one anatomy: `Note`, `Info`, `Tip`, `Warning`, and `Danger`, plus `Check` for confirmations. This paragraph sits in an `Info`.
+Five severities share one anatomy, plus `Check` for confirmations. This paragraph sits in an `Info`. See [Callouts](/components/callouts).
 </Info>
-
-| Component | Use for |
-| --- | --- |
-| `<Note>` | Supplementary detail, safe to skip |
-| `<Info>` | Context the reader should have, like permissions |
-| `<Tip>` | Recommendations and best practices |
-| `<Warning>` | Actions that can go wrong or destroy data |
-| `<Danger>` | Actions that will hurt if misused |
-| `<Check>` | Success confirmation at the end of a procedure |
 
 ## Structure
 
-| Component | Use for |
-| --- | --- |
-| `<Accordion>`, `<AccordionGroup>` | Optional detail the reader expands on demand |
-| `<Tabs>`, `<Tab>` | One choice among alternatives, like install paths |
-| `<Steps>`, `<Step>` | Numbered procedures |
-| `<Card>`, `<CardGroup>` | Linked navigation tiles |
-| `<Frame>` | Images and screenshots with a caption |
+| Component | Use for | Gallery |
+| --- | --- | --- |
+| `<Accordion>`, `<AccordionGroup>` | Optional detail the reader expands on demand | [Accordions](/components/accordions) |
+| `<Tabs>`, `<Tab>` | One choice among alternatives, with page-wide sync | [Tabs](/components/tabs) |
+| `<Steps>`, `<Step>` | Numbered procedures | [Steps](/components/steps) |
+| `<Card>`, `<CardGroup>` | Linked navigation tiles | [Cards](/components/cards) |
+| `<Frame>` | Media with a caption and a CLS-free declared ratio | [Frames](/components/frames) |
 
 ## Code
 
-| Component | Use for |
-| --- | --- |
-| `<CodeGroup>` | The same snippet in several languages, tabbed |
+| Component | Use for | Gallery |
+| --- | --- | --- |
+| `<CodeGroup>` | The same snippet in several languages, tabbed | [Code groups](/components/code-groups) |
 
-Fenced code blocks need no component: they are highlighted at build time with dual light and dark themes, and ship as static HTML.
+Fenced code blocks need no component: they highlight at build time with dual themes, titles, and line emphasis. See [Code blocks](/authoring/code-blocks).
 
 ## Inline elements
 
-| Component | Use for |
-| --- | --- |
-| `<Badge>` | Small status labels inline with text |
-| `<Kbd>` | Keyboard keys, like <Kbd>Ctrl</Kbd> <Kbd>K</Kbd> |
-| `<Tooltip>` | A definition on hover |
+| Component | Use for | Gallery |
+| --- | --- | --- |
+| `<Badge>` | Status labels inline with text | [Inline elements](/components/inline) |
+| `<Kbd>` | Keyboard keys, like <Kbd>Ctrl</Kbd> <Kbd>K</Kbd> | [Inline elements](/components/inline) |
+| `<Tooltip>` | A definition on hover and focus | [Inline elements](/components/inline) |
 
 ## Content types
 
-| Component | Use for |
-| --- | --- |
-| `<Update>` | Dated changelog entries |
-| `<Operation>` | One API operation, generated from your OpenAPI spec, embedded in any prose page |
-| `<Snippet>` | Shared content included from another file at build time |
+| Component | Use for | Gallery |
+| --- | --- | --- |
+| `<Update>` | Dated changelog entries | [Updates](/components/updates) |
+| `<Operation>` | One generated API operation inside prose | [Operation embeds](/components/operation) |
+| `<Snippet>` | Shared content included at build time | [Snippets and variables](/authoring/snippets-and-variables) |

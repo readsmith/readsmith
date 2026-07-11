@@ -32,6 +32,18 @@ tabs:
   - tab: Components
     pages:
       - components/overview
+      - group: Gallery
+        pages:
+          - components/callouts
+          - components/accordions
+          - components/tabs
+          - components/steps
+          - components/cards
+          - components/code-groups
+          - components/frames
+          - components/inline
+          - components/updates
+          - components/operation
   - tab: Self-host
     pages:
       - self-host/deploy

@@ -1,0 +1,71 @@
+---
+title: Callouts
+description: Six semantic callouts with one anatomy. Note, Info, Tip, Warning, Danger, and Check, each demonstrated live.
+---
+
+# Callouts
+
+A callout pulls one paragraph out of the reading flow and tells the reader how seriously to take it. Six severities share one anatomy: a tinted panel, a semantic left rule, an icon, and an optional title.
+
+## The six severities
+
+<Note>
+A `Note` carries supplementary detail. Skipping it costs nothing.
+</Note>
+
+<Info>
+An `Info` carries context the reader should have before continuing, like required permissions.
+</Info>
+
+<Tip>
+A `Tip` is a recommendation: the path we would take ourselves.
+</Tip>
+
+<Warning>
+A `Warning` marks an action that can go wrong or destroy data. Read before running.
+</Warning>
+
+<Danger>
+A `Danger` marks an action that will hurt if misused. The strongest signal on the page.
+</Danger>
+
+<Check>
+A `Check` confirms success: the state you should see when a procedure worked.
+</Check>
+
+## Usage
+
+```mdx
+<Tip>
+Prefer the shorthand components. The severity is visible in the source.
+</Tip>
+```
+
+Every callout accepts an optional `title`:
+
+<Warning title="Backup first">
+This one has a title. Use titles when the callout's point needs a headline the body then explains.
+</Warning>
+
+```mdx
+<Warning title="Backup first">
+This one has a title.
+</Warning>
+```
+
+The long form `<Callout type="warning" title="...">` is equivalent; an unknown `type` falls back to `note`.
+
+## Choosing a severity
+
+| Reach for | When |
+| --- | --- |
+| `Note` | Detail that enriches but is skippable |
+| `Info` | Context needed to proceed correctly |
+| `Tip` | A best practice or recommendation |
+| `Warning` | Reversible harm, surprises, data risks |
+| `Danger` | Irreversible or security-relevant harm |
+| `Check` | Confirmation at the end of a procedure |
+
+<Tip>
+One callout per idea, and rarely more than two per screen. When everything is highlighted, nothing is.
+</Tip>

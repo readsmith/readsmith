@@ -1,0 +1,45 @@
+---
+title: Inline elements
+description: Badges, keyboard keys, and tooltips. Small elements that live inside a sentence.
+---
+
+# Inline elements
+
+Three components live inside a sentence rather than between paragraphs: a status pill, a keyboard key, and a hover definition.
+
+## Badge
+
+A small status label: this feature is <Badge variant="new">New</Badge>, that flag is <Badge variant="warning">Deprecated</Badge>, and this one is just a neutral <Badge>Label</Badge>.
+
+```mdx
+This feature is <Badge variant="new">New</Badge>.
+```
+
+| Variant | Reads as |
+| --- | --- |
+| unset | Neutral label |
+| `new`, `tip` | Positive: fresh or recommended |
+| `warning` | Caution: deprecated, experimental |
+| `accent` | Brand-colored emphasis |
+
+## Kbd
+
+Keyboard keys render as stamped keys: press <Kbd>Ctrl</Kbd> <Kbd>K</Kbd> to open search, or <Kbd>Esc</Kbd> to close it.
+
+```mdx
+Press <Kbd>Ctrl</Kbd> <Kbd>K</Kbd> to open search.
+```
+
+## Tooltip
+
+A <Tooltip tip="A precompiled artifact holding the site's pages, search chunks, and agent outputs">bundle</Tooltip> gets its definition on hover or keyboard focus, with no JavaScript and no layout shift.
+
+```mdx
+A <Tooltip tip="A precompiled artifact holding...">bundle</Tooltip> gets its definition on hover.
+```
+
+The trigger is focusable and carries the tip as its accessible name, so the definition reaches keyboard and screen-reader users too.
+
+<Tip>
+Tooltips are for glosses a reader might want, never for content they need. Anything essential belongs in the sentence.
+</Tip>

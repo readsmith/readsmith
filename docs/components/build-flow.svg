@@ -1,0 +1,16 @@
+<svg viewBox="0 0 560 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Content builds into a bundle, which serves both a docs site and agent outputs">
+  <g fill="none" stroke="#8b8e95" stroke-width="1.5">
+    <rect x="8" y="40" width="120" height="40" rx="6"/>
+    <rect x="220" y="40" width="120" height="40" rx="6"/>
+    <rect x="432" y="12" width="120" height="40" rx="6"/>
+    <rect x="432" y="68" width="120" height="40" rx="6"/>
+    <path d="M128 60h88" stroke-opacity="0.7"/>
+    <path d="M340 56l92-22m-92 44l92 22" stroke-opacity="0.7"/>
+  </g>
+  <g fill="#8b8e95" font-family="monospace" font-size="13" text-anchor="middle">
+    <text x="68" y="65">content/</text>
+    <text x="280" y="65">bundle</text>
+    <text x="492" y="37">docs site</text>
+    <text x="492" y="93">agent outputs</text>
+  </g>
+</svg>

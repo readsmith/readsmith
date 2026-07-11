@@ -1,0 +1,62 @@
+---
+title: Tabs
+description: One choice among alternatives, with optional page-wide sync. Server-rendered first tab, keyboard navigation after hydration.
+---
+
+# Tabs
+
+Tabs present one choice among alternatives: install paths, operating systems, languages. The first tab is server-rendered so the page reads correctly with no JavaScript; a small island then wires keyboard navigation and selection.
+
+## Basic tabs
+
+<Tabs>
+  <Tab title="macOS">
+    Install with Homebrew, then verify with `docker --version`.
+  </Tab>
+  <Tab title="Linux">
+    Install Docker Engine from your distribution's repository, then add your user to the `docker` group.
+  </Tab>
+  <Tab title="Windows">
+    Install Docker Desktop and enable the WSL 2 backend.
+  </Tab>
+</Tabs>
+
+```mdx
+<Tabs>
+  <Tab title="macOS">...</Tab>
+  <Tab title="Linux">...</Tab>
+  <Tab title="Windows">...</Tab>
+</Tabs>
+```
+
+## Synced tabs
+
+Give several `Tabs` blocks the same `group` and they switch together across the whole page. Pick "Linux" in either block below and both follow:
+
+<Tabs group="os">
+  <Tab title="macOS">First block, macOS content.</Tab>
+  <Tab title="Linux">First block, Linux content.</Tab>
+</Tabs>
+
+<Tabs group="os">
+  <Tab title="macOS">Second block, macOS content: synced with the first.</Tab>
+  <Tab title="Linux">Second block, Linux content: synced with the first.</Tab>
+</Tabs>
+
+```mdx
+<Tabs group="os">
+  <Tab title="macOS">...</Tab>
+  <Tab title="Linux">...</Tab>
+</Tabs>
+```
+
+## Props
+
+| Prop | On | Type | Effect |
+| --- | --- | --- | --- |
+| `title` | `Tab` | string | The tab's label |
+| `group` | `Tabs` | string | Page-wide sync key: same group, same selection |
+
+<Tip>
+Tabs are for alternatives where the reader needs exactly one. If they should read all of it, use headings; if the content is optional depth, use an [accordion](/components/accordions). For code-only alternatives, a [code group](/components/code-groups) is tighter.
+</Tip>

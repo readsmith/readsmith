@@ -1,0 +1,55 @@
+---
+title: Accordions
+description: Progressive disclosure on the native details element. Keyboard-correct with zero JavaScript, grouped or standalone.
+---
+
+# Accordions
+
+An accordion hides optional depth until the reader asks for it. Readsmith builds it on the native `<details>` element, so it is keyboard-operable and screen-reader-correct with zero JavaScript.
+
+## A single accordion
+
+<Accordion title="What happens on a cache miss?">
+The page renders through the full pipeline and the result is stored under its content hash. The next build with the same inputs is a hit, byte for byte.
+</Accordion>
+
+```mdx
+<Accordion title="What happens on a cache miss?">
+The page renders through the full pipeline...
+</Accordion>
+```
+
+## Open by default
+
+Pass `open` to start expanded, for content that is optional but usually wanted:
+
+<Accordion title="This one starts open" open>
+Readers can still collapse it. The state is the native element's, not a script's.
+</Accordion>
+
+## Groups
+
+Wrap related accordions in an `AccordionGroup` and they join into one bordered stack:
+
+<AccordionGroup>
+  <Accordion title="Does hiding a page unpublish it?">
+    No. `hidden: true` unlists a page from navigation, the sitemap, feeds, and the AI index; the URL still serves.
+  </Accordion>
+  <Accordion title="Can I exclude files from the build entirely?">
+    Yes: `content.exclude` patterns merge with the defaults and matching files are never built.
+  </Accordion>
+  <Accordion title="Do accordions hurt searchability?">
+    No. Content inside an accordion is in the page's HTML, the search index, and the agent outputs like any other prose.
+  </Accordion>
+</AccordionGroup>
+
+## Props
+
+| Prop | On | Type | Default | Effect |
+| --- | --- | --- | --- | --- |
+| `title` | `Accordion` | string | `Details` | The always-visible summary line |
+| `open` | `Accordion` | boolean | `false` | Start expanded |
+
+<Tip>
+Accordions are for optional depth: an FAQ, an edge case, a long error table. Content a reader must see to succeed belongs in the open page, not behind a click.
+</Tip>

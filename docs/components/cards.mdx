@@ -1,0 +1,49 @@
+---
+title: Cards
+description: Linked navigation tiles, singly or in a responsive grid. The whole tile is the link.
+---
+
+# Cards
+
+Cards are navigation, not decoration: each tile links somewhere and the whole tile is the click target. Use them where a reader chooses a direction, like a landing page or the end of a guide.
+
+## A card grid
+
+<CardGroup cols="2">
+  <Card title="Quickstart" href="/quickstart">
+    From clone to a running docs site with one compose command.
+  </Card>
+  <Card title="Settings reference" href="/configuration/settings-reference">
+    Every key docs.yaml accepts, with types and defaults.
+  </Card>
+  <Card title="Callouts" href="/components/callouts">
+    The six severities and when to use each.
+  </Card>
+  <Card title="Theming" href="/configuration/theming">
+    Accent pairs, fonts, logos, and first-visit appearance.
+  </Card>
+</CardGroup>
+
+## Usage
+
+```mdx
+<CardGroup cols="2">
+  <Card title="Quickstart" href="/quickstart">
+    From clone to a running docs site with one compose command.
+  </Card>
+</CardGroup>
+```
+
+A `Card` without `href` renders as a plain tile, for the rare case where the grid mixes a non-link.
+
+## Props
+
+| Prop | On | Type | Default | Effect |
+| --- | --- | --- | --- | --- |
+| `title` | `Card` | string | unset | The tile's headline |
+| `href` | `Card` | string | unset | Destination; makes the whole tile a link |
+| `cols` | `CardGroup` | string | `2` | Grid columns on wide screens; collapses responsively |
+
+<Tip>
+Card bodies are one sentence, written like a promise: what the reader gets by clicking. Paragraphs belong on the destination page.
+</Tip>

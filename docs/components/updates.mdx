@@ -1,0 +1,47 @@
+---
+title: Updates
+description: Dated changelog entries with anchors, built for a changelog page that feeds the site's RSS.
+---
+
+# Updates
+
+An `Update` is one dated changelog entry: a label, an optional titled heading with its own anchor, and a body of ordinary Markdown. A page of them is a changelog; add `date` frontmatter and the page feeds the site's RSS.
+
+## An entry
+
+<Update label="2026-07-11" title="Example release">
+
+- Added the thing readers asked for
+- Fixed the thing nobody admitted to breaking
+
+Entries hold any content: lists, code blocks, callouts, links.
+
+</Update>
+
+## Usage
+
+```mdx
+---
+title: Changelog
+date: "2026-07-11"
+---
+
+<Update label="2026-07-11" title="0.2.0">
+
+- What shipped, in plain words
+
+</Update>
+```
+
+## Props
+
+| Prop | Type | Effect |
+| --- | --- | --- |
+| `label` | string | The date or version stamp beside the entry |
+| `title` | string | A heading with its own anchor, so releases are linkable |
+
+This site's own [changelog](/changelog) is the living example.
+
+<Tip>
+Write entries for readers, not for git: what changed for them, not which internals moved. The commit log already exists.
+</Tip>

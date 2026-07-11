@@ -1,0 +1,46 @@
+---
+title: Operation embeds
+description: Embed one generated API operation, request console and all, inside any prose page.
+---
+
+# Operation embeds
+
+`<Operation>` renders one operation from your OpenAPI spec inside a prose page: the method bar, parameters, request body, responses, and the request console, generated from the same spec that powers your API reference. It exists for narrative pages that walk through an API while keeping every contract detail generated rather than hand-copied.
+
+## Usage
+
+Configure your spec once:
+
+```yaml title="docs.yaml"
+apiReference:
+  spec: openapi.json
+```
+
+Then embed an operation anywhere prose needs it:
+
+```mdx
+Creating a sandbox is one call:
+
+<Operation op="POST /sandboxes" />
+
+The response arrives when the guest agent reports healthy.
+```
+
+The `op` value is the method and path exactly as they appear in your spec. A reference that matches nothing renders a visible danger callout in place, so a renamed endpoint cannot silently ship stale docs.
+
+## Props
+
+| Prop | Type | Effect |
+| --- | --- | --- |
+| `op` | string | `METHOD /path` of the operation to embed |
+
+## When to embed, when not to
+
+Embeds shine on site-only narrative pages: a walkthrough that interleaves prose with three or four fully specified calls. Two cautions from real use:
+
+- A repository whose docs also render on GitHub should prefer plain Markdown there: component tags degrade to raw text outside Readsmith, while the generated [API reference](/configuration/settings-reference#apireference) provides the rich version on the site.
+- One operation per embed. A page of twenty embeds is an API reference wearing a costume; use `apiReference.layout: pages` and get navigation, search, and per-operation URLs for free.
+
+<Info>
+These docs configure their own API reference in an upcoming release, and this page will then carry a live embed of a real Readsmith endpoint. The syntax above is complete and current.
+</Info>

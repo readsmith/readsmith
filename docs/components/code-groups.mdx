@@ -1,0 +1,56 @@
+---
+title: Code groups
+description: The same snippet in several languages behind one switcher. Tab labels come from the code blocks' own titles.
+---
+
+# Code groups
+
+When one request exists in several languages, a `CodeGroup` stacks the blocks behind a switcher so the reader picks once and the page stays short. Each fenced block's `title` becomes its tab label.
+
+## A code group
+
+<CodeGroup>
+
+```bash title="cURL"
+curl https://api.example.com/v1/pets \
+  -H "X-Api-Key: $KEY"
+```
+
+```ts title="TypeScript"
+const res = await fetch("https://api.example.com/v1/pets", {
+  headers: { "X-Api-Key": process.env.KEY },
+});
+```
+
+```python title="Python"
+import requests
+
+res = requests.get(
+    "https://api.example.com/v1/pets",
+    headers={"X-Api-Key": KEY},
+)
+```
+
+</CodeGroup>
+
+## Usage
+
+````mdx
+<CodeGroup>
+
+```bash title="cURL"
+curl https://api.example.com/v1/pets
+```
+
+```ts title="TypeScript"
+const pets = await fetch(...)
+```
+
+</CodeGroup>
+````
+
+Leave a blank line between the component tags and the fences; the blocks are ordinary Markdown code blocks in every other way, including line emphasis meta.
+
+<Tip>
+Keep every variant genuinely equivalent: same request, same values, same result. A reader who switches tabs is checking their language against yours, and any drift between variants reads as a bug in the docs.
+</Tip>
