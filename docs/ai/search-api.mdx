@@ -1,0 +1,12 @@
+---
+title: Search API
+sidebarTitle: Search API
+openapi: "POST /_readsmith/api/search"
+---
+
+Search is the one endpoint most integrations start with, so it earns a page inside the guides as well as its row in the API tab. The generated contract below comes from this site's own OpenAPI spec; the console shows a working request against this very site.
+
+Two behaviors worth knowing beyond the contract:
+
+- The `degraded` flag reports runtime health, not configuration. A site with a working embedding key still answers `degraded: true` when the provider is down or rate limited, so a client can label keyword-only results instead of silently serving worse ones.
+- Agents wanting full passages should use the MCP server's `search_docs` tool, which requests complete chunk text; the snippet field here is a display preview, never model grounding.

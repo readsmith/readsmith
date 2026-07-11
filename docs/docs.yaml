@@ -29,6 +29,18 @@ tabs:
           - configuration/settings-reference
           - configuration/navigation
           - configuration/theming
+      - group: API reference
+        pages:
+          - api-reference-guide/setup
+          - api-reference-guide/hybrid-pages
+          - api-reference-guide/schema-pages
+      - group: AI and agents
+        pages:
+          - ai/search-and-ask
+          - ai/search-api
+          - ai/agent-outputs
+          - ai/mcp
+          - ai/agent-skills
   - tab: Components
     pages:
       - components/overview
@@ -54,5 +66,16 @@ tabs:
   - tab: Changelog
     pages:
       - changelog
-# The API tab (Readsmith's own HTTP surface, pages-mode reference) lands with
-# the authored openapi.json.
+# The API tab: Readsmith's own HTTP surface, rendered by its own pages-mode
+# reference. The recursion is the point.
+apiReference:
+  spec: openapi.json
+  layout: pages
+  label: API
+ai:
+  chat:
+    provider: gateway
+    model: openai/gpt-4o-mini
+  embedding:
+    provider: gateway
+    model: openai/text-embedding-3-small

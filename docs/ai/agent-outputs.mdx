@@ -1,0 +1,34 @@
+---
+title: llms.txt and Markdown export
+description: Every build projects the same content for machines: llms.txt, llms-full.txt, and every page as plain Markdown.
+---
+
+# llms.txt and Markdown export
+
+The build that renders pages for people also projects them for machines. Nothing here is a bolted-on export that can drift: the same content, projected at the same moment, served from the same bundle.
+
+## The directory: /llms.txt
+
+Every page, titled, described, and linked, in the llms.txt convention agents already know:
+
+```bash
+curl https://docs.readsmith.dev/llms.txt
+```
+
+Sites with an API reference append an endpoint index, so an agent discovers operations without crawling.
+
+## The full export: /llms-full.txt
+
+The entire site's content in one Markdown document, for tools that want everything in a single fetch. Hidden pages are excluded, exactly as they are everywhere else.
+
+## Every page as Markdown
+
+Each page serves its own Markdown projection under `/md/`: prefix any page's path with it, so this page's projection lives at `/md/ai/agent-outputs`. Operation pages include their generated contract in the projection, so an agent reading the Markdown sees the same parameters a human sees rendered.
+
+## What feeds these
+
+All three derive from each page's built Markdown projection, the same text that feeds search chunks and Ask AI grounding. When you fix a page, every surface updates in the same build; there is no export step to forget.
+
+<Info>
+The capability summary lives one level up: [Agent Skills](/ai/agent-skills) covers `/skill.md` and the `.well-known/skills` convention, which tell agents what they can do with your product rather than where the pages are.
+</Info>

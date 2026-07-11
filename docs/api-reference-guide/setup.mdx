@@ -1,0 +1,39 @@
+---
+title: OpenAPI setup
+description: Point Readsmith at an OpenAPI spec and get a generated reference. One continuous page or one page per operation.
+---
+
+# OpenAPI setup
+
+Readsmith generates your API reference from an OpenAPI document. The spec stays the source of truth for the contract; the generator turns it into pages with parameters, request bodies, responses, and a console showing a working request per operation.
+
+## Configure
+
+```yaml title="docs.yaml"
+apiReference:
+  spec: openapi.json
+  layout: pages
+```
+
+`spec` is the path to your OpenAPI file, relative to the content root. That is the whole setup; the reference builds with the site.
+
+## Two layouts
+
+| Layout | What renders |
+| --- | --- |
+| `single` (default) | One continuous reference page at `/api-reference`, every operation anchored by its id |
+| `pages` | One page per operation with its own URL, search chunks, and prev/next, plus an overview at the reference root |
+
+With `pages`, the reference joins the top-level tab row as a complete catalog: every operation appears, grouped by tag, each row carrying its method badge. This site's own [API tab](/api-reference) is exactly that, generated from the `openapi.json` in its content root.
+
+## The catalog stays complete
+
+An operation you document with an [authored hybrid page](/api-reference-guide/hybrid-pages) and place in your own navigation keeps that home, and the catalog still lists it, so the reference never has silent gaps. A row in the reference tab always opens in the reference tab; readers are never bounced into another section mid-browse.
+
+## Links and validation
+
+Links into the reference validate like everything else at build time: in single layout, `#operationId` anchors on the reference path are known to the link checker; in pages layout the operation pages are real pages and validate normally.
+
+<Tip>
+Start with `single` while your API is small; switch to `pages` when operations deserve their own URLs and search results. The config change is one line and no content moves.
+</Tip>

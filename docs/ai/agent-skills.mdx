@@ -1,0 +1,59 @@
+---
+title: Agent Skills
+description: "Your docs as a capability summary: skill.md and the .well-known/skills convention, generated into your repo and reviewed like code."
+---
+
+# Agent Skills
+
+`llms.txt` tells an agent where your pages are. An Agent Skill tells it what someone can *do* with your product: the capabilities, the hard facts, the footguns. Readsmith serves skills at the standard discovery paths and, unlike hosted platforms that generate them opaquely on their servers, writes the generated skill into your repository where you review it like code.
+
+## What gets served
+
+| Path | What it is |
+| --- | --- |
+| `/skill.md` | The skill itself, or a redirect to the index when a site has several |
+| `/.well-known/skills/index.json` | The discovery index: every skill, with its files |
+| `/.well-known/skills/<name>/SKILL.md` | Each skill's document, following the agentskills.io format |
+
+Try it on this site:
+
+```bash
+curl https://docs.readsmith.dev/skill.md
+```
+
+Every site serves something here from the first build: with nothing configured, a generated fallback lists the pages so the path is never empty.
+
+## Author a skill by hand
+
+Put skills in the reserved `.readsmith/skills/` directory at your content root, one directory per skill:
+
+```text
+docs/
+└── .readsmith/
+    └── skills/
+        └── my-product/
+            └── SKILL.md
+```
+
+`SKILL.md` needs `name` (matching its directory) and `description` frontmatter; the body is yours. Authored skills always win over anything generated.
+
+## Generate one from your docs
+
+```bash
+pnpm skill:generate --dry-run
+pnpm skill:generate --model anthropic/claude-sonnet-5
+```
+
+The generator reads your built site, extracts facts, procedures, and gotchas in a bounded map-reduce loop on your own model key, verifies every claimed link against pages that actually exist, and writes the result into `.readsmith/skills/` in your repository. You read the diff, edit what you disagree with, and commit; the next build serves it.
+
+Three behaviors keep this safe:
+
+- **It never overwrites your hand-written skill.** A file without the generated marker is refused unless you pass `--force`.
+- **It never runs during a build.** Builds stay deterministic; generation is an explicit command, and its cost is printed when it finishes.
+- **It skips when content has not changed**, so re-running is free.
+
+<Tip>
+Use a cheap model for the site's live Ask AI and your strongest model for `--model` here. Generation runs rarely, and the quality difference in the extracted gotchas is dramatic.
+</Tip>
+
+This site's own skill was produced exactly this way; [the file in the repository](https://github.com/readsmith/readsmith) carries the marker and the review history.

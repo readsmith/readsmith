@@ -1,0 +1,297 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Readsmith site API",
+    "version": "0.1.0",
+    "description": "The HTTP surface every self-hosted Readsmith site serves: hybrid search, streamed Ask AI answers, reader feedback, and capability discovery. All endpoints are public and rate limited per client IP; none require authentication."
+  },
+  "servers": [{ "url": "https://docs.readsmith.dev" }],
+  "tags": [
+    {
+      "name": "Search",
+      "description": "Hybrid full-text plus vector search over the site's content."
+    },
+    {
+      "name": "Ask AI",
+      "description": "Grounded, cited answers streamed over server-sent events."
+    },
+    { "name": "Meta", "description": "Health and capability discovery." }
+  ],
+  "paths": {
+    "/_readsmith/api/search": {
+      "post": {
+        "operationId": "searchDocs",
+        "tags": ["Search"],
+        "summary": "Search the docs",
+        "description": "Hybrid search over the site's indexed content: Postgres full-text fused with vector similarity when an embedding key is configured. No LLM is involved. `degraded: true` marks a response whose vector arm failed at request time, so the hits are keyword-only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ScopedQuery" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ranked hits, possibly degraded to keyword-only.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SearchResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/_readsmith/api/ask": {
+      "post": {
+        "operationId": "askDocs",
+        "tags": ["Ask AI"],
+        "summary": "Ask a question",
+        "description": "Answers a question from the site's own content, streaming the reply as a server-sent-events message stream. Answers cite the pages they came from; retrieval grounds the model on full chunks, never previews.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ScopedQuery" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer as a streamed UI message stream.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "Server-sent events carrying the streamed answer parts and citations."
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/_readsmith/api/ai/feedback": {
+      "post": {
+        "operationId": "sendFeedback",
+        "tags": ["Ask AI"],
+        "summary": "Rate an answer",
+        "description": "Records a reader's thumbs signal on a logged answer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Feedback" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "ok": { "type": "boolean" } },
+                  "required": ["ok"]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/_readsmith/api/ai/capabilities": {
+      "get": {
+        "operationId": "getCapabilities",
+        "tags": ["Meta"],
+        "summary": "Which AI features are live",
+        "description": "Reports the degradation ladder's current state, so clients show only the controls that will work. Always answers; a site with no database or keys reports all-off.",
+        "responses": {
+          "200": {
+            "description": "Current capabilities.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Capabilities" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/_readsmith/api/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": ["Meta"],
+        "summary": "Health check",
+        "description": "Liveness plus database reachability. A site running docs-only reports the database as disabled and stays healthy.",
+        "responses": {
+          "200": {
+            "description": "Healthy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Health" }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is configured but unreachable.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Health" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ScopedQuery": {
+        "type": "object",
+        "description": "A query, optionally scoped to a docs version and locale.",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "The search query or question."
+          },
+          "version": {
+            "type": "string",
+            "description": "Docs version to scope to. Defaults to current."
+          },
+          "locale": { "type": "string", "description": "Locale to scope to. Defaults to en." }
+        },
+        "required": ["query"]
+      },
+      "SearchHit": {
+        "type": "object",
+        "description": "One ranked passage.",
+        "properties": {
+          "id": { "type": "string", "description": "The chunk id." },
+          "kind": {
+            "type": "string",
+            "enum": ["doc", "endpoint"],
+            "description": "Prose chunk or API operation."
+          },
+          "title": { "type": "string", "description": "The page or operation title." },
+          "snippet": {
+            "type": "string",
+            "description": "A short preview for display. Never model grounding."
+          },
+          "text": {
+            "type": "string",
+            "description": "The full chunk text, present only when the caller asked for it."
+          },
+          "url": { "type": "string", "description": "Deep link to the passage." },
+          "anchor": {
+            "type": ["string", "null"],
+            "description": "The heading anchor within the page."
+          },
+          "headerPath": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "The heading trail above the passage."
+          },
+          "method": {
+            "type": ["string", "null"],
+            "description": "HTTP method, for endpoint hits."
+          },
+          "path": {
+            "type": ["string", "null"],
+            "description": "Operation path, for endpoint hits."
+          },
+          "score": { "type": "number", "description": "Fused relevance score." }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "snippet",
+          "url",
+          "anchor",
+          "headerPath",
+          "method",
+          "path",
+          "score"
+        ]
+      },
+      "SearchResult": {
+        "type": "object",
+        "properties": {
+          "hits": { "type": "array", "items": { "$ref": "#/components/schemas/SearchHit" } },
+          "degraded": {
+            "type": "boolean",
+            "description": "True when the vector arm was expected but failed at request time: these hits are keyword-only."
+          }
+        },
+        "required": ["hits", "degraded"]
+      },
+      "Capabilities": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "boolean",
+            "description": "Search is answering (a database is connected)."
+          },
+          "vectorSearch": {
+            "type": "boolean",
+            "description": "The semantic arm is configured (an embedding key resolves)."
+          },
+          "askAi": {
+            "type": "boolean",
+            "description": "Ask AI is enabled and a chat key resolves."
+          }
+        },
+        "required": ["search", "vectorSearch", "askAi"]
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["ok", "degraded"] },
+          "database": { "type": "string", "enum": ["up", "down", "disabled"] }
+        },
+        "required": ["status", "database"]
+      },
+      "Feedback": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "description": "The logged answer's id." },
+          "value": { "type": "integer", "description": "The signal: positive up, negative down." }
+        },
+        "required": ["id", "value"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } },
+        "required": ["error"]
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "The body failed validation.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "RateLimited": {
+        "description": "Over the per-IP limit for this surface. Retry after the window.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unavailable": {
+        "description": "This capability is not live on this site (no database or no key).",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    }
+  }
+}

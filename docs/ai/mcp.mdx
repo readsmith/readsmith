@@ -1,0 +1,44 @@
+---
+title: MCP server
+description: "Every site serves a Model Context Protocol endpoint: live search, endpoint lookup, and skill resources for connected agents."
+---
+
+# MCP server
+
+Every Readsmith site is an MCP server. An agent that connects gets live tools over the same indexes the site's own search uses, read-only by design: connected agents can look things up, never change them.
+
+## Connect
+
+The endpoint answers at `/mcp` over the streamable HTTP transport:
+
+```json title="An MCP client entry"
+{
+  "readsmith-docs": {
+    "url": "https://docs.readsmith.dev/mcp"
+  }
+}
+```
+
+If a docs page claims the `/mcp` URL, the endpoint stays reachable at its canonical `/_readsmith/mcp`, and `mcp.path` in config can set a different alias.
+
+## The tools
+
+| Tool | What it does |
+| --- | --- |
+| `search_docs` | Hybrid search returning ranked passages with full chunk text, sized for model grounding rather than display |
+| `list_endpoints` | The API reference's operations, optionally filtered by tag |
+| `get_endpoint` | One operation in full: parameters, request and response shapes |
+
+The endpoint tools appear when the site has an [API reference](/api-reference-guide/setup) configured.
+
+## Skill resources
+
+The site's [Agent Skills](/ai/agent-skills) are exposed as MCP resources, so a connected agent discovers and reads them without installing anything; the resource URIs mirror the HTTP paths under `/.well-known/skills/`.
+
+## Limits
+
+MCP requests share the site's rate limiting (60 per minute per IP by default) and the search quality floor: the same retrieval, the same full-chunk grounding.
+
+<Tip>
+Tell your users their agents can connect. One MCP entry pointed at your docs beats pasting pages into a context window, and it stays current because it queries the live index.
+</Tip>

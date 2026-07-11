@@ -1,0 +1,59 @@
+---
+title: Search and Ask AI
+description: Hybrid search and cited answers on your own model keys. Configuration, the degradation ladder, and rate limits.
+---
+
+# Search and Ask AI
+
+Every Readsmith site with a database gets search; add a model key and it gets semantic search and Ask AI, cited answers generated from your own content, on your own keys. Nothing routes through a third party you did not choose.
+
+## Configure
+
+```yaml title="docs.yaml"
+ai:
+  chat:
+    provider: anthropic
+    model: claude-haiku-4-5-20251001
+  embedding:
+    provider: openai
+    model: text-embedding-3-small
+```
+
+Providers: `openai`, `anthropic`, `google`, or `gateway` for chat; `openai`, `google`, or `gateway` for embeddings. Mix freely. Keys never go in config; they come from the [environment](/self-host/environment#ai-keys), role overrides first, provider-native variables second.
+
+## Index the content
+
+```bash
+pnpm ai:index
+```
+
+Indexing is incremental by content hash: unchanged chunks are never re-embedded, so a typo fix costs one chunk, not a re-index. Run it after deploys (the compose image runs migrations on boot; indexing is the one manual step in this release).
+
+## The degradation ladder
+
+Features turn off one at a time, never all at once:
+
+| Missing | What still works |
+| --- | --- |
+| Chat key | Everything except Ask AI |
+| Embedding key | Ask AI and keyword search; the semantic arm is off |
+| Provider down at request time | Search answers `degraded: true` with keyword results, and the UI says so |
+| Database | The whole docs site, agent outputs included; search and Ask AI are off |
+
+Clients can read the current state from [the capabilities endpoint](/api-reference) rather than guessing.
+
+## Grounding and citations
+
+Ask AI retrieves full chunks, never display previews, and answers cite the pages they came from. The same retrieval serves the on-site console and the MCP `search_docs` tool, so an agent and a reader get the same floor of quality.
+
+## Rate limits
+
+On by default: Ask AI 10 requests per minute, search 60, per client IP. Tune in config or override at deploy time:
+
+```yaml title="docs.yaml"
+ai:
+  limits:
+    ask: { limit: 20, windowMs: 60000 }
+```
+
+Ask AI spends your model credits; the tight default is intentional. The [security page](/self-host/security#rate-limits) covers the environment overrides and proxy IP handling.

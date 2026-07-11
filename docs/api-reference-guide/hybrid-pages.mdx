@@ -1,0 +1,40 @@
+---
+title: Hybrid pages
+description: "One frontmatter key turns any page into an operation page: your prose and the generated contract, together."
+---
+
+# Hybrid pages
+
+Generated references are complete but wordless; hand-written API docs age badly. A hybrid page is both: declare which operation a page documents, write prose like any other page, and the generated sections render around it.
+
+## Declare the operation
+
+```mdx title="ai/search-api.mdx"
+---
+title: Search API
+openapi: "POST /_readsmith/api/search"
+---
+
+Search is the one endpoint most integrations start with...
+```
+
+The reference is the method and path exactly as normalized from your spec. This site's own [Search API](/ai/search-api) page is this exact example, live.
+
+## What renders, in order
+
+Breadcrumbs and the tag eyebrow, the title, the method and path bar, the operation's description from the spec, **then your authored body**, then the generated sections: authorization, parameters, request body, responses, with the request console alongside. Prose introduces; generated material specifies. Neither duplicates the other.
+
+## The rules
+
+- **One operation, one page.** A second page claiming the same operation is a build error; the first claim wins deterministically.
+- **Titles fall back sensibly**: frontmatter `title`, else the operation's summary, else `METHOD /path`.
+- **Placement is yours.** Put the page anywhere in your navigation; the reference tab's catalog still lists the operation and opens it without leaving the tab.
+- **Mintlify compatibility**: the `openapi: "file.json POST /path"` file-token form is accepted, so scraped or migrated frontmatter works unchanged.
+
+## An empty body is valid
+
+A hybrid page with no prose renders exactly like a generated page. Scaffold every operation first, then write the prose that matters most, in whatever order the support tickets suggest.
+
+<Tip>
+Write the prose a spec cannot carry: why the endpoint exists, the gotcha that fills your support inbox, the sequence it participates in. The parameters table is already perfect; your paragraphs should say what it cannot.
+</Tip>

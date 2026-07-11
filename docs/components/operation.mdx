@@ -28,6 +28,12 @@ The response arrives when the guest agent reports healthy.
 
 The `op` value is the method and path exactly as they appear in your spec. A reference that matches nothing renders a visible danger callout in place, so a renamed endpoint cannot silently ship stale docs.
 
+## A live embed
+
+This site configures its own spec, so here is a real one: the capabilities endpoint every Readsmith site serves, embedded in this prose page:
+
+<Operation op="GET /_readsmith/api/ai/capabilities" />
+
 ## Props
 
 | Prop | Type | Effect |
@@ -41,6 +47,3 @@ Embeds shine on site-only narrative pages: a walkthrough that interleaves prose 
 - A repository whose docs also render on GitHub should prefer plain Markdown there: component tags degrade to raw text outside Readsmith, while the generated [API reference](/configuration/settings-reference#apireference) provides the rich version on the site.
 - One operation per embed. A page of twenty embeds is an API reference wearing a costume; use `apiReference.layout: pages` and get navigation, search, and per-operation URLs for free.
 
-<Info>
-These docs configure their own API reference in an upcoming release, and this page will then carry a live embed of a real Readsmith endpoint. The syntax above is complete and current.
-</Info>

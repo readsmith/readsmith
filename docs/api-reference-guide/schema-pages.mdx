@@ -1,0 +1,37 @@
+---
+title: Data-model pages
+description: Give a component schema its own documented page, fields generated from the spec, prose written by you.
+---
+
+# Data-model pages
+
+APIs are half operations, half shapes. A data-model page documents one component schema from your spec: your prose about what the model means, followed by a generated fields section with types, constraints, and nested structure.
+
+## Declare the schema
+
+```mdx title="models/pet.mdx"
+---
+title: The Pet model
+openapi-schema: "Pet"
+---
+
+A pet is the store's core record. Names are not unique;
+identity lives in the id.
+```
+
+The value names a schema under your spec's `components.schemas`. The Mintlify file-token form (`"openapi.json Pet"`) is accepted here too.
+
+## What renders
+
+A document-shaped page (no request console; a model has no request): title, the schema's own description as the lede, your authored body, then the generated fields, required flags, enums, and nested objects expandable in place.
+
+## The rules
+
+- **One schema, one page**; duplicates are a build error, first claim wins.
+- **Unknown names fail visibly**: a schema that matches nothing renders a danger callout in place, so a renamed model cannot silently ship stale docs.
+- **Titles fall back**: frontmatter `title`, else the schema's `title`, else its name.
+- **A page carrying both keys keeps the operation**: `openapi` wins over `openapi-schema`, with a build warning.
+
+<Tip>
+Give a model page to any schema readers reason about across endpoints: the core records, the webhook payloads, the error envelope. Request-specific shapes are already documented on their operations.
+</Tip>
