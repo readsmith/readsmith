@@ -15,6 +15,7 @@ import {
   listDeployments,
   loadDbConfig,
   repointCurrent,
+  runMigrations,
 } from "@readsmith/db";
 import { z } from "zod";
 
@@ -36,6 +37,7 @@ async function main() {
   }
   const db = createDb(loadDbConfig());
   try {
+    await runMigrations(db);
     if (arg === "--list") {
       const rows = await listDeployments(db, { siteId: SITE_ID, limit: 20 });
       if (rows.length === 0) {

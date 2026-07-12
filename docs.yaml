@@ -1,3 +1,8 @@
+# Readsmith's own docs, built from this repository's root: the config lives
+# here and points at docs/ as the content root (the monorepo convention), so a
+# git-connected deployment of this repo builds exactly the documentation site.
+content:
+  root: docs
 site:
   name: Readsmith
   url: https://readsmith.dev/docs

@@ -17,6 +17,7 @@ import {
   getGitConnection,
   hasDatabase,
   loadDbConfig,
+  runMigrations,
 } from "@readsmith/db";
 import {
   createGitHubProvider,
@@ -44,6 +45,7 @@ async function main() {
   const db = createDb(dbConfig);
   const log = createLogger(dbConfig.logLevel);
   try {
+    await runMigrations(db);
     const provider = createGitHubProvider({ auth: gitConfig.auth });
     const connection = await getGitConnection(db, SITE_ID);
     const repo = connection?.repo ?? gitConfig.repo;
