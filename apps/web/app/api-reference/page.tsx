@@ -6,6 +6,10 @@ import { type ShellSite, renderReferenceBody } from "@readsmith/components";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+// Regenerate at most once a minute: a published deployment (pointer flip)
+// becomes visible without an app rebuild; docs-only output is unchanged.
+export const revalidate = 60;
+
 export async function generateMetadata(): Promise<Metadata> {
   const ref = await getApiReference();
   const { name, url } = await getSite();

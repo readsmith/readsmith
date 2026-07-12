@@ -6,6 +6,9 @@ import { getSkills } from "@/lib/skills";
  * <domain>` and MCP-less agents start here.
  */
 export const dynamic = "force-static";
+// Regenerate at most once a minute: a published deployment (pointer flip)
+// becomes visible without an app rebuild; docs-only output is unchanged.
+export const revalidate = 60;
 
 export async function GET() {
   const skills = await getSkills();

@@ -6,6 +6,9 @@ import { siteBasePath } from "@readsmith/config";
  * /.well-known/skills (no file) land on the index instead of a 404.
  */
 export const dynamic = "force-static";
+// Regenerate at most once a minute: a published deployment (pointer flip)
+// becomes visible without an app rebuild; docs-only output is unchanged.
+export const revalidate = 60;
 
 export async function GET() {
   // Location headers are not basePath-scoped by Next; prefix explicitly.

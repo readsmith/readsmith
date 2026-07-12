@@ -8,16 +8,26 @@ import {
   deleteChunksNotIn,
   findSpecByHash,
   ftsSearchChunks,
+  getCurrentDeployment,
+  getGitConnection,
   getSite,
   insertAiQuery,
+  insertDeployment,
   insertEndpoints,
   insertSpec,
   listChunkHashes,
+  listDeployments,
   listEndpointsBySpec,
+  markDeploymentFailed,
+  pruneSuperseded,
+  publishDeployment,
   purgeAiQueries,
+  repointCurrent,
   searchEndpoints,
   setAiQueryFeedback,
+  setLastSyncedSha,
   upsertDocChunks,
+  upsertGitConnection,
   upsertSite,
   vectorSearchChunks,
 } from "../src/repos.js";
@@ -428,5 +438,161 @@ describe.skipIf(!DATABASE_URL)("persistence backbone (integration)", () => {
     expect(f.map((h) => h.id)).toContain("sca");
     expect(f.map((h) => h.id)).not.toContain("scb"); // no keyword match
     expect(f.map((h) => h.id)).not.toContain("scc"); // fr filtered out
+  });
+});
+
+// M2 migration 0003: git connections + deployments (DM-1..DM-4).
+describe.skipIf(!DATABASE_URL)("git connections + deployments (integration)", () => {
+  let db: Db;
+  const SITE = "deploy-test";
+
+  beforeAll(async () => {
+    db = createDb(config());
+    await runMigrations(db);
+    await upsertSite(db, { id: SITE, name: "Deploy Test" });
+    // Idempotent across runs on a persistent test database.
+    await db.query(sql`DELETE FROM app.deployments WHERE site_id = ${SITE}`);
+    await db.query(sql`DELETE FROM app.git_connections WHERE site_id = ${SITE}`);
+  });
+
+  afterAll(async () => {
+    await db?.close();
+  });
+
+  const openDeployment = (sha: string) =>
+    insertDeployment(db, { siteId: SITE, gitRef: "refs/heads/main", commitSha: sha });
+
+  it("upserts a connection per (site, repo) and records the synced sha", async () => {
+    const first = await upsertGitConnection(db, {
+      id: "conn-1",
+      siteId: SITE,
+      provider: "github",
+      installationId: null, // PAT mode: no installation
+      repo: "acme/docs",
+      branch: "main",
+    });
+    expect(first.installation_id).toBeNull();
+
+    const rebound = await upsertGitConnection(db, {
+      id: "conn-ignored", // conflict target keeps the original id
+      siteId: SITE,
+      provider: "github",
+      installationId: "12345",
+      repo: "acme/docs",
+      branch: "docs",
+    });
+    expect(rebound.id).toBe("conn-1");
+    expect(rebound.installation_id).toBe("12345");
+    expect(rebound.branch).toBe("docs");
+
+    await setLastSyncedSha(db, { id: "conn-1", sha: "abc123" });
+    const fetched = await getGitConnection(db, SITE);
+    expect(fetched?.last_synced_sha).toBe("abc123");
+  });
+
+  it("allocates a per-site monotonic build_seq and a deterministic id", async () => {
+    const a = await openDeployment("sha-a");
+    const b = await openDeployment("sha-b");
+    expect(b.build_seq).toBe(a.build_seq + 1);
+    expect(a.id).toBe(`dep:${SITE}:${a.build_seq}`);
+    expect(a.status).toBe("building");
+    expect(a.is_current).toBe(false);
+  });
+
+  it("publishes atomically: ready + current, and dedupes nothing away", async () => {
+    const dep = await openDeployment("sha-pub");
+    const { flipped, row } = await publishDeployment(db, {
+      id: dep.id,
+      bundleRef: "bundles/hash-pub.json",
+      bundleHash: "hash-pub",
+    });
+    expect(flipped).toBe(true);
+    expect(row.status).toBe("ready");
+    expect(row.is_current).toBe(true);
+    const current = await getCurrentDeployment(db, { siteId: SITE });
+    expect(current?.id).toBe(dep.id);
+  });
+
+  it("supersede guard: a late-finishing older build can never flip the pointer backward", async () => {
+    const older = await openDeployment("sha-old");
+    const newer = await openDeployment("sha-new");
+    // The newer build finishes and publishes first.
+    await publishDeployment(db, {
+      id: newer.id,
+      bundleRef: "bundles/hash-new.json",
+      bundleHash: "hash-new",
+    });
+    // The older build finishes late: it must land as superseded, not current.
+    const { flipped, row } = await publishDeployment(db, {
+      id: older.id,
+      bundleRef: "bundles/hash-old.json",
+      bundleHash: "hash-old",
+    });
+    expect(flipped).toBe(false);
+    expect(row.status).toBe("superseded");
+    const current = await getCurrentDeployment(db, { siteId: SITE });
+    expect(current?.id).toBe(newer.id);
+  });
+
+  it("enforces one current deployment per (site, version) at the index level", async () => {
+    await expect(
+      db.query(sql`
+        UPDATE app.deployments SET is_current = true
+        WHERE site_id = ${SITE} AND NOT is_current AND status = 'superseded'`),
+    ).rejects.toThrow();
+  });
+
+  it("rollback repoints to a prior ready deployment; unpublishable targets are rejected", async () => {
+    const prior = await openDeployment("sha-prior");
+    await publishDeployment(db, {
+      id: prior.id,
+      bundleRef: "bundles/hash-prior.json",
+      bundleHash: "hash-prior",
+    });
+    const latest = await openDeployment("sha-latest");
+    await publishDeployment(db, {
+      id: latest.id,
+      bundleRef: "bundles/hash-latest.json",
+      bundleHash: "hash-latest",
+    });
+    expect((await getCurrentDeployment(db, { siteId: SITE }))?.id).toBe(latest.id);
+
+    const rolled = await repointCurrent(db, { siteId: SITE, deploymentId: prior.id });
+    expect(rolled.id).toBe(prior.id);
+    expect(rolled.is_current).toBe(true);
+    expect((await getCurrentDeployment(db, { siteId: SITE }))?.id).toBe(prior.id);
+
+    // A failed build has no artifact: it can never become current.
+    const failed = await openDeployment("sha-fail");
+    await markDeploymentFailed(db, failed.id);
+    await expect(repointCurrent(db, { siteId: SITE, deploymentId: failed.id })).rejects.toThrow(
+      /not a publishable snapshot/,
+    );
+  });
+
+  it("prunes old snapshots but never the current one, and keeps shared artifact refs", async () => {
+    // A new deployment sharing the artifact of an old one (identical content dedupe).
+    const shared = await openDeployment("sha-shared");
+    await publishDeployment(db, {
+      id: shared.id,
+      bundleRef: "bundles/hash-pub.json", // same ref as the earlier sha-pub deployment
+      bundleHash: "hash-pub",
+    });
+
+    const { prunedIds, unreferencedRefs } = await pruneSuperseded(db, {
+      siteId: SITE,
+      keepLast: 1,
+    });
+    expect(prunedIds.length).toBeGreaterThan(0);
+
+    const current = await getCurrentDeployment(db, { siteId: SITE });
+    expect(current?.id).toBe(shared.id);
+    expect(prunedIds).not.toContain(shared.id);
+    // hash-pub is still referenced by the current deployment: never deletable.
+    expect(unreferencedRefs).not.toContain("bundles/hash-pub.json");
+
+    const history = await listDeployments(db, { siteId: SITE, limit: 50 });
+    const pruned = history.filter((d) => d.status === "pruned");
+    expect(pruned.map((d) => d.id)).toEqual(expect.arrayContaining(prunedIds));
   });
 });

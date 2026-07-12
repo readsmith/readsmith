@@ -3,7 +3,9 @@ import {
   type AiQueryRow,
   type ApiEndpointRow,
   type ApiSpecRow,
+  type DeploymentRow,
   type DocChunkRow,
+  type GitConnectionRow,
   type NewAiQuery,
   type NewDocChunk,
   type NewEndpoint,
@@ -12,7 +14,9 @@ import {
   aiQueryRowSchema,
   apiEndpointRowSchema,
   apiSpecRowSchema,
+  deploymentRowSchema,
   docChunkRowSchema,
+  gitConnectionRowSchema,
   searchChunkRowSchema,
   siteRowSchema,
 } from "./schema.js";
@@ -271,4 +275,220 @@ export async function purgeAiQueries(db: Db, input: { olderThanDays: number }): 
     WHERE created_at < now() - make_interval(days => ${input.olderThanDays})
     RETURNING id`);
   return res.length;
+}
+
+// --- M2: git connections + deployments ---
+
+const GIT_CONNECTION_COLUMNS = sql`id, site_id, provider, installation_id, repo, branch,
+  last_synced_sha, created_at, updated_at`;
+
+const DEPLOYMENT_COLUMNS = sql`id, site_id, version_id, kind, git_ref, commit_sha, build_seq,
+  bundle_ref, bundle_hash, url, status, is_current, created_at, published_at, expires_at`;
+
+export interface NewGitConnection {
+  id: string;
+  siteId: string;
+  provider: string;
+  /** Null for PAT connections (no App installation exists). */
+  installationId: string | null;
+  repo: string;
+  branch: string;
+}
+
+/** One connection per (site, repo); re-binding refreshes provider/installation/branch. */
+export async function upsertGitConnection(
+  db: Db,
+  input: NewGitConnection,
+): Promise<GitConnectionRow> {
+  const row = await db.one(sql`
+    INSERT INTO app.git_connections (id, site_id, provider, installation_id, repo, branch)
+    VALUES (${input.id}, ${input.siteId}, ${input.provider}, ${input.installationId},
+            ${input.repo}, ${input.branch})
+    ON CONFLICT (site_id, repo) DO UPDATE SET
+      provider = EXCLUDED.provider,
+      installation_id = EXCLUDED.installation_id,
+      branch = EXCLUDED.branch,
+      updated_at = now()
+    RETURNING ${GIT_CONNECTION_COLUMNS}`);
+  return gitConnectionRowSchema.parse(row);
+}
+
+/** The site's connection (v1: at most one; newest wins if several exist). */
+export async function getGitConnection(db: Db, siteId: string): Promise<GitConnectionRow | null> {
+  const row = await db.one(sql`
+    SELECT ${GIT_CONNECTION_COLUMNS} FROM app.git_connections
+    WHERE site_id = ${siteId}
+    ORDER BY updated_at DESC
+    LIMIT 1`);
+  return row ? gitConnectionRowSchema.parse(row) : null;
+}
+
+/** Record the last commit actually built (also the polling comparand). */
+export async function setLastSyncedSha(db: Db, input: { id: string; sha: string }): Promise<void> {
+  await db.query(sql`
+    UPDATE app.git_connections
+    SET last_synced_sha = ${input.sha}, updated_at = now()
+    WHERE id = ${input.id}`);
+}
+
+export interface NewDeployment {
+  siteId: string;
+  versionId?: string;
+  kind?: string;
+  gitRef: string | null;
+  commitSha: string;
+}
+
+/**
+ * Open a deployment for a starting build: allocates the per-site monotonic
+ * `build_seq` under a site-level lock (so two concurrent builds cannot race the
+ * same sequence) and inserts the row as `building`. The id derives from the
+ * sequence, so it is deterministic and human-traceable.
+ */
+export async function insertDeployment(db: Db, input: NewDeployment): Promise<DeploymentRow> {
+  return db.tx(async (tx) => {
+    await tx.query(sql`SELECT id FROM app.sites WHERE id = ${input.siteId} FOR UPDATE`);
+    const next = await tx.one<{ seq: number }>(sql`
+      SELECT coalesce(max(build_seq), 0) + 1 AS seq
+      FROM app.deployments WHERE site_id = ${input.siteId}`);
+    const seq = next?.seq ?? 1;
+    const id = `dep:${input.siteId}:${seq}`;
+    const row = await tx.one(sql`
+      INSERT INTO app.deployments (id, site_id, version_id, kind, git_ref, commit_sha, build_seq, status)
+      VALUES (${id}, ${input.siteId}, ${input.versionId ?? "current"}, ${input.kind ?? "production"},
+              ${input.gitRef}, ${input.commitSha}, ${seq}, 'building')
+      RETURNING ${DEPLOYMENT_COLUMNS}`);
+    return deploymentRowSchema.parse(row);
+  });
+}
+
+export async function markDeploymentFailed(db: Db, id: string): Promise<void> {
+  await db.query(sql`UPDATE app.deployments SET status = 'failed' WHERE id = ${id}`);
+}
+
+/**
+ * Atomic publish with the supersede guard: record the verified artifact, then
+ * flip `is_current` only if no *newer* build (higher `build_seq`) already holds
+ * the pointer. A stale build that finishes late lands as `superseded` and never
+ * moves the pointer backward. Runs under a site-level lock; the partial unique
+ * index on (site_id, version_id) WHERE is_current backstops any race.
+ */
+export async function publishDeployment(
+  db: Db,
+  input: { id: string; bundleRef: string; bundleHash: string },
+): Promise<{ flipped: boolean; row: DeploymentRow }> {
+  return db.tx(async (tx) => {
+    const target = await tx.one<{ site_id: string; version_id: string; build_seq: number }>(sql`
+      SELECT site_id, version_id, build_seq FROM app.deployments WHERE id = ${input.id}`);
+    if (!target) throw new Error(`unknown deployment: ${input.id}`);
+    await tx.query(sql`SELECT id FROM app.sites WHERE id = ${target.site_id} FOR UPDATE`);
+    await tx.query(sql`
+      UPDATE app.deployments
+      SET bundle_ref = ${input.bundleRef}, bundle_hash = ${input.bundleHash}, published_at = now()
+      WHERE id = ${input.id}`);
+    const newer = await tx.one<{ id: string }>(sql`
+      SELECT id FROM app.deployments
+      WHERE site_id = ${target.site_id} AND version_id = ${target.version_id}
+        AND is_current AND build_seq > ${target.build_seq}`);
+    if (newer) {
+      const row = await tx.one(sql`
+        UPDATE app.deployments SET status = 'superseded' WHERE id = ${input.id}
+        RETURNING ${DEPLOYMENT_COLUMNS}`);
+      return { flipped: false, row: deploymentRowSchema.parse(row) };
+    }
+    await tx.query(sql`
+      UPDATE app.deployments SET is_current = false
+      WHERE site_id = ${target.site_id} AND version_id = ${target.version_id} AND is_current`);
+    const row = await tx.one(sql`
+      UPDATE app.deployments SET is_current = true, status = 'ready' WHERE id = ${input.id}
+      RETURNING ${DEPLOYMENT_COLUMNS}`);
+    return { flipped: true, row: deploymentRowSchema.parse(row) };
+  });
+}
+
+/**
+ * Rollback (and forward redeploy): explicitly repoint `is_current` at a prior
+ * `ready` snapshot. Deliberately not guarded by `build_seq` - moving backward is
+ * the point - but only a `ready` row with an artifact can become current.
+ */
+export async function repointCurrent(
+  db: Db,
+  input: { siteId: string; versionId?: string; deploymentId: string },
+): Promise<DeploymentRow> {
+  const versionId = input.versionId ?? "current";
+  return db.tx(async (tx) => {
+    await tx.query(sql`SELECT id FROM app.sites WHERE id = ${input.siteId} FOR UPDATE`);
+    const target = await tx.one(sql`
+      SELECT ${DEPLOYMENT_COLUMNS} FROM app.deployments
+      WHERE id = ${input.deploymentId} AND site_id = ${input.siteId} AND version_id = ${versionId}`);
+    if (!target) throw new Error(`unknown deployment: ${input.deploymentId}`);
+    const parsed = deploymentRowSchema.parse(target);
+    if (parsed.status !== "ready" || parsed.bundle_ref === null) {
+      throw new Error(
+        `deployment ${input.deploymentId} is not a publishable snapshot (status: ${parsed.status})`,
+      );
+    }
+    await tx.query(sql`
+      UPDATE app.deployments SET is_current = false
+      WHERE site_id = ${input.siteId} AND version_id = ${versionId} AND is_current`);
+    const row = await tx.one(sql`
+      UPDATE app.deployments SET is_current = true WHERE id = ${input.deploymentId}
+      RETURNING ${DEPLOYMENT_COLUMNS}`);
+    return deploymentRowSchema.parse(row);
+  });
+}
+
+export async function getCurrentDeployment(
+  db: Db,
+  input: { siteId: string; versionId?: string },
+): Promise<DeploymentRow | null> {
+  const row = await db.one(sql`
+    SELECT ${DEPLOYMENT_COLUMNS} FROM app.deployments
+    WHERE site_id = ${input.siteId} AND version_id = ${input.versionId ?? "current"} AND is_current`);
+  return row ? deploymentRowSchema.parse(row) : null;
+}
+
+/** Deployment history, newest first (the rollback list). */
+export async function listDeployments(
+  db: Db,
+  input: { siteId: string; limit?: number },
+): Promise<DeploymentRow[]> {
+  const rows = await db.query(sql`
+    SELECT ${DEPLOYMENT_COLUMNS} FROM app.deployments
+    WHERE site_id = ${input.siteId}
+    ORDER BY build_seq DESC
+    LIMIT ${input.limit ?? 20}`);
+  return rows.map((r) => deploymentRowSchema.parse(r));
+}
+
+/**
+ * Retention: mark non-current rollback candidates beyond the `keepLast` most
+ * recent as `pruned`, and report which artifact refs are no longer referenced by
+ * any live row (content-addressed refs dedupe, so a ref shared with a live or
+ * current deployment must never be deleted). The current deployment is never
+ * pruned. Artifact deletion is the caller's concern.
+ */
+export async function pruneSuperseded(
+  db: Db,
+  input: { siteId: string; keepLast: number },
+): Promise<{ prunedIds: string[]; unreferencedRefs: string[] }> {
+  return db.tx(async (tx) => {
+    await tx.query(sql`SELECT id FROM app.sites WHERE id = ${input.siteId} FOR UPDATE`);
+    const candidates = await tx.query<{ id: string }>(sql`
+      SELECT id FROM app.deployments
+      WHERE site_id = ${input.siteId} AND NOT is_current AND status IN ('ready', 'superseded')
+      ORDER BY build_seq DESC
+      OFFSET ${input.keepLast}`);
+    const ids = candidates.map((c) => c.id);
+    if (ids.length === 0) return { prunedIds: [], unreferencedRefs: [] };
+    await tx.query(sql`
+      UPDATE app.deployments SET status = 'pruned' WHERE id = ANY(${ids})`);
+    const refs = await tx.query<{ bundle_ref: string }>(sql`
+      SELECT DISTINCT bundle_ref FROM app.deployments
+      WHERE id = ANY(${ids}) AND bundle_ref IS NOT NULL
+        AND bundle_ref NOT IN (
+          SELECT bundle_ref FROM app.deployments
+          WHERE site_id = ${input.siteId} AND status <> 'pruned' AND bundle_ref IS NOT NULL)`);
+    return { prunedIds: ids, unreferencedRefs: refs.map((r) => r.bundle_ref) };
+  });
 }

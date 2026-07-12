@@ -1,16 +1,20 @@
 import { join } from "node:path";
+import { type CurrentBundleLoader, createCurrentBundleLoader } from "@readsmith/git";
 import type { SiteBuild } from "@readsmith/mdx";
 import type { NormalizedSpec } from "@readsmith/model";
 import { createBundleStore, resolveStorageConfig } from "@readsmith/storage";
+import { getDb } from "./db";
 
 /**
- * Server-only. Reads the precompiled content bundle (produced by
- * scripts/build-content.mjs as a prebuild step) through the BundleStore port.
- * Next is the serving shell here: the compile happened before the build, so the
- * routes just read one immutable artifact. The store key is fixed and the local
- * driver root is a static subfolder, so the content pipeline is never traced
- * into the route graph. Swapping to an S3-compatible driver later touches only
- * the store construction, not any route.
+ * Server-only. Resolves the content bundle the shell serves, through the
+ * BundleStore port. With a database, the current *deployment* wins: the
+ * `is_current` pointer names an immutable content-addressed artifact, checked
+ * at most once per TTL (never Postgres per page view), and rollback is just
+ * that pointer moving. Without a database, or before any deployment exists,
+ * this reads the locally-compiled `bundle.json` exactly as before - the
+ * docs-only path is byte-identical. The store key layout is fixed and the
+ * local driver root is a static subfolder, so the content pipeline is never
+ * traced into the route graph.
  */
 export interface Site {
   build: SiteBuild;
@@ -50,13 +54,24 @@ interface Bundle {
 }
 
 const BUNDLE_KEY = "bundle.json";
+const SITE_ID = "default";
 const store = createBundleStore(
   resolveStorageConfig(process.env, join(process.cwd(), ".readsmith")),
 );
 
 let cached: Promise<Bundle> | null = null;
+let loader: CurrentBundleLoader | null | undefined;
+let parsedCurrent: { ref: string; bundle: Bundle } | null = null;
 
-function loadBundle(): Promise<Bundle> {
+function currentLoader(): CurrentBundleLoader | null {
+  if (loader === undefined) {
+    const db = getDb();
+    loader = db ? createCurrentBundleLoader({ db, store, siteId: SITE_ID }) : null;
+  }
+  return loader;
+}
+
+function loadLocalBundle(): Promise<Bundle> {
   if (!cached) {
     cached = store.get(BUNDLE_KEY).then((bytes) => {
       if (!bytes) {
@@ -66,6 +81,18 @@ function loadBundle(): Promise<Bundle> {
     });
   }
   return cached;
+}
+
+async function loadBundle(): Promise<Bundle> {
+  const current = await currentLoader()?.load();
+  if (current) {
+    // Parse once per deployment: the artifact behind a ref is immutable.
+    if (parsedCurrent?.ref !== current.ref) {
+      parsedCurrent = { ref: current.ref, bundle: JSON.parse(current.json) as Bundle };
+    }
+    return parsedCurrent.bundle;
+  }
+  return loadLocalBundle();
 }
 
 export async function getSite(): Promise<Site> {

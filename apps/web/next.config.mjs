@@ -111,6 +111,8 @@ const nextConfig = {
     "pg",
     "pg-boss",
     "@readsmith/db",
+    "@readsmith/git",
+    "@readsmith/build",
     "@readsmith/ai",
     "@readsmith/cache",
     "@readsmith/api-reference",

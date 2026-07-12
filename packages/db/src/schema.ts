@@ -150,3 +150,58 @@ export interface NewAiQuery {
   costEstimate: number | null;
   latencyMs: number | null;
 }
+
+// --- M2: git connections + deployments ---
+
+/**
+ * A connected git repository (v1: one per site). Credentials never live here;
+ * the App key, webhook secret, or PAT stay in the environment.
+ * `installation_id` is null for PAT connections.
+ */
+export const gitConnectionRowSchema = z.object({
+  id: z.string(),
+  site_id: z.string(),
+  provider: z.string(),
+  installation_id: z.string().nullable(),
+  repo: z.string(),
+  branch: z.string(),
+  last_synced_sha: z.string().nullable(),
+  created_at: z.date(),
+  updated_at: z.date(),
+});
+export type GitConnectionRow = z.infer<typeof gitConnectionRowSchema>;
+
+export const deploymentStatusSchema = z.enum([
+  "building",
+  "ready",
+  "failed",
+  "superseded",
+  "pruned",
+]);
+export type DeploymentStatus = z.infer<typeof deploymentStatusSchema>;
+
+/**
+ * An immutable compiled snapshot of the site. `bundle_ref` is the content-
+ * addressed artifact key (identical content dedupes across rows); `build_seq`
+ * is per-site monotonic and drives the publish guard: the current pointer only
+ * ever moves to a strictly newer sequence, except through an explicit rollback
+ * repoint.
+ */
+export const deploymentRowSchema = z.object({
+  id: z.string(),
+  site_id: z.string(),
+  version_id: z.string(),
+  kind: z.string(),
+  git_ref: z.string().nullable(),
+  commit_sha: z.string(),
+  build_seq: z.number().int(),
+  bundle_ref: z.string().nullable(),
+  bundle_hash: z.string().nullable(),
+  url: z.string().nullable(),
+  status: deploymentStatusSchema,
+  is_current: z.boolean(),
+  created_at: z.date(),
+  published_at: z.date().nullable(),
+  expires_at: z.date().nullable(),
+});
+export type DeploymentRow = z.infer<typeof deploymentRowSchema>;

@@ -74,6 +74,9 @@ importers:
       '@readsmith/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@readsmith/git':
+        specifier: workspace:*
+        version: link:../../packages/git
       '@readsmith/mdx':
         specifier: workspace:*
         version: link:../../packages/mdx
@@ -252,6 +255,24 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.20.0
+
+  packages/git:
+    dependencies:
+      '@readsmith/build':
+        specifier: workspace:*
+        version: link:../build
+      '@readsmith/db':
+        specifier: workspace:*
+        version: link:../db
+      '@readsmith/model':
+        specifier: workspace:*
+        version: link:../model
+      '@readsmith/storage':
+        specifier: workspace:*
+        version: link:../storage
+      zod:
+        specifier: ^4.0.5
+        version: 4.4.3
 
   packages/mdx:
     dependencies:

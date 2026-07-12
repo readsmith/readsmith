@@ -8,6 +8,10 @@ interface Params {
   slug?: string[];
 }
 
+// Regenerate at most once a minute: a published deployment (pointer flip)
+// becomes visible without an app rebuild; docs-only output is unchanged.
+export const revalidate = 60;
+
 export async function generateStaticParams(): Promise<Params[]> {
   const { build, apiReference } = await getSite();
   // The reference ROOT belongs to the dedicated route (a static segment wins

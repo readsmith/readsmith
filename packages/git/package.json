@@ -1,0 +1,29 @@
+{
+  "name": "@readsmith/git",
+  "version": "0.0.0",
+  "license": "FSL-1.1-MIT",
+  "private": true,
+  "type": "module",
+  "description": "Git-driven deployments: the provider and executor ports, the site.build orchestration, and current-deployment resolution.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@readsmith/build": "workspace:*",
+    "@readsmith/db": "workspace:*",
+    "@readsmith/model": "workspace:*",
+    "@readsmith/storage": "workspace:*",
+    "zod": "^4.0.5"
+  }
+}

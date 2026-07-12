@@ -14,6 +14,7 @@
     "ai:index": "node scripts/ai-index.mjs",
     "ai:reindex": "node scripts/ai-index.mjs --reindex",
     "skill:generate": "node scripts/generate-skill.mjs",
+    "site:rollback": "node scripts/site-rollback.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome check ."
   },
@@ -30,6 +31,7 @@
     "@readsmith/components": "workspace:*",
     "@readsmith/config": "workspace:*",
     "@readsmith/db": "workspace:*",
+    "@readsmith/git": "workspace:*",
     "@readsmith/mdx": "workspace:*",
     "@readsmith/model": "workspace:*",
     "@readsmith/storage": "workspace:*",

@@ -1,0 +1,4 @@
+site:
+  name: Petstore Docs
+apiReference:
+  spec: openapi.json
