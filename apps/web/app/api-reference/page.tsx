@@ -1,8 +1,6 @@
 import { HydrateClient } from "@/components/hydrate-client";
-import { getApiReference } from "@/lib/api-reference";
-import { renderDocPage } from "@/lib/render-page";
-import { getSite } from "@/lib/site";
 import { type ShellSite, renderReferenceBody } from "@readsmith/components";
+import { getApiReference, getSite, renderDocPage } from "@readsmith/serve";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 

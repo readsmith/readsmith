@@ -8,6 +8,23 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.5.0" title="The serving core is a package">
+
+Everything the web app does at request time (site resolution, bundle
+loading, the AI and git services, boot, and every text route from
+`llms.txt` to the MCP endpoint) now lives in one server-only package,
+`@readsmith/serve`. The Next app is a thin composition over it.
+
+- **Same site, byte for byte**: every route's output is verified identical
+  to 0.4.0; nothing changes for readers or operators
+- **Compose your own host**: a custom server (or a future multi-tenant one)
+  imports the same handlers and services the bundled app uses, instead of
+  forking route files
+- One shared instance of the database pool and site caches across the whole
+  server, where the bundler previously duplicated them per route graph
+
+</Update>
+
 <Update label="0.4.0" title="Analytics, your way">
 
 Your analytics tool on your docs with one config block, plus identity-free

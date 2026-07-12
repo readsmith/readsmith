@@ -1,13 +1,8 @@
-import { getSite } from "@/lib/site";
+import { rssXmlRoute } from "@readsmith/serve";
 
+// Static + ISR (A-8): a published deployment (pointer flip) becomes visible
+// within a minute without an app rebuild; static installs serve from cache.
 export const dynamic = "force-static";
-// Regenerate at most once a minute: a published deployment (pointer flip)
-// becomes visible without an app rebuild; docs-only output is unchanged.
 export const revalidate = 60;
 
-export async function GET() {
-  const { build } = await getSite();
-  return new Response(build.rss, {
-    headers: { "content-type": "application/rss+xml; charset=utf-8" },
-  });
-}
+export const GET = rssXmlRoute.GET;

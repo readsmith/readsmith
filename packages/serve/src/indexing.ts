@@ -16,8 +16,8 @@ import {
   upsertSite,
 } from "@readsmith/db";
 import { z } from "zod";
-import type { ApiReference, Site } from "./site";
-import { getApiReference, getSite } from "./site";
+import type { ApiReference, Site } from "./site.js";
+import { getApiReference, getSite } from "./site.js";
 
 /**
  * `embed.index` as a pg-boss job: re-index the compiled bundle's chunks into

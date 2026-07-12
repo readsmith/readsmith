@@ -1,5 +1,5 @@
-import { getSite } from "@/lib/site";
 import type { Skill } from "@readsmith/mdx";
+import { getSite } from "./site.js";
 
 /**
  * Server-only. The bundle's agent skills (assembly guarantees at least the

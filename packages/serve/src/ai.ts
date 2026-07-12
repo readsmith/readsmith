@@ -25,9 +25,9 @@ import type { NormalizedSpec, SearchFilters } from "@readsmith/model";
 import { InMemoryEventStore } from "@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { siteBasePath, siteOrigin } from "@readsmith/config";
-import { logSearchQuery } from "./analytics";
-import { getDb } from "./db";
-import { getApiReference, getSite } from "./site";
+import { logSearchQuery } from "./analytics.js";
+import { getDb } from "./db.js";
+import { getApiReference, getSite } from "./site.js";
 
 /**
  * Composes the AI services the API routes call, from @readsmith/ai (provider,
@@ -167,7 +167,7 @@ async function build(): Promise<AiServices | null> {
       onsessioninitialized: (id) => {
         sessions.set(id, transport);
       },
-      onsessionclosed: (id) => {
+      onsessionclosed: (id: string) => {
         sessions.delete(id);
       },
     });

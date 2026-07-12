@@ -16,7 +16,7 @@ import {
   siteBuildJob,
   siteBuildSingletonKey,
 } from "@readsmith/git";
-import { getDb } from "./db";
+import { getDb } from "./db.js";
 
 /**
  * Server-only composition of the git integration. Config resolves once from

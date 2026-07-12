@@ -1,6 +1,6 @@
 import { type RateLimiter, createRateLimiter, resolveRateLimitConfig } from "@readsmith/api";
 import { createCache, resolveCacheConfig } from "@readsmith/cache";
-import { getSite } from "./site";
+import { getSite } from "./site.js";
 
 /**
  * The process-wide rate limiter, shared by the JSON API and the MCP endpoint so both

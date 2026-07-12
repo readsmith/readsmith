@@ -1,28 +1,8 @@
-import { getApiReference } from "@/lib/api-reference";
-import { getSite } from "@/lib/site";
+import { sitemapXmlRoute } from "@readsmith/serve";
 
+// Static + ISR (A-8): a published deployment (pointer flip) becomes visible
+// within a minute without an app rebuild; static installs serve from cache.
 export const dynamic = "force-static";
-// Regenerate at most once a minute: a published deployment (pointer flip)
-// becomes visible without an app rebuild; docs-only output is unchanged.
 export const revalidate = 60;
 
-export async function GET() {
-  const { build, url } = await getSite();
-  const ref = await getApiReference();
-
-  let xml = build.sitemap;
-  if (ref) {
-    // Add the API reference page just before the closing tag.
-    const base = url ? url.replace(/\/+$/, "") : "";
-    const loc = `${base}${ref.path}`;
-    xml = xml.replace("</urlset>", `  <url><loc>${escapeXml(loc)}</loc></url>\n</urlset>`);
-  }
-
-  return new Response(xml, {
-    headers: { "content-type": "application/xml; charset=utf-8" },
-  });
-}
-
-function escapeXml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+export const GET = sitemapXmlRoute.GET;

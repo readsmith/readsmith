@@ -1,11 +1,11 @@
 /**
  * Next boot hook. The DB-backed work (migrations + job worker) is imported only
  * inside the Node.js runtime branch, so its Postgres dependencies are excluded
- * from the edge instrumentation bundle. See lib/boot.ts.
+ * from the edge instrumentation bundle. See @readsmith/serve (boot.ts).
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    const { boot } = await import("./lib/boot");
+    const { boot } = await import("@readsmith/serve");
     await boot();
   }
 }

@@ -10,7 +10,7 @@ import {
 import type { SiteBuild } from "@readsmith/mdx";
 import type { NormalizedSpec } from "@readsmith/model";
 import { createBundleStore, resolveStorageConfig } from "@readsmith/storage";
-import { getDb } from "./db";
+import { getDb } from "./db.js";
 
 /**
  * Server-only. Resolves the content bundle the shell serves, through the

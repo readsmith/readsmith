@@ -110,6 +110,10 @@ const nextConfig = {
   serverExternalPackages: [
     "pg",
     "pg-boss",
+    // The serving core: external so its module-level singletons (DB pool, site
+    // resolver, LRU caches) are shared across every Next module graph instead
+    // of being duplicated per bundled route.
+    "@readsmith/serve",
     "@readsmith/db",
     "@readsmith/git",
     "@readsmith/build",

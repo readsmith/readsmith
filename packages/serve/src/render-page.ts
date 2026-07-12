@@ -1,8 +1,8 @@
-import { getApiReference } from "@/lib/api-reference";
-import { getSite } from "@/lib/site";
 import { type ShellSite, type ShellTab, renderShellBody } from "@readsmith/components";
 import { siteBasePath } from "@readsmith/config";
 import type { FinalNavNode, FinalNavTab, PageModel } from "@readsmith/mdx";
+import { getApiReference } from "./api-reference.js";
+import { getSite } from "./site.js";
 
 /**
  * Server-only. Renders one built page into the reading shell: sidebar and tab

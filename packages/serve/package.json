@@ -1,0 +1,36 @@
+{
+  "name": "@readsmith/serve",
+  "version": "0.0.0",
+  "license": "FSL-1.1-MIT",
+  "private": true,
+  "type": "module",
+  "description": "The serving shell's server logic: site resolution, services, and route handlers, composed by thin Next apps.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@readsmith/ai": "workspace:*",
+    "@readsmith/api": "workspace:*",
+    "@readsmith/cache": "workspace:*",
+    "@readsmith/components": "workspace:*",
+    "@readsmith/config": "workspace:*",
+    "@readsmith/db": "workspace:*",
+    "@readsmith/git": "workspace:*",
+    "@readsmith/mdx": "workspace:*",
+    "@readsmith/model": "workspace:*",
+    "@readsmith/storage": "workspace:*",
+    "zod": "^4.0.5"
+  }
+}

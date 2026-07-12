@@ -2,6 +2,7 @@
 // declare the families the design tokens reference. Imported before the design
 // stylesheet.
 import "@fontsource/spectral/400.css";
+import { getSite } from "@readsmith/serve";
 import "@fontsource/spectral/500.css";
 import "@fontsource/spectral/600.css";
 import "@fontsource/ibm-plex-sans/400.css";
@@ -10,7 +11,6 @@ import "@fontsource/ibm-plex-sans/600.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "@readsmith/components/styles.css";
-import { getSite } from "@/lib/site";
 import { themeInitScript } from "@readsmith/components";
 import { siteBasePath } from "@readsmith/config";
 import type { Metadata } from "next";

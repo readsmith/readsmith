@@ -35,6 +35,7 @@
     "@readsmith/git": "workspace:*",
     "@readsmith/mdx": "workspace:*",
     "@readsmith/model": "workspace:*",
+    "@readsmith/serve": "workspace:*",
     "@readsmith/storage": "workspace:*",
     "hono": "^4.12.28",
     "next": "^16.2.10",

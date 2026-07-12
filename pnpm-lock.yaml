@@ -83,6 +83,9 @@ importers:
       '@readsmith/model':
         specifier: workspace:*
         version: link:../../packages/model
+      '@readsmith/serve':
+        specifier: workspace:*
+        version: link:../../packages/serve
       '@readsmith/storage':
         specifier: workspace:*
         version: link:../../packages/storage
@@ -349,6 +352,45 @@ importers:
 
   packages/model:
     dependencies:
+      zod:
+        specifier: ^4.0.5
+        version: 4.4.3
+
+  packages/serve:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.29.0
+        version: 1.29.0(zod@4.4.3)
+      '@readsmith/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@readsmith/api':
+        specifier: workspace:*
+        version: link:../api
+      '@readsmith/cache':
+        specifier: workspace:*
+        version: link:../cache
+      '@readsmith/components':
+        specifier: workspace:*
+        version: link:../components
+      '@readsmith/config':
+        specifier: workspace:*
+        version: link:../config
+      '@readsmith/db':
+        specifier: workspace:*
+        version: link:../db
+      '@readsmith/git':
+        specifier: workspace:*
+        version: link:../git
+      '@readsmith/mdx':
+        specifier: workspace:*
+        version: link:../mdx
+      '@readsmith/model':
+        specifier: workspace:*
+        version: link:../model
+      '@readsmith/storage':
+        specifier: workspace:*
+        version: link:../storage
       zod:
         specifier: ^4.0.5
         version: 4.4.3

@@ -19,9 +19,9 @@ import {
   siteBuildSingletonKey,
 } from "@readsmith/git";
 import { createBundleStore, resolveStorageConfig } from "@readsmith/storage";
-import { getGitRuntime } from "./git";
-import { embedIndexJob, indexBundle } from "./indexing";
-import { invalidateSiteCache } from "./site";
+import { getGitRuntime } from "./git.js";
+import { embedIndexJob, indexBundle } from "./indexing.js";
+import { invalidateSiteCache } from "./site.js";
 
 /**
  * One-time backbone boot: run pending migrations, then start the job worker.

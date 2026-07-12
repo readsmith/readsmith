@@ -1,4 +1,4 @@
-import { getGitRuntime } from "./git";
+import { getGitRuntime } from "./git.js";
 
 /**
  * Server-only helpers for the one-time GitHub App setup pages. These pages

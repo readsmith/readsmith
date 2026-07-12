@@ -1,16 +1,8 @@
-import { getSite } from "@/lib/site";
+import { robotsTxtRoute } from "@readsmith/serve";
 
+// Static + ISR (A-8): a published deployment (pointer flip) becomes visible
+// within a minute without an app rebuild; static installs serve from cache.
 export const dynamic = "force-static";
-// Regenerate at most once a minute: a published deployment (pointer flip)
-// becomes visible without an app rebuild; docs-only output is unchanged.
 export const revalidate = 60;
 
-export async function GET() {
-  const { url } = await getSite();
-  const base = url ? url.replace(/\/+$/, "") : "";
-  const sitemap = `${base}/sitemap.xml`;
-  const body = `User-agent: *\nAllow: /\n\nSitemap: ${sitemap}\n`;
-  return new Response(body, {
-    headers: { "content-type": "text/plain; charset=utf-8" },
-  });
-}
+export const GET = robotsTxtRoute.GET;

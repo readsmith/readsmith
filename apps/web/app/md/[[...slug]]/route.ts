@@ -1,24 +1,9 @@
-import { getSite } from "@/lib/site";
+import { mdRoute } from "@readsmith/serve";
 
+// Static + ISR (A-8): a published deployment (pointer flip) becomes visible
+// within a minute without an app rebuild; static installs serve from cache.
 export const dynamic = "force-static";
-// Regenerate at most once a minute: a published deployment (pointer flip)
-// becomes visible without an app rebuild; docs-only output is unchanged.
 export const revalidate = 60;
 
-export async function generateStaticParams(): Promise<{ slug?: string[] }[]> {
-  const { build } = await getSite();
-  return build.pages
-    .filter((page) => !page.hidden)
-    .map((page) => ({ slug: page.slug === "" ? [] : page.slug.split("/") }));
-}
-
-/** Serve a page's raw Markdown at /md/{slug}, for agents and "view as Markdown". */
-export async function GET(_request: Request, { params }: { params: Promise<{ slug?: string[] }> }) {
-  const { build } = await getSite();
-  const slug = ((await params).slug ?? []).join("/");
-  const page = build.pages.find((p) => p.slug === slug);
-  if (!page) return new Response("Not found", { status: 404 });
-  return new Response(page.rawMd, {
-    headers: { "content-type": "text/markdown; charset=utf-8" },
-  });
-}
+export const generateStaticParams = mdRoute.generateStaticParams;
+export const GET = mdRoute.GET;

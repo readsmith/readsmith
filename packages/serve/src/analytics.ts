@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AnalyticsService } from "@readsmith/api";
 import { insertPageFeedback, insertSearchQuery } from "@readsmith/db";
-import { getDb } from "./db";
+import { getDb } from "./db.js";
 
 /**
  * Server-only reader-signal persistence: page feedback for the API route, and
