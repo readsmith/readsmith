@@ -1,5 +1,5 @@
-import { getSkills } from "../skills.js";
 import { getBundle } from "../site.js";
+import { getSkills } from "../skills.js";
 import { skillFileResponse } from "../text-routes.js";
 
 interface Params {

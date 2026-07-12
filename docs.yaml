@@ -8,7 +8,7 @@ site:
   url: https://readsmith.dev/docs
   description: The Fair Source documentation platform. Precompiled MDX, a beautiful API reference, and agent-ready outputs from the first build.
 variables:
-  version: 0.8.1
+  version: 0.9.0
 footer:
   socials:
     github: https://github.com/readsmith/readsmith

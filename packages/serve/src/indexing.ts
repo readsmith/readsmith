@@ -17,7 +17,7 @@ import {
 } from "@readsmith/db";
 import { z } from "zod";
 import type { ApiReference, Site } from "./site.js";
-import { getApiReference, getSite } from "./site.js";
+import { loadBundleForSite } from "./site.js";
 
 /**
  * `embed.index` as a pg-boss job: re-index the compiled bundle's chunks into
@@ -75,11 +75,13 @@ function buildSourceChunks(site: Site, apiReference: ApiReference | null): Sourc
   return [...docs, ...endpoints];
 }
 
-/** Re-index the current bundle into `doc_chunks` (incremental, FTS-only without a key). */
-export async function indexBundle(db: Db): Promise<void> {
-  const site = await getSite();
-  const apiRef = await getApiReference();
-  await upsertSite(db, { id: SITE_ID, name: site.name });
+/** Re-index a site's current bundle into `doc_chunks` (incremental, FTS-only without a key). */
+export async function indexBundle(db: Db, siteId = SITE_ID): Promise<void> {
+  const bundle = await loadBundleForSite(siteId);
+  if (!bundle) return; // nothing deployed yet; the next publish re-enqueues
+  const site = bundle.site;
+  const apiRef = bundle.apiReference;
+  await upsertSite(db, { id: siteId, name: site.name });
 
   let provider: ModelProvider = NULL_PROVIDER;
   try {
@@ -97,6 +99,6 @@ export async function indexBundle(db: Db): Promise<void> {
 
   await indexChunks(
     { store, provider },
-    { siteId: SITE_ID, version: "current", locale: "en", chunks: buildSourceChunks(site, apiRef) },
+    { siteId, version: "current", locale: "en", chunks: buildSourceChunks(site, apiRef) },
   );
 }

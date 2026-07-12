@@ -21,13 +21,14 @@ function siteLimits(ai: unknown): unknown {
 }
 
 async function build(): Promise<RateLimiter> {
-  const site = await getSite();
+  // A multi-site host has no local default bundle; env-configured limits apply.
+  const site = await getSite().catch(() => null);
   const cacheConfig = resolveCacheConfig(process.env);
   return createRateLimiter({
     cache: createCache(
       cacheConfig.driver === "memory" ? { ...cacheConfig, max: 10_000 } : cacheConfig,
     ),
-    config: resolveRateLimitConfig(process.env, siteLimits(site.ai)),
+    config: resolveRateLimitConfig(process.env, siteLimits(site?.ai)),
   });
 }
 

@@ -9,16 +9,14 @@ import { getDb } from "./db.js";
  * to a no-op without a database, and a logging failure is swallowed - signals
  * are diagnostics, never load-bearing.
  */
-const SITE_ID = "default";
-
-export function getAnalyticsService(): AnalyticsService | null {
+export function getAnalyticsService(siteId = "default"): AnalyticsService | null {
   const db = getDb();
   if (!db) return null;
   return {
     async pageFeedback(input) {
       await insertPageFeedback(db, {
         id: randomUUID(),
-        siteId: SITE_ID,
+        siteId,
         path: input.path,
         helpful: input.helpful,
       });
@@ -28,6 +26,7 @@ export function getAnalyticsService(): AnalyticsService | null {
 
 /** Log an answered search; never awaited on the response path, never throws. */
 export function logSearchQuery(input: {
+  siteId?: string;
   query: string;
   resultsCount: number;
   version?: string;
@@ -37,7 +36,7 @@ export function logSearchQuery(input: {
   if (!db) return;
   insertSearchQuery(db, {
     id: randomUUID(),
-    siteId: SITE_ID,
+    siteId: input.siteId ?? "default",
     query: input.query,
     resultsCount: input.resultsCount,
     versionId: input.version,

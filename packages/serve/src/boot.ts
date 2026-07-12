@@ -59,8 +59,8 @@ export async function boot(): Promise<void> {
     await runner.start();
     // Re-index the served bundle on demand (enqueued after every publish;
     // `pnpm ai:index` is the inline path for v1 self-host).
-    await runner.work(embedIndexJob, async () => {
-      await indexBundle(db);
+    await runner.work(embedIndexJob, async (payload) => {
+      await indexBundle(db, payload.siteId ?? "default");
     });
 
     // Git-driven deployments: register the build handler and bind the

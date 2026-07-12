@@ -8,6 +8,17 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.9.0" title="Search and Ask AI for every site">
+
+The AI stack now composes per site: `getAiServicesForSite` builds search,
+Ask AI, and the MCP endpoint for any deployed site (rebuilt exactly when
+its deployment changes), indexing runs against the site a publish names,
+and reader signals record under the right site. A multi-site host serves
+every tenant's AI through the same code path the single-site app uses;
+single-site installs are unchanged.
+
+</Update>
+
 <Update label="0.8.1" title="Text surfaces for every site">
 
 The agent and crawler surfaces (`llms.txt`, `llms-full.txt`, `robots.txt`,

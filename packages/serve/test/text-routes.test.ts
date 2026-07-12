@@ -10,7 +10,10 @@ import {
   skillsIndexResponse,
 } from "../src/text-routes.js";
 
-function bundle(overrides: Partial<Bundle["site"]> = {}, apiReference: Bundle["apiReference"] = null): Bundle {
+function bundle(
+  overrides: Partial<Bundle["site"]> = {},
+  apiReference: Bundle["apiReference"] = null,
+): Bundle {
   return {
     site: {
       name: "Demo",
@@ -47,7 +50,9 @@ describe("text routes from a bundle", () => {
     } as unknown as Bundle["apiReference"]);
     const text = await llmsTxtResponse(withRef).text();
     expect(text).toContain("## API reference");
-    expect(text).toContain("[GET /pets](https://demo.readsmith.app/api-reference#op-get-pets): List pets");
+    expect(text).toContain(
+      "[GET /pets](https://demo.readsmith.app/api-reference#op-get-pets): List pets",
+    );
     // Without a reference, the built text passes through untouched.
     expect(await llmsTxtResponse(bundle()).text()).toBe(bundle().site.build.llmsTxt);
   });

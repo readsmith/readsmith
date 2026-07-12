@@ -1,7 +1,7 @@
-import type { Skill } from "@readsmith/mdx";
 import { siteBasePath } from "@readsmith/config";
-import { skillContentType } from "./skills.js";
+import type { Skill } from "@readsmith/mdx";
 import type { Bundle } from "./site.js";
+import { skillContentType } from "./skills.js";
 
 /**
  * The text surfaces (agent outputs, crawler files, raw Markdown, agent

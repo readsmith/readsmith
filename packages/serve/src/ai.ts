@@ -27,7 +27,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { siteBasePath, siteOrigin } from "@readsmith/config";
 import { logSearchQuery } from "./analytics.js";
 import { getDb } from "./db.js";
-import { getApiReference, getSite } from "./site.js";
+import { type Bundle, getBundle, loadBundleForSite } from "./site.js";
 
 /**
  * Composes the AI services the API routes call, from @readsmith/ai (provider,
@@ -36,7 +36,6 @@ import { getApiReference, getSite } from "./site.js";
  * Server-only, memoized. Returns null with no DB (docs-only).
  */
 
-const SITE_ID = "default";
 const DEFAULT_FILTERS: SearchFilters = { version: "current", locale: "en" };
 
 /** A provider that reports no capabilities: FTS-only search still works through it. */
@@ -89,12 +88,12 @@ function retrievalStore(db: Db): RetrievalStore {
   };
 }
 
-async function build(): Promise<AiServices | null> {
+function build(siteId: string, bundle: Bundle): AiServices | null {
   const db = getDb();
   if (!db) return null; // docs-only: no server search/ask.
 
-  const site = await getSite();
-  const apiRef = await getApiReference();
+  const site = bundle.site;
+  const apiRef = bundle.apiReference;
 
   let provider: ModelProvider = NULL_PROVIDER;
   let aiConfig = null as ReturnType<typeof resolveAiConfig>;
@@ -153,7 +152,7 @@ async function build(): Promise<AiServices | null> {
 
     const server = createMcpServer({
       search,
-      siteId: SITE_ID,
+      siteId,
       filters: DEFAULT_FILTERS,
       spec: mcpSpec,
       // Skills ride along as resources: connected agents discover and read
@@ -182,13 +181,14 @@ async function build(): Promise<AiServices | null> {
     capabilities,
     async search(input) {
       const result = await hybridSearch(search, {
-        siteId: SITE_ID,
+        siteId,
         query: input.query,
         filters: filtersFrom(input),
         topK,
       });
       // The search-gaps dataset: fire-and-forget, never on the response path.
       logSearchQuery({
+        siteId,
         query: input.query,
         resultsCount: result.hits.length,
         version: input.version,
@@ -200,7 +200,7 @@ async function build(): Promise<AiServices | null> {
       const filters = filtersFrom(input);
       const { result, completion } = askDocs(
         { provider, search, siteName: site.name, bounds: aiConfig?.askAi, topK },
-        { siteId: SITE_ID, query: input.query, filters },
+        { siteId, query: input.query, filters },
       );
 
       // A minimal SSE the vanilla reading-shell island consumes: text deltas as
@@ -223,7 +223,7 @@ async function build(): Promise<AiServices | null> {
             send({ type: "sources", sources: c.sources });
             insertAiQuery(db, {
               id: queryId,
-              siteId: SITE_ID,
+              siteId,
               query: input.query,
               filters,
               retrievedChunkIds: c.retrievedIds,
@@ -257,9 +257,27 @@ async function build(): Promise<AiServices | null> {
   };
 }
 
-let cached: Promise<AiServices | null> | undefined;
+/**
+ * Services are built per bundle object: the parsed-site LRU hands back the
+ * same object while a deployment serves, and a pointer flip parses a new one,
+ * so a WeakMap keyed on the bundle rebuilds services exactly when the content
+ * they embed (chunks, spec, skills, ai config) actually changed - and old
+ * entries die with their bundles.
+ */
+const perBundle = new WeakMap<Bundle, AiServices | null>();
 
-export function getAiServices(): Promise<AiServices | null> {
-  if (!cached) cached = build();
-  return cached;
+/** The AI services for one site's current deployment (null = no DB or nothing deployed). */
+export async function getAiServicesForSite(siteId: string): Promise<AiServices | null> {
+  const bundle = await loadBundleForSite(siteId);
+  if (!bundle) return null;
+  if (!perBundle.has(bundle)) perBundle.set(bundle, build(siteId, bundle));
+  return perBundle.get(bundle) ?? null;
+}
+
+/** The default site's AI services (the single-site app's path). */
+export async function getAiServices(): Promise<AiServices | null> {
+  const bundle = await getBundle().catch(() => null);
+  if (!bundle) return null;
+  if (!perBundle.has(bundle)) perBundle.set(bundle, build("default", bundle));
+  return perBundle.get(bundle) ?? null;
 }
