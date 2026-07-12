@@ -58,6 +58,13 @@ export interface RunSiteBuildDeps {
    * addresses are shared). The current deployment is never pruned. 0 disables.
    */
   retention?: { keepLast: number };
+  /**
+   * The URL a site is served at, when the host owns domain assignment (a
+   * multi-site install). Resolved per build and passed to the executor, so a
+   * domain change is exactly one rebuild. Absent = the config's own site.url
+   * (the self-host behavior, unchanged).
+   */
+  resolveSiteUrl?: (siteId: string) => Promise<string | null | undefined>;
 }
 
 /**
@@ -74,6 +81,7 @@ export async function runSiteBuild(
 ): Promise<DeploymentRow> {
   const { db, store, executor, logger } = deps;
   const connection = await getGitConnection(db, payload.siteId);
+  const siteUrl = (await deps.resolveSiteUrl?.(payload.siteId)) ?? null;
   const opened = await insertDeployment(db, {
     siteId: payload.siteId,
     gitRef: payload.ref,
@@ -96,6 +104,7 @@ export async function runSiteBuild(
     limits: { timeoutSec: deps.timeoutSec ?? 300 },
     artifact: { bundlePrefix: BUNDLE_PREFIX },
     failOnError: deps.failOnError,
+    siteUrl,
   });
 
   if (!result.ok || result.bundleKey === null || result.bundleHash === null) {

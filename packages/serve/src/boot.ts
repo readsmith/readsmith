@@ -21,7 +21,7 @@ import {
 import { createBundleStore, resolveStorageConfig } from "@readsmith/storage";
 import { getGitRuntime } from "./git.js";
 import { embedIndexJob, indexBundle } from "./indexing.js";
-import { invalidateSiteCache } from "./site.js";
+import { invalidateSiteCache, resolveSiteUrl } from "./site.js";
 
 /**
  * One-time backbone boot: run pending migrations, then start the job worker.
@@ -88,6 +88,7 @@ export async function boot(): Promise<void> {
             logger: log,
             retention: { keepLast },
             failOnError,
+            resolveSiteUrl,
             afterFlip: async (row) => {
               // This graph's pointer cache re-resolves immediately (the routes'
               // copy follows via TTL + revalidation), then search converges.

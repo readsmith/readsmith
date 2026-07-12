@@ -93,3 +93,20 @@ describe("compileSite analytics injection", () => {
     expect(bundleJson).not.toContain("analyticsHtml");
   });
 });
+
+describe("siteUrl override", () => {
+  it("serves the site at the host-assigned URL instead of the config's own", async () => {
+    const dir = fixture("site");
+    const own = await compileSite({ contentDir: dir });
+    const overridden = await compileSite({
+      contentDir: dir,
+      siteUrl: "https://acme.readsmith.app",
+    });
+    expect(overridden.bundle.site.url).toBe("https://acme.readsmith.app");
+    expect(overridden.bundle.site.url).not.toBe(own.bundle.site.url);
+    // Different served URL = different artifact, deterministically.
+    expect(overridden.bundleHash).not.toBe(own.bundleHash);
+    const again = await compileSite({ contentDir: dir, siteUrl: "https://acme.readsmith.app" });
+    expect(again.bundleHash).toBe(overridden.bundleHash);
+  });
+});

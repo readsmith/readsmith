@@ -39,6 +39,7 @@ export {
   ftsSearchChunks,
   getCurrentDeployment,
   getGitConnection,
+  listGitConnections,
   getSite,
   insertAiQuery,
   insertDeployment,

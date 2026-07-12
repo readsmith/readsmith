@@ -27,8 +27,14 @@ describe.skipIf(!DATABASE_URL)("poller (integration)", () => {
     fetchAtRef: async () => {},
   };
 
-  const poller = () =>
-    createPoller({ db, provider, siteId: SITE, enqueue: async (p) => void enqueued.push(p) });
+  const poller = () => createPoller({ db, provider, enqueue: async (p) => void enqueued.push(p) });
+
+  // The sweep covers every connection in the shared test database; assertions
+  // look only at this suite's site.
+  const outcomeFor = async (): Promise<string | undefined> => {
+    const results = await poller().checkOnce();
+    return results.find((r) => r.siteId === SITE)?.outcome;
+  };
 
   beforeAll(async () => {
     db = createDb({
@@ -47,10 +53,10 @@ describe.skipIf(!DATABASE_URL)("poller (integration)", () => {
     await db?.close();
   });
 
-  it("reports no-connection before any bind", async () => {
+  it("sweeps past a site with no connection", async () => {
     enqueued = [];
-    expect(await poller().checkOnce()).toBe("no-connection");
-    expect(enqueued).toEqual([]);
+    expect(await outcomeFor()).toBeUndefined();
+    expect(enqueued.filter((p) => p.siteId === SITE)).toEqual([]);
   });
 
   it("enqueues when the head moves past the last built commit", async () => {
@@ -63,8 +69,8 @@ describe.skipIf(!DATABASE_URL)("poller (integration)", () => {
       branch: "main",
     });
     enqueued = [];
-    expect(await poller().checkOnce()).toBe("queued");
-    expect(enqueued).toEqual([
+    expect(await outcomeFor()).toBe("queued");
+    expect(enqueued.filter((p) => p.siteId === SITE)).toEqual([
       { siteId: SITE, repo: "acme/docs", ref: "refs/heads/main", commitSha: "poll-sha-1" },
     ]);
   });
@@ -73,19 +79,21 @@ describe.skipIf(!DATABASE_URL)("poller (integration)", () => {
     // The enqueued build opened a row (simulate) but has not published yet.
     await insertDeployment(db, { siteId: SITE, gitRef: "refs/heads/main", commitSha: head });
     enqueued = [];
-    expect(await poller().checkOnce()).toBe("unchanged");
-    expect(enqueued).toEqual([]);
+    expect(await outcomeFor()).toBe("unchanged");
+    expect(enqueued.filter((p) => p.siteId === SITE)).toEqual([]);
   });
 
   it("stays quiet once last_synced_sha records the built head, and wakes on a new one", async () => {
     const conn = `conn:${SITE}:acme/docs`;
     await setLastSyncedSha(db, { id: conn, sha: head });
     enqueued = [];
-    expect(await poller().checkOnce()).toBe("unchanged");
+    expect(await outcomeFor()).toBe("unchanged");
 
     head = "poll-sha-2";
-    expect(await poller().checkOnce()).toBe("queued");
-    expect(enqueued.map((p) => p.commitSha)).toEqual(["poll-sha-2"]);
+    expect(await outcomeFor()).toBe("queued");
+    expect(enqueued.filter((p) => p.siteId === SITE).map((p) => p.commitSha)).toEqual([
+      "poll-sha-2",
+    ]);
   });
 
   it("swallows provider faults as an error outcome, never a throw", async () => {
@@ -97,9 +105,9 @@ describe.skipIf(!DATABASE_URL)("poller (integration)", () => {
           throw new Error("api down");
         },
       },
-      siteId: SITE,
       enqueue: async () => {},
     });
-    expect(await broken.checkOnce()).toBe("error");
+    const results = await broken.checkOnce();
+    expect(results.find((r) => r.siteId === SITE)?.outcome).toBe("error");
   });
 });

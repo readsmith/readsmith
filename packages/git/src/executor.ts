@@ -23,6 +23,8 @@ export interface ExecutorJob {
   artifact: { bundlePrefix: string };
   /** Strict mode: a page-level error diagnostic fails the build (nothing publishes). */
   failOnError?: boolean;
+  /** Serve at this URL instead of the config's `site.url` (the host owns domains). */
+  siteUrl?: string | null;
 }
 
 export interface ExecutorResult {
@@ -95,6 +97,7 @@ export function createInProcessExecutor(deps: {
             siteId: job.siteId,
             renderCache: persisted?.cache,
             failOnError: job.failOnError,
+            siteUrl: job.siteUrl ?? undefined,
           });
         });
         if (!compiled.bundle.site.build.ok) {

@@ -94,6 +94,25 @@ export function configureSiteResolver(next: SiteResolver): void {
   resolver = next;
 }
 
+let siteUrlResolver: ((siteId: string) => Promise<string | null | undefined>) | null = null;
+
+/**
+ * Replace the site-URL resolver (the second multi-tenant seam): where a site
+ * is served, for hosts that assign domains. Consulted per build (the URL is
+ * baked into page URLs and metadata), so a domain change is one rebuild.
+ * Default: none, and builds use the config's own `site.url` (self-host).
+ */
+export function configureSiteUrlResolver(
+  next: (siteId: string) => Promise<string | null | undefined>,
+): void {
+  siteUrlResolver = next;
+}
+
+/** The URL the host serves this site at, or null to use the config's own. */
+export async function resolveSiteUrl(siteId: string): Promise<string | null> {
+  return (await siteUrlResolver?.(siteId)) ?? null;
+}
+
 /** Resolve a request Host to a site (null = unknown, suspended = serve a 410). */
 export function resolveSiteForHost(
   host: string,

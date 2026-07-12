@@ -325,6 +325,14 @@ export async function getGitConnection(db: Db, siteId: string): Promise<GitConne
   return row ? gitConnectionRowSchema.parse(row) : null;
 }
 
+/** Every site's newest connection (the poller sweeps all of them). */
+export async function listGitConnections(db: Db): Promise<GitConnectionRow[]> {
+  const rows = await db.query(sql`
+    SELECT DISTINCT ON (site_id) ${GIT_CONNECTION_COLUMNS} FROM app.git_connections
+    ORDER BY site_id, updated_at DESC`);
+  return rows.map((row) => gitConnectionRowSchema.parse(row));
+}
+
 /** Record the last commit actually built (also the polling comparand). */
 export async function setLastSyncedSha(db: Db, input: { id: string; sha: string }): Promise<void> {
   await db.query(sql`

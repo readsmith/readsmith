@@ -42,6 +42,14 @@ export interface CompileSiteInput {
    * Default (false) keeps the resilient behavior: build with diagnostics.
    */
   failOnError?: boolean;
+  /**
+   * Serve the site at this URL instead of the config's `site.url`. A host that
+   * owns where a site is reachable (a multi-site install assigning domains)
+   * passes the assigned URL here, so authored config never moves a site and a
+   * domain change is exactly one rebuild with a new value. Affects everything
+   * `site.url` affects: page URLs, the base path, canonical and OG metadata.
+   */
+  siteUrl?: string;
 }
 
 /** The API reference as it rides inside the bundle. */
@@ -257,7 +265,10 @@ async function readSkills(contentRoot: string): Promise<AuthoredSkill[]> {
  */
 export async function compileSite(input: CompileSiteInput): Promise<CompileSiteResult> {
   const siteId = input.siteId ?? "default";
-  const config = await resolveConfig(input.contentDir);
+  const resolved = await resolveConfig(input.contentDir);
+  const config = input.siteUrl
+    ? { ...resolved, site: { ...resolved.site, url: input.siteUrl } }
+    : resolved;
   const contentRoot = contentRootOf(input.contentDir, config);
   const { reference, diagnostics: apiReferenceDiagnostics } = await buildApiReference(
     config,

@@ -8,6 +8,21 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.6.0" title="Multi-site builds">
+
+Two additions for installs that serve more than one site; single-site
+self-hosting is unchanged.
+
+- **Host-assigned site URLs**: a host that owns where sites are reachable
+  (assigning domains to tenants) can override `site.url` per build, so the
+  authored config never moves a site and a domain change is exactly one
+  rebuild. Page URLs, base path, canonicals, and social metadata all follow
+- **The git poller sweeps every connection**: polling-mode deploys now
+  cover all connected sites, one API call per site per tick, in sequence
+  (a single-site install behaves exactly as before)
+
+</Update>
+
 <Update label="0.5.1" title="Render any site's bundle">
 
 A small addition to `@readsmith/serve` for hosts that serve more than one
