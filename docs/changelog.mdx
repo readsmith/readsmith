@@ -8,6 +8,17 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.7.0" title="Deployments carry their assets">
+
+Git-deployed sites now serve their images, fonts, and downloads. The build
+ships a manifest of content-addressed asset keys inside the bundle, the
+deploy stores each asset once (identical bytes are shared across
+deployments), and serving streams them with strong ETags, so a repeat
+visit revalidates without moving bytes. Local installs keep serving from
+`public/` exactly as before.
+
+</Update>
+
 <Update label="0.6.1" title="Webhooks route by repository">
 
 Push webhooks now enqueue a build for every site connected to the pushed

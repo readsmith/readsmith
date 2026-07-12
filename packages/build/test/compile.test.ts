@@ -110,3 +110,46 @@ describe("siteUrl override", () => {
     expect(again.bundleHash).toBe(overridden.bundleHash);
   });
 });
+
+describe("asset manifest", () => {
+  async function siteWithAssets(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "rs-assets-"));
+    await cp(fixture("site"), dir, { recursive: true });
+    await mkdir(join(dir, "images"), { recursive: true });
+    await writeFile(
+      join(dir, "images", "logo.svg"),
+      `<svg xmlns="http://www.w3.org/2000/svg"><rect width="4" height="4"/></svg>`,
+    );
+    return dir;
+  }
+
+  it("omits the manifest entirely for a site with no assets", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "rs-noassets-"));
+    await writeFile(join(dir, "index.md"), "# Bare\n\nProse only.\n");
+    const { bundle, assetFiles } = await compileSite({ contentDir: dir });
+    expect(bundle.site.assets).toBeUndefined();
+    expect(assetFiles).toEqual([]);
+  });
+
+  it("maps serving paths to content-addressed keys, deterministically", async () => {
+    const dir = await siteWithAssets();
+    const a = await compileSite({ contentDir: dir });
+    const b = await compileSite({ contentDir: dir });
+    expect(a.bundleJson).toBe(b.bundleJson);
+    const ref = a.bundle.site.assets?.["/images/logo.svg"];
+    expect(ref).toBeDefined();
+    expect(ref?.key).toMatch(/^assets\/[0-9a-f]{64}$/);
+    expect(ref?.contentType).toBe("image/svg+xml");
+    expect(ref?.bytes).toBeGreaterThan(0);
+    // The returned files back exactly the manifest's keys.
+    expect(a.assetFiles.map((f) => f.key)).toContain(ref?.key);
+  });
+
+  it("prose and config never appear as served assets", async () => {
+    const dir = await siteWithAssets();
+    const { bundle } = await compileSite({ contentDir: dir });
+    const paths = Object.keys(bundle.site.assets ?? {}).sort();
+    // The fixture's own logo.svg plus the added image; never .md or docs.yaml.
+    expect(paths).toEqual(["/images/logo.svg", "/logo.svg"]);
+  });
+});

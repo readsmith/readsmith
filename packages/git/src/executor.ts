@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compileSite, openRenderCache } from "@readsmith/build";
@@ -116,6 +116,14 @@ export function createInProcessExecutor(deps: {
             ],
             usage: { wallMs: now() - started },
           };
+        }
+        // Assets go in before the bundle that references them: content-addressed
+        // keys make the puts idempotent and shareable across deployments, and a
+        // key that already exists is skipped rather than rewritten.
+        for (const file of compiled.assetFiles) {
+          if (!(await deps.store.has(file.key))) {
+            await deps.store.put(file.key, await readFile(file.source));
+          }
         }
         const bundleKey = `${job.artifact.bundlePrefix}${compiled.bundleHash}.json`;
         await deps.store.put(bundleKey, compiled.bundleJson);

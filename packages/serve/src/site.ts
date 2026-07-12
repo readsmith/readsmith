@@ -46,6 +46,8 @@ export interface Site {
   footer?: { socials?: Record<string, string> };
   /** Opaque AI config block from docs.yaml (validated at runtime by @readsmith/ai). */
   ai?: unknown;
+  /** Static assets by serving path, each naming a content-addressed artifact key. */
+  assets?: Record<string, { key: string; contentType: string; bytes: number }>;
 }
 
 /** The normalized API reference, ready to render. */
@@ -175,6 +177,36 @@ export async function getBundle(): Promise<Bundle> {
  */
 export function invalidateSiteCache(siteId?: string): void {
   bundleSource()?.invalidate(siteId);
+}
+
+/**
+ * Serve one static asset for a site, straight from the artifact store via the
+ * bundle's manifest. Conditional requests hit the content address: the ETag is
+ * the asset's own hash, so a 304 needs no byte read at all. Null = the site
+ * has no such asset (the host 404s).
+ */
+export async function loadSiteAsset(
+  siteId: string,
+  path: string,
+  request?: Request,
+): Promise<Response | null> {
+  const bundle = await loadBundleForSite(siteId);
+  const ref = bundle?.site.assets?.[path.startsWith("/") ? path : `/${path}`];
+  if (!ref) return null;
+  const etag = `"${ref.key.slice("assets/".length)}"`;
+  const headers: Record<string, string> = {
+    "content-type": ref.contentType,
+    etag,
+    // The PATH is mutable across deployments even though the bytes behind an
+    // ETag never are, so freshness is short and revalidation is cheap (304).
+    "cache-control": "public, max-age=300, stale-while-revalidate=600",
+  };
+  if (request?.headers.get("if-none-match") === etag) {
+    return new Response(null, { status: 304, headers });
+  }
+  const bytes = await store.get(ref.key);
+  if (!bytes) return null;
+  return new Response(new Uint8Array(bytes), { headers });
 }
 
 export async function getSite(): Promise<Site> {

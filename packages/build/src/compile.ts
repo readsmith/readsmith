@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -16,6 +17,8 @@ import {
   contentHash,
   normalizedSpecSchema,
 } from "@readsmith/model";
+import { collectAssets } from "./assets.js";
+import { assetContentType } from "./mime.js";
 
 /**
  * The compile: one deterministic path from a content directory to the bundle
@@ -78,6 +81,28 @@ export interface CompiledSiteEnvelope {
   apiReference?: ResolvedConfig["apiReference"];
   footer?: ResolvedConfig["footer"];
   ai: unknown;
+  /**
+   * Static assets by serving path (leading slash), each naming its
+   * content-addressed artifact key. Omitted when the site ships none, so
+   * asset-less bundles stay byte-identical to earlier releases.
+   */
+  assets?: Record<string, CompiledAssetRef>;
+}
+
+/** One served asset inside the bundle manifest. */
+export interface CompiledAssetRef {
+  /** Content-addressed artifact key (`assets/{sha256}`), shared across deploys. */
+  key: string;
+  contentType: string;
+  bytes: number;
+}
+
+/** An asset the caller must store so the manifest's keys resolve. */
+export interface CompiledAssetFile {
+  key: string;
+  /** Absolute path of the source file to upload. */
+  source: string;
+  contentType: string;
 }
 
 /** The whole immutable artifact: what `bundleJson` serializes. */
@@ -103,6 +128,12 @@ export interface CompileSiteResult {
    * must never depend on cache state).
    */
   rebuiltPages: string[];
+  /**
+   * The manifest's backing files, deduplicated by content address. A caller
+   * that publishes the bundle must store these first (a local install serves
+   * from public/ instead and may ignore them).
+   */
+  assetFiles: CompiledAssetFile[];
 }
 
 interface ApiReferenceOutcome {
@@ -295,6 +326,25 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
     skills: await readSkills(contentRoot),
     snippets: await readSnippets(contentRoot),
   });
+  // Assets ride the bundle as a manifest of content-addressed keys: the same
+  // sorted walk the local public/ copy uses, so both flows serve exactly the
+  // same set. Hashing reads every asset, which is what makes the manifest
+  // deterministic and the artifacts shareable across deployments.
+  const collected = await collectAssets(input.contentDir, config);
+  const assets: Record<string, CompiledAssetRef> = {};
+  const assetFiles: CompiledAssetFile[] = [];
+  const seenKeys = new Set<string>();
+  for (const entry of collected.entries) {
+    const bytes = await readFile(entry.source);
+    const key = `assets/${createHash("sha256").update(bytes).digest("hex")}`;
+    const contentType = assetContentType(entry.key);
+    assets[`/${entry.key}`] = { key, contentType, bytes: bytes.length };
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      assetFiles.push({ key, source: entry.source, contentType });
+    }
+  }
+
   // The artifact must not remember how it was built: `rebuilt` varies with
   // cache warmth, so it is normalized out of the serialized bundle (and
   // returned separately) to keep the content address cache-independent.
@@ -313,6 +363,7 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
     apiReference: config.apiReference,
     footer: config.footer,
     ai: config.ai ?? null,
+    ...(assetFiles.length > 0 ? { assets } : {}),
   };
   const bundle: ContentBundle = { site, apiReference: reference };
   const bundleJson = JSON.stringify(bundle);
@@ -324,5 +375,6 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
     bundleHash: contentHash(bundleJson),
     apiReferenceDiagnostics,
     rebuiltPages: build.rebuilt,
+    assetFiles,
   };
 }
