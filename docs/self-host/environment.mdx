@@ -19,9 +19,20 @@ Everything the app reads from its environment, in one place. Configuration that 
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `STORAGE_ROOT` | `apps/web/.readsmith` | Root of the bundle store: the compiled site artifact the app serves |
-| `STORAGE_DRIVER` | `local` | Bundle store driver; `local` is the self-host driver in this release |
+| `STORAGE_DRIVER` | `local` | Bundle store driver: `local` (filesystem) or `s3` (any S3-compatible store) |
+| `STORAGE_ROOT` | `apps/web/.readsmith` | `local` driver: root of the bundle store, the compiled site artifact the app serves |
+| `STORAGE_ENDPOINT` | unset | `s3` driver: scheme + host, e.g. `http://minio:9000` or your R2 account endpoint |
+| `STORAGE_BUCKET` | unset | `s3` driver: the bucket holding the bundle store |
+| `STORAGE_ACCESS_KEY_ID` | unset | `s3` driver: access key |
+| `STORAGE_SECRET_ACCESS_KEY` | unset | `s3` driver: secret key |
+| `STORAGE_REGION` | `auto` | `s3` driver: SigV4 region (`auto` works for R2 and MinIO) |
 | `READSMITH_STORAGE_ROOT` | unset | Filesystem root for persisted spec blobs (the database-backed API reference ingest); a mounted volume in compose |
+
+The `s3` driver speaks to Cloudflare R2, MinIO, or any S3-compatible store. For
+a bundled MinIO, start compose with the opt-in profile: `docker compose
+--profile s3 up` brings up MinIO with a console on `:9001` and creates the
+bucket on first start. The default deployment needs none of this; the
+filesystem driver remains the zero-config path.
 
 <Warning>
 <Snippet file="storage-root.md" />

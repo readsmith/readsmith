@@ -17,12 +17,12 @@ describe("storage config resolution", () => {
   it("fails fast on an unknown driver, naming the allowed values", () => {
     let message = "";
     try {
-      resolveStorageConfig({ STORAGE_DRIVER: "s3" }, "/tmp/r");
+      resolveStorageConfig({ STORAGE_DRIVER: "gcs" }, "/tmp/r");
     } catch (err) {
       expect(err).toBeInstanceOf(StorageConfigError);
       message = (err as Error).message;
     }
-    expect(message).toContain("s3");
+    expect(message).toContain("gcs");
     expect(message).toContain("local");
   });
 
@@ -31,5 +31,43 @@ describe("storage config resolution", () => {
     expect(typeof store.get).toBe("function");
     expect(typeof store.put).toBe("function");
     expect(typeof store.list).toBe("function");
+  });
+});
+
+describe("s3 config resolution", () => {
+  const FULL = {
+    STORAGE_DRIVER: "s3",
+    STORAGE_ENDPOINT: "http://localhost:9000",
+    STORAGE_BUCKET: "readsmith",
+    STORAGE_ACCESS_KEY_ID: "ak",
+    STORAGE_SECRET_ACCESS_KEY: "sk",
+  };
+
+  it("resolves a complete s3 env, defaulting the region to auto", () => {
+    const config = resolveStorageConfig(FULL, "/tmp/r");
+    expect(config).toEqual({
+      driver: "s3",
+      endpoint: "http://localhost:9000",
+      bucket: "readsmith",
+      accessKeyId: "ak",
+      secretAccessKey: "sk",
+      region: "auto",
+    });
+    const regioned = resolveStorageConfig({ ...FULL, STORAGE_REGION: "us-east-1" }, "/tmp/r");
+    expect(regioned.driver === "s3" && regioned.region).toBe("us-east-1");
+  });
+
+  it("fails fast naming every missing variable, echoing no values", () => {
+    let message = "";
+    try {
+      resolveStorageConfig({ STORAGE_DRIVER: "s3", STORAGE_BUCKET: "readsmith" }, "/tmp/r");
+    } catch (err) {
+      expect(err).toBeInstanceOf(StorageConfigError);
+      message = (err as Error).message;
+    }
+    expect(message).toContain("STORAGE_ENDPOINT");
+    expect(message).toContain("STORAGE_ACCESS_KEY_ID");
+    expect(message).toContain("STORAGE_SECRET_ACCESS_KEY");
+    expect(message).not.toContain("readsmith"); // no values, ever
   });
 });

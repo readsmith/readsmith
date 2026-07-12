@@ -6,15 +6,18 @@ import {
   StorageConfigError,
   storageConfigSchema,
 } from "./port.js";
+import { createS3Store } from "./s3.js";
 
 /** Construct a BundleStore from validated config. One driver per process. */
 export function createBundleStore(config: StorageConfig): BundleStore {
   switch (config.driver) {
     case "local":
       return createLocalStore(config.root);
+    case "s3":
+      return createS3Store(config);
     default: {
-      // Exhaustive over the discriminated union; unreachable in v1.
-      const unreachable: never = config.driver;
+      // Exhaustive over the discriminated union.
+      const unreachable: never = config;
       throw new StorageConfigError(`unsupported storage driver: ${String(unreachable)}`);
     }
   }
@@ -43,8 +46,34 @@ export function resolveStorageConfig(env: StorageEnv, defaultRoot: string): Stor
       `unknown STORAGE_DRIVER "${driver}"; allowed: ${STORAGE_DRIVERS.join(", ")}`,
     );
   }
-  const root = env.STORAGE_ROOT ?? defaultRoot;
-  const parsed = storageConfigSchema.safeParse({ driver, root });
+  let candidate: Record<string, unknown>;
+  if (driver === "s3") {
+    const required = {
+      STORAGE_ENDPOINT: env.STORAGE_ENDPOINT,
+      STORAGE_BUCKET: env.STORAGE_BUCKET,
+      STORAGE_ACCESS_KEY_ID: env.STORAGE_ACCESS_KEY_ID,
+      STORAGE_SECRET_ACCESS_KEY: env.STORAGE_SECRET_ACCESS_KEY,
+    };
+    const missing = Object.entries(required)
+      .filter(([, v]) => !v)
+      .map(([k]) => k);
+    if (missing.length > 0) {
+      throw new StorageConfigError(
+        `STORAGE_DRIVER=s3 needs ${missing.join(", ")} (values never logged)`,
+      );
+    }
+    candidate = {
+      driver,
+      endpoint: env.STORAGE_ENDPOINT,
+      bucket: env.STORAGE_BUCKET,
+      accessKeyId: env.STORAGE_ACCESS_KEY_ID,
+      secretAccessKey: env.STORAGE_SECRET_ACCESS_KEY,
+      region: env.STORAGE_REGION ?? "auto",
+    };
+  } else {
+    candidate = { driver, root: env.STORAGE_ROOT ?? defaultRoot };
+  }
+  const parsed = storageConfigSchema.safeParse(candidate);
   if (!parsed.success) {
     throw new StorageConfigError(
       `invalid storage config: ${parsed.error.issues[0]?.message ?? "unknown error"}`,

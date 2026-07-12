@@ -22,8 +22,8 @@ export interface BundleStore {
   delete(key: string): Promise<void>;
 }
 
-/** The driver names this build understands (v1: local only). */
-export const STORAGE_DRIVERS = ["local"] as const;
+/** The driver names this build understands. */
+export const STORAGE_DRIVERS = ["local", "s3"] as const;
 
 /** Driver config. A discriminated union so future drivers add additively. */
 export const storageConfigSchema = z.discriminatedUnion("driver", [
@@ -31,6 +31,16 @@ export const storageConfigSchema = z.discriminatedUnion("driver", [
     driver: z.literal("local"),
     /** Root directory the local driver sandboxes all keys within. */
     root: z.string().min(1),
+  }),
+  z.object({
+    driver: z.literal("s3"),
+    /** Scheme + host (+ port): R2 account endpoint, MinIO address, any S3. */
+    endpoint: z.string().url(),
+    bucket: z.string().min(1),
+    accessKeyId: z.string().min(1),
+    secretAccessKey: z.string().min(1),
+    /** SigV4 region; R2 uses "auto", MinIO accepts anything. */
+    region: z.string().min(1).default("auto"),
   }),
 ]);
 
