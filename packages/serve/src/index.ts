@@ -25,6 +25,7 @@ export * from "./rate-limit.js";
 export * from "./render-page.js";
 export * from "./setup.js";
 export * from "./skills.js";
+export * from "./text-routes.js";
 
 export * as apiRoute from "./routes/api.js";
 export * as faviconRoute from "./routes/favicon.js";

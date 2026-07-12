@@ -8,6 +8,17 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.8.1" title="Text surfaces for every site">
+
+The agent and crawler surfaces (`llms.txt`, `llms-full.txt`, `robots.txt`,
+`sitemap.xml`, `rss.xml`, `skill.md`, the `/md/` raw-Markdown mirror, and
+`/.well-known/skills`) are now pure functions over a site's bundle in
+`@readsmith/serve`, so a multi-site host serves them per tenant through
+the exact code path the single-site app uses. Single-site output is
+unchanged.
+
+</Update>
+
 <Update label="0.8.0" title="Immutable asset URLs">
 
 Pages now reference their images and downloads by fingerprinted URLs

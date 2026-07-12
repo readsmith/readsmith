@@ -1,7 +1,5 @@
-import { getSite } from "../site.js";
-
-// Regenerate at most once a minute: a published deployment (pointer flip)
-// becomes visible without an app rebuild; docs-only output is unchanged.
+import { getBundle, getSite } from "../site.js";
+import { rawMarkdownResponse } from "../text-routes.js";
 
 export async function generateStaticParams(): Promise<{ slug?: string[] }[]> {
   const { build } = await getSite();
@@ -15,11 +13,5 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ slug?: string[] }> },
 ): Promise<Response> {
-  const { build } = await getSite();
-  const slug = ((await params).slug ?? []).join("/");
-  const page = build.pages.find((p) => p.slug === slug);
-  if (!page) return new Response("Not found", { status: 404 });
-  return new Response(page.rawMd, {
-    headers: { "content-type": "text/markdown; charset=utf-8" },
-  });
+  return rawMarkdownResponse(await getBundle(), ((await params).slug ?? []).join("/"));
 }
