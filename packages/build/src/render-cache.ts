@@ -6,7 +6,8 @@ import { z } from "zod";
  * The persisted render cache: P7's in-process, dependency-aware page cache made
  * durable through the artifact store, so a rebuild pays only for what changed
  * even across processes and deployments. Entries are content-addressed by the
- * page cacheKey (source + variables + theme + used-snippet hashes), which is
+ * page cacheKey (source + variables + theme + base path + used-snippet
+ * hashes), which is
  * why reuse is safe: a shared-snippet edit changes every dependent page's key,
  * an unrelated edit changes only its own. The cache is best-effort by
  * construction; a missing, corrupt, or unwritable entry only costs a render.

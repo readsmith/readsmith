@@ -543,6 +543,10 @@ async function buildPage(
     lib: input.libVersion ?? "0",
     trust,
     theme: config.site.theme ?? {},
+    // The base path is rendered into every internal href, so it must key the
+    // cache: a site moving between subpaths would otherwise serve cached pages
+    // whose links still carry the old prefix.
+    basePath,
     path: page.path,
     source: raw,
     globals,

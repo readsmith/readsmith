@@ -81,4 +81,26 @@ describe("persisted render cache", () => {
     expect(rebuilt.rebuiltPages.length).toBe(1); // only the corrupted entry's page
     expect(rebuilt.bundleJson).toBe(cold.bundleJson);
   });
+
+  it("keys the cache by base path: a subpath change re-renders, never serves stale hrefs", async () => {
+    const dir = await copyOfFixture();
+    await writeFile(
+      join(dir, "linked.md"),
+      "# Linked\n\nGo read [Getting started](getting-started.mdx).\n",
+    );
+    const htmlOf = (r: Awaited<ReturnType<typeof compileSite>>) =>
+      r.bundle.site.build.pages.find((p) => p.slug === "linked")?.html ?? "";
+    const first = await openRenderCache(store);
+    const rootPathed = await compileSite({ contentDir: dir, renderCache: first.cache });
+    expect(htmlOf(rootPathed)).toContain('href="/getting-started"');
+    await first.flush();
+
+    // The site moves under a subpath; sources are byte-identical.
+    await writeFile(join(dir, "docs.yaml"), "site:\n  name: site\n  url: https://x.dev/help\n");
+    const second = await openRenderCache(store);
+    const subPathed = await compileSite({ contentDir: dir, renderCache: second.cache });
+    expect(subPathed.rebuiltPages.length).toBeGreaterThan(0); // keys changed, no stale hits
+    expect(htmlOf(subPathed)).toContain('href="/help/getting-started"');
+    expect(htmlOf(subPathed)).not.toContain('href="/getting-started"');
+  });
 });
