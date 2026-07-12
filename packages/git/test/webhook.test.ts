@@ -51,15 +51,15 @@ describe("verifyWebhookSignature", () => {
 
 describe("parseWebhookEvent", () => {
   it("classifies pushes, branch deletions, and non-branch refs", () => {
-    expect(parseWebhookEvent("push", pushPayload("acme/docs", "main"))).toEqual({
+    expect(parseWebhookEvent("push", pushPayload("acme/hook-docs", "main"))).toEqual({
       kind: "push",
-      repo: "acme/docs",
+      repo: "acme/hook-docs",
       branch: "main",
       headSha: "abc123def456",
       deleted: false,
     });
     const gone = parseWebhookEvent("push", {
-      ...pushPayload("acme/docs", "main", "0000000000000000000000000000000000000000"),
+      ...pushPayload("acme/hook-docs", "main", "0000000000000000000000000000000000000000"),
       deleted: true,
     });
     expect(gone.kind === "push" && gone.deleted).toBe(true);
@@ -70,20 +70,20 @@ describe("parseWebhookEvent", () => {
     const created = parseWebhookEvent("installation", {
       action: "created",
       installation: { id: 42 },
-      repositories: [{ full_name: "acme/docs" }],
+      repositories: [{ full_name: "acme/hook-docs" }],
     });
     expect(created).toEqual({
       kind: "installation",
       installationId: "42",
-      reposBound: ["acme/docs"],
+      reposBound: ["acme/hook-docs"],
       reposUnbound: [],
     });
     const removed = parseWebhookEvent("installation_repositories", {
       action: "removed",
       installation: { id: 42 },
-      repositories_removed: [{ full_name: "acme/docs" }],
+      repositories_removed: [{ full_name: "acme/hook-docs" }],
     });
-    expect(removed.kind === "installation" && removed.reposUnbound).toEqual(["acme/docs"]);
+    expect(removed.kind === "installation" && removed.reposUnbound).toEqual(["acme/hook-docs"]);
     expect(parseWebhookEvent("issues", {}).kind).toBe("ignored");
   });
 });
@@ -99,7 +99,6 @@ describe.skipIf(!DATABASE_URL)("webhook handler (integration)", () => {
     createWebhookHandler({
       db,
       secret: SECRET,
-      siteId: SITE,
       enqueue: async (p) => {
         enqueued.push(p);
       },
@@ -116,11 +115,11 @@ describe.skipIf(!DATABASE_URL)("webhook handler (integration)", () => {
     await upsertSite(db, { id: SITE, name: "Hook Test" });
     await db.query(sql`DELETE FROM app.git_connections WHERE site_id = ${SITE}`);
     await upsertGitConnection(db, {
-      id: `conn:${SITE}:acme/docs`,
+      id: `conn:${SITE}:acme/hook-docs`,
       siteId: SITE,
       provider: "github",
       installationId: null,
-      repo: "acme/docs",
+      repo: "acme/hook-docs",
       branch: "main",
     });
   });
@@ -132,7 +131,7 @@ describe.skipIf(!DATABASE_URL)("webhook handler (integration)", () => {
   it("rejects a bad signature with 401 and no side effect", async () => {
     enqueued = [];
     const res = await handler()(
-      delivery("push", pushPayload("acme/docs", "main"), { signature: "sha256=bad" }),
+      delivery("push", pushPayload("acme/hook-docs", "main"), { signature: "sha256=bad" }),
     );
     expect(res.status).toBe(401);
     expect(enqueued).toEqual([]);
@@ -142,9 +141,8 @@ describe.skipIf(!DATABASE_URL)("webhook handler (integration)", () => {
     const res = await createWebhookHandler({
       db,
       secret: null,
-      siteId: SITE,
       enqueue: async () => {},
-    })(delivery("push", pushPayload("acme/docs", "main")));
+    })(delivery("push", pushPayload("acme/hook-docs", "main")));
     expect(res.status).toBe(503);
     expect(await res.text()).not.toContain(SECRET);
   });
@@ -156,21 +154,23 @@ describe.skipIf(!DATABASE_URL)("webhook handler (integration)", () => {
 
   it("enqueues one superseding build for a push to the connected repo+branch", async () => {
     enqueued = [];
-    const res = await handler()(delivery("push", pushPayload("ACME/docs", "main", "sha-push-1")));
+    const res = await handler()(
+      delivery("push", pushPayload("ACME/hook-docs", "main", "sha-push-1")),
+    );
     expect(res.status).toBe(202);
     expect(enqueued).toEqual([
-      { siteId: SITE, repo: "acme/docs", ref: "refs/heads/main", commitSha: "sha-push-1" },
+      { siteId: SITE, repo: "acme/hook-docs", ref: "refs/heads/main", commitSha: "sha-push-1" },
     ]);
   });
 
   it("ignores pushes to other branches, other repos, and deletions", async () => {
     enqueued = [];
-    expect((await handler()(delivery("push", pushPayload("acme/docs", "feature")))).status).toBe(
-      202,
-    );
+    expect(
+      (await handler()(delivery("push", pushPayload("acme/hook-docs", "feature")))).status,
+    ).toBe(202);
     expect((await handler()(delivery("push", pushPayload("other/repo", "main")))).status).toBe(202);
     const gone = {
-      ...pushPayload("acme/docs", "main", "0000000000000000000000000000000000000000"),
+      ...pushPayload("acme/hook-docs", "main", "0000000000000000000000000000000000000000"),
       deleted: true,
     };
     expect((await handler()(delivery("push", gone))).status).toBe(200);
@@ -181,7 +181,7 @@ describe.skipIf(!DATABASE_URL)("webhook handler (integration)", () => {
     const bind = {
       action: "created",
       installation: { id: 4242 },
-      repositories: [{ full_name: "acme/docs" }],
+      repositories: [{ full_name: "acme/hook-docs" }],
     };
     expect((await handler()(delivery("installation", bind))).status).toBe(200);
     expect((await getGitConnection(db, SITE))?.installation_id).toBe("4242");
@@ -189,7 +189,7 @@ describe.skipIf(!DATABASE_URL)("webhook handler (integration)", () => {
     const unbind = {
       action: "deleted",
       installation: { id: 4242 },
-      repositories: [{ full_name: "acme/docs" }],
+      repositories: [{ full_name: "acme/hook-docs" }],
     };
     expect((await handler()(delivery("installation", unbind))).status).toBe(200);
     expect((await getGitConnection(db, SITE))?.installation_id).toBeNull();

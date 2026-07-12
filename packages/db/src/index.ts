@@ -40,6 +40,7 @@ export {
   getCurrentDeployment,
   getGitConnection,
   listGitConnections,
+  listGitConnectionsByRepo,
   getSite,
   insertAiQuery,
   insertDeployment,

@@ -76,14 +76,22 @@ boot with a message naming the conflict.
   </Step>
   <Step title="Polling (firewalled hosts)">
     If GitHub cannot reach your instance at all, set
-    `GITHUB_POLL_INTERVAL=120` (seconds). Readsmith compares the branch head to
-    the last built commit with one API call per tick and builds on change.
-    Polling and webhooks can coexist safely; duplicate triggers deduplicate.
+    `GITHUB_POLL_INTERVAL=120` (seconds). Each tick sweeps every connected
+    site with one API call per connection, comparing the branch head to the
+    last built commit, and builds on change. Polling and webhooks can coexist
+    safely; duplicate triggers deduplicate.
   </Step>
 </Steps>
 
 Pushes to other branches and repositories are ignored. Set `GITHUB_BRANCH` to
 build something other than the repository's default branch.
+
+<Info>
+Since 0.6, both paths route by repository: a push (or poll tick) triggers a
+build for **every** site connected to that repository and branch. A
+single-site install behaves exactly as before; installs serving several
+sites from one repository fan out automatically.
+</Info>
 
 ## Deployments, atomicity, and rollback
 

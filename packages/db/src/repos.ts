@@ -514,14 +514,23 @@ export async function pruneSuperseded(
  */
 export async function setInstallationId(
   db: Db,
-  input: { siteId: string; repo: string; installationId: string | null },
+  input: { repo: string; installationId: string | null },
 ): Promise<boolean> {
   const rows = await db.query<{ id: string }>(sql`
     UPDATE app.git_connections
     SET installation_id = ${input.installationId}, updated_at = now()
-    WHERE site_id = ${input.siteId} AND lower(repo) = lower(${input.repo})
+    WHERE lower(repo) = lower(${input.repo})
     RETURNING id`);
   return rows.length > 0;
+}
+
+/** Every site connected to a repo (webhook fan-out; newest connection per site). */
+export async function listGitConnectionsByRepo(db: Db, repo: string): Promise<GitConnectionRow[]> {
+  const rows = await db.query(sql`
+    SELECT DISTINCT ON (site_id) ${GIT_CONNECTION_COLUMNS} FROM app.git_connections
+    WHERE lower(repo) = lower(${repo})
+    ORDER BY site_id, updated_at DESC`);
+  return rows.map((row) => gitConnectionRowSchema.parse(row));
 }
 
 // --- Analytics lite: search-gap log + page feedback ---

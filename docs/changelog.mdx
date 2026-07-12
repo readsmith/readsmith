@@ -8,6 +8,15 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.6.1" title="Webhooks route by repository">
+
+Push webhooks now enqueue a build for every site connected to the pushed
+repository and branch, not just the default site. A single-site install
+behaves exactly as before; a multi-site install fans out. Installation
+events likewise record the installation on every matching connection.
+
+</Update>
+
 <Update label="0.6.0" title="Multi-site builds">
 
 Two additions for installs that serve more than one site; single-site

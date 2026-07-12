@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { type Db, type Logger, getGitConnection, setInstallationId } from "@readsmith/db";
+import { type Db, type Logger, listGitConnectionsByRepo, setInstallationId } from "@readsmith/db";
 import type { SiteBuildPayload } from "./site-build.js";
 
 /**
@@ -91,7 +91,6 @@ export interface WebhookHandlerDeps {
   db: Db | null;
   /** The shared webhook secret; null = misconfigured, deliveries fail loudly. */
   secret: string | null;
-  siteId?: string;
   enqueue: (payload: SiteBuildPayload) => Promise<unknown>;
   logger?: Logger;
 }
@@ -105,14 +104,15 @@ function json(status: number, body: Record<string, unknown>): Response {
 
 /**
  * The webhook endpoint body, host-agnostic (a web Request in, a Response out).
- * Routing: `ping` acks; `push` on the connected repo+branch enqueues one
- * idempotent, superseding `site.build`; installation events record or clear the
- * installation id on the matching connection; everything else acks and ignores.
+ * Routing is by repository: `ping` acks; `push` enqueues one idempotent,
+ * superseding `site.build` for EVERY site connected to that repo and branch
+ * (a single-site install has exactly one, a multi-site host fans out);
+ * installation events record or clear the installation id on every matching
+ * connection; everything else acks and ignores.
  */
 export function createWebhookHandler(
   deps: WebhookHandlerDeps,
 ): (request: Request) => Promise<Response> {
-  const siteId = deps.siteId ?? "default";
   return async (request: Request): Promise<Response> => {
     if (!deps.secret) {
       return json(503, { error: "webhook received but no webhook secret is configured" });
@@ -141,13 +141,12 @@ export function createWebhookHandler(
           if (!deps.db) return json(200, { ignored: "no database" });
           for (const repo of event.reposBound) {
             await setInstallationId(deps.db, {
-              siteId,
               repo,
               installationId: event.installationId,
             });
           }
           for (const repo of event.reposUnbound) {
-            await setInstallationId(deps.db, { siteId, repo, installationId: null });
+            await setInstallationId(deps.db, { repo, installationId: null });
           }
           deps.logger?.info("installation recorded", {
             installation: event.installationId,
@@ -159,21 +158,29 @@ export function createWebhookHandler(
         case "push": {
           if (!deps.db) return json(200, { ignored: "no database" });
           if (event.deleted) return json(200, { ignored: "branch deleted" });
-          const connection = await getGitConnection(deps.db, siteId);
-          if (!connection || connection.repo.toLowerCase() !== event.repo.toLowerCase()) {
-            return json(202, { ignored: "repository is not connected" });
+          const connections = await listGitConnectionsByRepo(deps.db, event.repo);
+          const matching = connections.filter((c) => c.branch === event.branch);
+          if (matching.length === 0) {
+            return json(202, {
+              ignored: connections.length
+                ? "not the connected branch"
+                : "repository is not connected",
+            });
           }
-          if (connection.branch !== event.branch) {
-            return json(202, { ignored: "not the connected branch" });
+          for (const connection of matching) {
+            await deps.enqueue({
+              siteId: connection.site_id,
+              repo: connection.repo,
+              ref: `refs/heads/${event.branch}`,
+              commitSha: event.headSha,
+            });
           }
-          await deps.enqueue({
-            siteId,
-            repo: connection.repo,
-            ref: `refs/heads/${event.branch}`,
-            commitSha: event.headSha,
+          deps.logger?.info("push accepted", {
+            repo: event.repo,
+            commit: event.headSha,
+            sites: matching.length,
           });
-          deps.logger?.info("push accepted", { repo: connection.repo, commit: event.headSha });
-          return json(202, { queued: true });
+          return json(202, { queued: matching.length });
         }
       }
     } catch (err) {
