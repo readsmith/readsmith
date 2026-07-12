@@ -8,6 +8,16 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.5.1" title="Render any site's bundle">
+
+A small addition to `@readsmith/serve` for hosts that serve more than one
+site: `renderPageFromBundle(bundle, slug)` renders a page from any loaded
+bundle (pure, no ambient site), and `getBundle()` exposes the default
+site's bundle. Single-site serving is unchanged and delegates to the same
+code path.
+
+</Update>
+
 <Update label="0.5.0" title="The serving core is a package">
 
 Everything the web app does at request time (site resolution, bundle

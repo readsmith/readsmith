@@ -1,8 +1,7 @@
 import { type ShellSite, type ShellTab, renderShellBody } from "@readsmith/components";
 import { siteBasePath } from "@readsmith/config";
 import type { FinalNavNode, FinalNavTab, PageModel } from "@readsmith/mdx";
-import { getApiReference } from "./api-reference.js";
-import { getSite } from "./site.js";
+import { type Bundle, getBundle } from "./site.js";
 
 /**
  * Server-only. Renders one built page into the reading shell: sidebar and tab
@@ -40,9 +39,14 @@ export interface RenderedPage {
   html: string;
 }
 
-/** Render the page at `slug` into the shell, or null when no such page exists. */
-export async function renderDocPage(slug: string): Promise<RenderedPage | null> {
-  const { build, name, branding, url, logo, homeUrl, apiReference, footer } = await getSite();
+/**
+ * Render the page at `slug` from the given bundle, or null when no such page
+ * exists. Pure over its inputs: a multi-site host resolves the bundle per
+ * request (loadBundleForSite) and renders through the exact code path the
+ * single-site app uses, so tenant serving can never drift from self-host.
+ */
+export function renderPageFromBundle(bundle: Bundle, slug: string): RenderedPage | null {
+  const { build, name, branding, url, logo, homeUrl, apiReference, footer } = bundle.site;
   const page = build.pages.find((p) => p.slug === slug);
   if (!page) return null;
 
@@ -72,8 +76,13 @@ export async function renderDocPage(slug: string): Promise<RenderedPage | null> 
   };
 
   // Hybrid operation and data-model pages render their generated sections from
-  // the normalized spec; the bundle is memoized, so the read is cheap.
+  // the normalized spec, carried in the same bundle.
   const needsSpec = page.kind === "api-operation" || page.kind === "api-schema";
-  const apiSpec = needsSpec ? (await getApiReference())?.spec : undefined;
+  const apiSpec = needsSpec ? bundle.apiReference?.spec : undefined;
   return { page, html: renderShellBody(site, page, { apiSpec: apiSpec ?? null }) };
+}
+
+/** Render the default site's page at `slug` (the single-site app's path). */
+export async function renderDocPage(slug: string): Promise<RenderedPage | null> {
+  return renderPageFromBundle(await getBundle(), slug);
 }

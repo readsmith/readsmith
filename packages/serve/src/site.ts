@@ -140,7 +140,8 @@ export async function loadBundleForSite(siteId: string): Promise<Bundle | null> 
   return siteId === DEFAULT_SITE_ID ? loadLocalBundle() : null;
 }
 
-async function loadBundle(): Promise<Bundle> {
+/** The default site's whole bundle (site plus API reference). Throws when absent. */
+export async function getBundle(): Promise<Bundle> {
   const bundle = await loadBundleForSite(DEFAULT_SITE_ID);
   if (!bundle) {
     throw new Error("content bundle missing - run the content build (pnpm build / predev)");
@@ -158,9 +159,9 @@ export function invalidateSiteCache(siteId?: string): void {
 }
 
 export async function getSite(): Promise<Site> {
-  return (await loadBundle()).site;
+  return (await getBundle()).site;
 }
 
 export async function getApiReference(): Promise<ApiReference | null> {
-  return (await loadBundle()).apiReference;
+  return (await getBundle()).apiReference;
 }
