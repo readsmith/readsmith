@@ -22,9 +22,13 @@ async function main() {
   // The persisted render cache makes repeated local builds pay only for the
   // diff; it is an accelerator only and never changes the produced bytes.
   const persisted = await openRenderCache(store).catch(() => null);
+  const failOnError = ["1", "true", "yes"].includes(
+    (process.env.READSMITH_FAIL_ON_ERROR ?? "").toLowerCase(),
+  );
   const { config, bundle, bundleJson, apiReferenceDiagnostics, rebuiltPages } = await compileSite({
     contentDir: CONTENT_DIR,
     renderCache: persisted?.cache,
+    failOnError,
   });
 
   // Config diagnostics (reserved paths, asset mounts, home page) matter as much as
@@ -56,6 +60,13 @@ async function main() {
     for (const d of build.diagnostics.slice(0, 20)) {
       console.warn(`  ${d.severity} ${d.code} (${d.source}): ${d.message}`);
     }
+  }
+
+  if (!bundle.site.build.ok) {
+    // Strict mode: a failed build never becomes the served artifact.
+    await persisted?.flush().catch(() => {});
+    console.error(`[readsmith] build failed (READSMITH_FAIL_ON_ERROR): ${errors} error(s)`);
+    process.exit(1);
   }
 
   await store.put(BUNDLE_KEY, bundleJson);

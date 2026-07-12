@@ -94,6 +94,11 @@ wins even when its build finishes first; the stale build is recorded as
 superseded and never served.
 
 ```bash
+# Build and publish right now (branch head, a named branch, or an exact commit)
+pnpm site:build
+pnpm site:build main
+pnpm site:build 3f9c2e1a...
+
 # The deployment history, newest first (* marks what is serving)
 pnpm site:rollback --list
 
@@ -110,6 +115,11 @@ re-renders one page, and a shared-snippet edit re-renders exactly the pages
 that embed it. History keeps the last 20 non-current snapshots by default
 (`READSMITH_KEEP_DEPLOYMENTS`); older ones are pruned after each publish, and
 the currently-served deployment is never touched.
+
+By default a page with a broken component or bad syntax builds anyway, with the
+problem reported as a diagnostic: one bad page should not take your docs down.
+Set `READSMITH_FAIL_ON_ERROR=true` to invert that for CI-style strictness: any
+page error fails the whole build, and the previous deployment keeps serving.
 
 ## What the build will not do
 

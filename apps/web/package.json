@@ -14,6 +14,7 @@
     "ai:index": "node scripts/ai-index.mjs",
     "ai:reindex": "node scripts/ai-index.mjs --reindex",
     "skill:generate": "node scripts/generate-skill.mjs",
+    "site:build": "node scripts/site-build.mjs",
     "site:rollback": "node scripts/site-rollback.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome check ."

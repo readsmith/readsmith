@@ -54,3 +54,19 @@ describe("compileSite", () => {
     ]);
   });
 });
+
+describe("compileSite failOnError", () => {
+  it("builds resiliently by default: diagnostics ride along, ok stays true", async () => {
+    const { bundle } = await compileSite({ contentDir: fixture("broken-page") });
+    expect(bundle.site.build.ok).toBe(true);
+    expect(bundle.site.build.diagnostics.some((d) => d.severity === "error")).toBe(true);
+  });
+
+  it("strict mode marks the build not-ok so callers refuse to publish it", async () => {
+    const { bundle } = await compileSite({
+      contentDir: fixture("broken-page"),
+      failOnError: true,
+    });
+    expect(bundle.site.build.ok).toBe(false);
+  });
+});

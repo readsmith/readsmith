@@ -49,6 +49,8 @@ export interface RunSiteBuildDeps {
   afterFlip?: (row: DeploymentRow) => void | Promise<void>;
   /** Build wall-clock budget, seconds. */
   timeoutSec?: number;
+  /** Strict mode: a page-level error diagnostic fails the build (nothing publishes). */
+  failOnError?: boolean;
   /**
    * Rollback-history retention, applied after every publish: non-current
    * snapshots beyond the most recent `keepLast` are marked pruned and their
@@ -93,6 +95,7 @@ export async function runSiteBuild(
     },
     limits: { timeoutSec: deps.timeoutSec ?? 300 },
     artifact: { bundlePrefix: BUNDLE_PREFIX },
+    failOnError: deps.failOnError,
   });
 
   if (!result.ok || result.bundleKey === null || result.bundleHash === null) {

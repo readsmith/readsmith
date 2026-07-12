@@ -21,6 +21,8 @@ export interface ExecutorJob {
   source: { repo: string; commitSha: string; installationId?: string | null };
   limits: { timeoutSec: number };
   artifact: { bundlePrefix: string };
+  /** Strict mode: a page-level error diagnostic fails the build (nothing publishes). */
+  failOnError?: boolean;
 }
 
 export interface ExecutorResult {
@@ -92,8 +94,26 @@ export function createInProcessExecutor(deps: {
             contentDir: dir,
             siteId: job.siteId,
             renderCache: persisted?.cache,
+            failOnError: job.failOnError,
           });
         });
+        if (!compiled.bundle.site.build.ok) {
+          // Strict mode tripped: report the diagnostics, publish nothing. The
+          // successful page renders still flush (they make the retry cheap).
+          await persisted?.flush().catch(() => {});
+          return {
+            ok: false,
+            bundleKey: null,
+            bundleHash: null,
+            pageCount: compiled.bundle.site.build.pages.length,
+            rendered: compiled.rebuiltPages.length,
+            diagnostics: [
+              ...compiled.apiReferenceDiagnostics,
+              ...compiled.bundle.site.build.diagnostics,
+            ],
+            usage: { wallMs: now() - started },
+          };
+        }
         const bundleKey = `${job.artifact.bundlePrefix}${compiled.bundleHash}.json`;
         await deps.store.put(bundleKey, compiled.bundleJson);
         await persisted?.flush().catch(() => {});

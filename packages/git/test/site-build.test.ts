@@ -221,3 +221,67 @@ describe.skipIf(!DATABASE_URL)("retention (integration)", () => {
     expect((await getCurrentDeployment(db, { siteId: SITE }))?.bundle_ref).toBe(refs[2]);
   });
 });
+
+describe.skipIf(!DATABASE_URL)("failOnError (integration)", () => {
+  const SITE = "strict-test";
+  let db: Db;
+  let store: BundleStore;
+
+  const brokenProvider: GitProvider = {
+    async fetchAtRef(_t, destDir) {
+      await cp(FIXTURE, destDir, { recursive: true });
+      await writeFile(join(destDir, "broken.mdx"), "# Broken\n\n<Unclosed\n");
+    },
+  };
+
+  beforeAll(async () => {
+    db = createDb({
+      databaseUrl: DATABASE_URL ?? "",
+      storageRoot: ".rs-test",
+      workerConcurrency: 2,
+      logLevel: "error",
+    });
+    await runMigrations(db);
+    await upsertSite(db, { id: SITE, name: "Strict Test" });
+    await db.query(sql`DELETE FROM app.deployments WHERE site_id = ${SITE}`);
+    store = createBundleStore({ driver: "local", root: await mkdtemp(join(tmpdir(), "rs-str-")) });
+  });
+
+  afterAll(async () => {
+    await db?.close();
+  });
+
+  const payload = (sha: string) => ({
+    siteId: SITE,
+    repo: "acme/docs",
+    ref: "refs/heads/main",
+    commitSha: sha,
+  });
+
+  it("default: a broken page publishes with diagnostics", async () => {
+    const executor = createInProcessExecutor({ provider: brokenProvider, store });
+    const row = await runSiteBuild({ db, store, executor }, payload("strict-sha-1"));
+    expect(row.status).toBe("ready");
+    expect(row.is_current).toBe(true);
+  });
+
+  it("strict: a broken page fails the build and never moves the pointer", async () => {
+    const before = await getCurrentDeployment(db, { siteId: SITE });
+    const executor = createInProcessExecutor({ provider: brokenProvider, store });
+    const row = await runSiteBuild(
+      { db, store, executor, failOnError: true },
+      payload("strict-sha-2"),
+    );
+    expect(row.status).toBe("failed");
+    expect(row.is_current).toBe(false);
+    expect((await getCurrentDeployment(db, { siteId: SITE }))?.id).toBe(before?.id);
+    // Healthy content under the same strict flag still publishes.
+    const healthy = createInProcessExecutor({ provider, store });
+    const fixed = await runSiteBuild(
+      { db, store, executor: healthy, failOnError: true },
+      payload("strict-sha-3"),
+    );
+    expect(fixed.status).toBe("ready");
+    expect(fixed.is_current).toBe(true);
+  });
+});

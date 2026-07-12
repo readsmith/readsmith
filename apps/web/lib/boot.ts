@@ -60,6 +60,9 @@ export async function boot(): Promise<void> {
       // publish (their artifacts too, when no live deployment shares them).
       const keepRaw = Number(process.env.READSMITH_KEEP_DEPLOYMENTS ?? "20");
       const keepLast = Number.isInteger(keepRaw) && keepRaw >= 0 ? keepRaw : 20;
+      const failOnError = ["1", "true", "yes"].includes(
+        (process.env.READSMITH_FAIL_ON_ERROR ?? "").toLowerCase(),
+      );
       await runner.work(siteBuildJob, async (payload) => {
         await runSiteBuild(
           {
@@ -68,6 +71,7 @@ export async function boot(): Promise<void> {
             executor,
             logger: log,
             retention: { keepLast },
+            failOnError,
             afterFlip: async (row) => {
               // This graph's pointer cache re-resolves immediately (the routes'
               // copy follows via TTL + revalidation), then search converges.

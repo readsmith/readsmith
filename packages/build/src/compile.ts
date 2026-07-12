@@ -31,6 +31,12 @@ export interface CompileSiteInput {
    * `bundleJson` is byte-identical for the same content.
    */
   renderCache?: RenderCache;
+  /**
+   * Strict mode: when any page produces an error diagnostic, the result's
+   * `bundle.site.build.ok` is false and callers must not publish or serve it.
+   * Default (false) keeps the resilient behavior: build with diagnostics.
+   */
+  failOnError?: boolean;
 }
 
 /** The API reference as it rides inside the bundle. */
@@ -256,6 +262,7 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
     readPage: (path) => readFile(join(contentRoot, path), "utf8"),
     registry: createRegistry({ apiSpec: reference?.spec ?? null }),
     renderCache: input.renderCache,
+    failOnError: input.failOnError,
     baseUrl: config.site.url,
     apiReference:
       reference && config.apiReference
