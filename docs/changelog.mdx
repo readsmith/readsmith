@@ -8,6 +8,28 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.3.0" title="S3-compatible storage">
+
+The compiled-site store now speaks S3: keep the zero-config local filesystem,
+or point the same port at Cloudflare R2, MinIO, or any S3-compatible bucket.
+
+- **`STORAGE_DRIVER=s3`**: five environment variables move the bundle store
+  (deployments, render cache and all) into object storage; the local driver
+  remains the default and needs nothing
+- **Bundled MinIO, opt-in**: `docker compose --profile s3 up` adds MinIO with
+  a console and creates the bucket on first start; the default two-service
+  deployment is unchanged
+- **Zero new dependencies**: request signing is implemented against AWS's
+  published test vectors and verified against real MinIO
+- **Instant deploys across instances**: publishes and rollbacks now signal
+  every running instance over Postgres, so multi-instance installs converge in
+  milliseconds instead of waiting out a cache window
+- Groundwork for serving many sites from one install (a host-to-site
+  resolution seam and per-site bundle caching), invisible to single-site
+  deployments
+
+</Update>
+
 <Update label="0.2.0" title="Deploy on push">
 
 Connect a GitHub repository and Readsmith becomes a deployment pipeline. See

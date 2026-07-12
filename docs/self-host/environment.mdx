@@ -38,6 +38,23 @@ filesystem driver remains the zero-config path.
 <Snippet file="storage-root.md" />
 </Warning>
 
+## Git deploys
+
+The full setup lives in [Deploy on push](/self-host/git-deploys); this is the
+reference. Configure exactly one auth mode: the App pair or a PAT, never both.
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `GITHUB_APP_ID` | unset | App mode: the GitHub App's id (pairs with the private key) |
+| `GITHUB_APP_PRIVATE_KEY` | unset | App mode: the App's private key, `\n`-escaped on one line |
+| `GITHUB_PAT` | unset | PAT mode: a fine-grained personal access token (read-only contents) |
+| `GITHUB_WEBHOOK_SECRET` | unset | Verifies webhook deliveries; required for the webhook path |
+| `GITHUB_REPO` | unset | The `owner/name` to serve; binding auto-builds a site with no history |
+| `GITHUB_BRANCH` | repo default | Build a branch other than the repository's default |
+| `GITHUB_POLL_INTERVAL` | off | Polling fallback, seconds, for instances webhooks cannot reach |
+| `READSMITH_KEEP_DEPLOYMENTS` | `20` | Rollback history kept per site; older snapshots prune after each publish (`0` disables) |
+| `READSMITH_FAIL_ON_ERROR` | `false` | Strict builds: any page error fails the deploy instead of publishing with diagnostics |
+
 ## AI keys
 
 Keys resolve in a fixed order: a role-specific override wins, then the provider-native variable for whichever provider your `docs.yaml` names.
@@ -89,6 +106,7 @@ CSP sources from the environment add to `docs.yaml` `security.csp` and to the st
 | `CACHE_DRIVER` | `memory` | The query-embedding cache driver; in-memory suits a single instance |
 | `READSMITH_LOG_LEVEL` | `info` | Log verbosity |
 | `READSMITH_WORKER_CONCURRENCY` | `2` | Background job concurrency |
+| `READSMITH_SITE_CACHE_MAX` | `16` | Hydrated site bundles held in memory; single-site installs never need more than one |
 | `READSMITH_MIGRATIONS_DIR` | resolved from the package | Where database migrations load from; the compose image sets it, you rarely will |
 
 ## Compose-only

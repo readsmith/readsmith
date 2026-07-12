@@ -15,7 +15,10 @@ docker-compose.yml
 └── db         Postgres 16 + pgvector: search, vectors, jobs
 ```
 
-The compose file in the repository root is the reference deployment. It wires the database with a health check, a persistent volume for each store, and the app port; you provide an `.env` created from `.env.example`.
+The compose file in the repository root is the reference deployment. An
+optional third service exists behind a profile: `docker compose --profile s3
+up` adds MinIO as an S3-compatible bundle store (see
+[Environment](/self-host/environment) for the `STORAGE_*` variables). It wires the database with a health check, a persistent volume for each store, and the app port; you provide an `.env` created from `.env.example`.
 
 ## From zero to serving
 
