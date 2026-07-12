@@ -9,6 +9,7 @@ import {
   analyticsHeadHtml,
   contentRootOf,
   resolveConfig,
+  siteBasePath,
 } from "@readsmith/config";
 import { type AuthoredSkill, type RenderCache, type SiteBuild, assembleSite } from "@readsmith/mdx";
 import {
@@ -91,10 +92,16 @@ export interface CompiledSiteEnvelope {
 
 /** One served asset inside the bundle manifest. */
 export interface CompiledAssetRef {
-  /** Content-addressed artifact key (`assets/{sha256}`), shared across deploys. */
+  /** Content-addressed artifact key (`sites/{siteId}/assets/{sha256}`), shared across deploys. */
   key: string;
   contentType: string;
   bytes: number;
+  /**
+   * True on fingerprinted paths (`logo.{hash}.svg`): the URL names exact
+   * bytes, so it may be cached forever. The authored path stays servable with
+   * short freshness for links that live outside the site.
+   */
+  immutable?: boolean;
 }
 
 /** An asset the caller must store so the manifest's keys resolve. */
@@ -294,6 +301,14 @@ async function readSkills(contentRoot: string): Promise<AuthoredSkill[]> {
  * Pure with respect to its inputs: no clock, no randomness, no writes; the
  * caller decides where the bytes land.
  */
+/** `/images/logo.svg` + hash -> `/images/logo.{hash10}.svg`; null when extensionless. */
+function fingerprintPath(path: string, hash: string): string | null {
+  const dot = path.lastIndexOf(".");
+  const slash = path.lastIndexOf("/");
+  if (dot <= slash + 1) return null;
+  return `${path.slice(0, dot)}.${hash.slice(0, 10)}${path.slice(dot)}`;
+}
+
 export async function compileSite(input: CompileSiteInput): Promise<CompileSiteResult> {
   const siteId = input.siteId ?? "default";
   const resolved = await resolveConfig(input.contentDir);
@@ -329,20 +344,57 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
   // Assets ride the bundle as a manifest of content-addressed keys: the same
   // sorted walk the local public/ copy uses, so both flows serve exactly the
   // same set. Hashing reads every asset, which is what makes the manifest
-  // deterministic and the artifacts shareable across deployments.
+  // deterministic and the artifacts shareable across deployments. Keys are
+  // site-scoped so retention GC and quota accounting stay per-site.
   const collected = await collectAssets(input.contentDir, config);
   const assets: Record<string, CompiledAssetRef> = {};
   const assetFiles: CompiledAssetFile[] = [];
   const seenKeys = new Set<string>();
+  const fingerprints: [original: string, fingerprinted: string][] = [];
   for (const entry of collected.entries) {
     const bytes = await readFile(entry.source);
-    const key = `assets/${createHash("sha256").update(bytes).digest("hex")}`;
+    const hash = createHash("sha256").update(bytes).digest("hex");
+    const key = `sites/${siteId}/assets/${hash}`;
     const contentType = assetContentType(entry.key);
-    assets[`/${entry.key}`] = { key, contentType, bytes: bytes.length };
+    const originalPath = `/${entry.key}`;
+    assets[originalPath] = { key, contentType, bytes: bytes.length };
+    const fingerprinted = fingerprintPath(originalPath, hash);
+    if (fingerprinted) {
+      assets[fingerprinted] = { key, contentType, bytes: bytes.length, immutable: true };
+      fingerprints.push([originalPath, fingerprinted]);
+    }
     if (!seenKeys.has(key)) {
       seenKeys.add(key);
       assetFiles.push({ key, source: entry.source, contentType });
     }
+  }
+
+  // Rewrite page references to the fingerprinted URLs (quoted attribute values
+  // only, so prose that merely mentions a path is untouched). Runs on the
+  // assembled HTML, after the per-page render cache, so cached pages cannot
+  // pin stale fingerprints and the cache key needs no asset awareness.
+  if (fingerprints.length > 0) {
+    const base = siteBasePath(config.site.url);
+    const rewrite = (html: string): string => {
+      let out = html;
+      for (const [original, fingerprinted] of fingerprints) {
+        out = out.replaceAll(`"${base}${original}"`, `"${base}${fingerprinted}"`);
+      }
+      return out;
+    };
+    for (const page of build.pages) {
+      page.html = rewrite(page.html);
+    }
+    const asImage = (image?: { light: string; dark: string }) => {
+      if (!image) return image;
+      const map = new Map(fingerprints);
+      return {
+        light: map.get(image.light) ?? image.light,
+        dark: map.get(image.dark) ?? image.dark,
+      };
+    };
+    config.site.logo = asImage(config.site.logo);
+    config.site.favicon = asImage(config.site.favicon);
   }
 
   // The artifact must not remember how it was built: `rebuilt` varies with

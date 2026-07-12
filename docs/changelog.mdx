@@ -8,6 +8,22 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.8.0" title="Immutable asset URLs">
+
+Pages now reference their images and downloads by fingerprinted URLs
+(`mark.3f9c2e1a04.svg`), rewritten at build time from the same hashes the
+asset manifest already carries. A fingerprinted URL names exact bytes, so
+it is served with year-long immutable caching and can never go stale: a
+changed image changes the URL, and the very next deployment's pages point
+at it. Authored paths keep working with short freshness for links that
+live outside the site.
+
+Also in this release: asset storage is scoped per site, and retention now
+garbage-collects assets referenced only by pruned deployments, so
+rollback history keeps exactly what it needs.
+
+</Update>
+
 <Update label="0.7.0" title="Deployments carry their assets">
 
 Git-deployed sites now serve their images, fonts, and downloads. The build

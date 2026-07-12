@@ -485,7 +485,7 @@ export async function listDeployments(
 export async function pruneSuperseded(
   db: Db,
   input: { siteId: string; keepLast: number },
-): Promise<{ prunedIds: string[]; unreferencedRefs: string[] }> {
+): Promise<{ prunedIds: string[]; unreferencedRefs: string[]; retainedRefs: string[] }> {
   return db.tx(async (tx) => {
     await tx.query(sql`SELECT id FROM app.sites WHERE id = ${input.siteId} FOR UPDATE`);
     const candidates = await tx.query<{ id: string }>(sql`
@@ -494,7 +494,7 @@ export async function pruneSuperseded(
       ORDER BY build_seq DESC
       OFFSET ${input.keepLast}`);
     const ids = candidates.map((c) => c.id);
-    if (ids.length === 0) return { prunedIds: [], unreferencedRefs: [] };
+    if (ids.length === 0) return { prunedIds: [], unreferencedRefs: [], retainedRefs: [] };
     await tx.query(sql`
       UPDATE app.deployments SET status = 'pruned' WHERE id = ANY(${ids})`);
     const refs = await tx.query<{ bundle_ref: string }>(sql`
@@ -503,7 +503,14 @@ export async function pruneSuperseded(
         AND bundle_ref NOT IN (
           SELECT bundle_ref FROM app.deployments
           WHERE site_id = ${input.siteId} AND status <> 'pruned' AND bundle_ref IS NOT NULL)`);
-    return { prunedIds: ids, unreferencedRefs: refs.map((r) => r.bundle_ref) };
+    const retained = await tx.query<{ bundle_ref: string }>(sql`
+      SELECT DISTINCT bundle_ref FROM app.deployments
+      WHERE site_id = ${input.siteId} AND status <> 'pruned' AND bundle_ref IS NOT NULL`);
+    return {
+      prunedIds: ids,
+      unreferencedRefs: refs.map((r) => r.bundle_ref),
+      retainedRefs: retained.map((r) => r.bundle_ref),
+    };
   });
 }
 

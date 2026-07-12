@@ -138,7 +138,7 @@ describe("asset manifest", () => {
     expect(a.bundleJson).toBe(b.bundleJson);
     const ref = a.bundle.site.assets?.["/images/logo.svg"];
     expect(ref).toBeDefined();
-    expect(ref?.key).toMatch(/^assets\/[0-9a-f]{64}$/);
+    expect(ref?.key).toMatch(/^sites\/default\/assets\/[0-9a-f]{64}$/);
     expect(ref?.contentType).toBe("image/svg+xml");
     expect(ref?.bytes).toBeGreaterThan(0);
     // The returned files back exactly the manifest's keys.
@@ -149,7 +149,47 @@ describe("asset manifest", () => {
     const dir = await siteWithAssets();
     const { bundle } = await compileSite({ contentDir: dir });
     const paths = Object.keys(bundle.site.assets ?? {}).sort();
-    // The fixture's own logo.svg plus the added image; never .md or docs.yaml.
-    expect(paths).toEqual(["/images/logo.svg", "/logo.svg"]);
+    // The fixture's own logo.svg plus the added image, each under its authored
+    // path AND its fingerprinted alias; never .md or docs.yaml.
+    expect(paths.filter((p) => !/\.[0-9a-f]{10}\./.test(p))).toEqual([
+      "/images/logo.svg",
+      "/logo.svg",
+    ]);
+    expect(paths.filter((p) => /\.[0-9a-f]{10}\./.test(p))).toHaveLength(2);
+  });
+});
+
+describe("asset fingerprinting", () => {
+  it("rewrites quoted page references to the immutable alias, leaving prose alone", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "rs-fp-"));
+    await mkdir(join(dir, "images"), { recursive: true });
+    await writeFile(join(dir, "images", "mark.svg"), "<svg><g/></svg>");
+    await writeFile(
+      join(dir, "index.md"),
+      "# Home\n\n![The mark](/images/mark.svg)\n\nThe file lives at /images/mark.svg on disk.\n",
+    );
+    const { bundle } = await compileSite({ contentDir: dir });
+    const aliases = Object.entries(bundle.site.assets ?? {}).filter(([, ref]) => ref.immutable);
+    expect(aliases).toHaveLength(1);
+    const alias = aliases[0]?.[0];
+    expect(alias).toMatch(/^\/images\/mark\.[0-9a-f]{10}\.svg$/);
+    const html = bundle.site.build.pages[0]?.html ?? "";
+    expect(html).toContain(`src="${alias}"`);
+    expect(html).not.toContain('src="/images/mark.svg"');
+    // The prose mention is not an attribute and stays authored.
+    expect(html).toContain("/images/mark.svg on disk");
+    // Both paths resolve to the same content address.
+    expect(bundle.site.assets?.["/images/mark.svg"]?.key).toBe(
+      bundle.site.assets?.[alias ?? ""]?.key,
+    );
+  });
+
+  it("fingerprinted output is deterministic", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "rs-fp2-"));
+    await writeFile(join(dir, "index.md"), "![m](/m.png)");
+    await writeFile(join(dir, "m.png"), Buffer.from([137, 80, 78, 71]));
+    const a = await compileSite({ contentDir: dir });
+    const b = await compileSite({ contentDir: dir });
+    expect(a.bundleJson).toBe(b.bundleJson);
   });
 });

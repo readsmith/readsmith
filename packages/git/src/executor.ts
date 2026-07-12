@@ -118,12 +118,12 @@ export function createInProcessExecutor(deps: {
           };
         }
         // Assets go in before the bundle that references them: content-addressed
-        // keys make the puts idempotent and shareable across deployments, and a
-        // key that already exists is skipped rather than rewritten.
+        // keys make the puts idempotent and shareable across deployments.
+        // Deliberately unconditional (no exists-check): a concurrent retention
+        // GC could delete a key between a skipped put and this build's publish,
+        // and re-writing identical bytes is cheaper than that race.
         for (const file of compiled.assetFiles) {
-          if (!(await deps.store.has(file.key))) {
-            await deps.store.put(file.key, await readFile(file.source));
-          }
+          await deps.store.put(file.key, await readFile(file.source));
         }
         const bundleKey = `${job.artifact.bundlePrefix}${compiled.bundleHash}.json`;
         await deps.store.put(bundleKey, compiled.bundleJson);

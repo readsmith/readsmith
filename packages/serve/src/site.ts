@@ -47,7 +47,7 @@ export interface Site {
   /** Opaque AI config block from docs.yaml (validated at runtime by @readsmith/ai). */
   ai?: unknown;
   /** Static assets by serving path, each naming a content-addressed artifact key. */
-  assets?: Record<string, { key: string; contentType: string; bytes: number }>;
+  assets?: Record<string, { key: string; contentType: string; bytes: number; immutable?: boolean }>;
 }
 
 /** The normalized API reference, ready to render. */
@@ -193,13 +193,17 @@ export async function loadSiteAsset(
   const bundle = await loadBundleForSite(siteId);
   const ref = bundle?.site.assets?.[path.startsWith("/") ? path : `/${path}`];
   if (!ref) return null;
-  const etag = `"${ref.key.slice("assets/".length)}"`;
+  const etag = `"${ref.key.slice(ref.key.lastIndexOf("/") + 1)}"`;
   const headers: Record<string, string> = {
     "content-type": ref.contentType,
     etag,
-    // The PATH is mutable across deployments even though the bytes behind an
-    // ETag never are, so freshness is short and revalidation is cheap (304).
-    "cache-control": "public, max-age=300, stale-while-revalidate=600",
+    // A fingerprinted path names exact bytes and may be cached forever. The
+    // authored path is mutable across deployments even though the bytes
+    // behind an ETag never are, so its freshness is short and revalidation
+    // is cheap (304).
+    "cache-control": ref.immutable
+      ? "public, max-age=31536000, immutable"
+      : "public, max-age=300, stale-while-revalidate=600",
   };
   if (request?.headers.get("if-none-match") === etag) {
     return new Response(null, { status: 304, headers });

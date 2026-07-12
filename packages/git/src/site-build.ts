@@ -149,15 +149,41 @@ export async function runSiteBuild(
     if (keepLast > 0) {
       // Retention is housekeeping: a fault here never fails a published build.
       try {
-        const { prunedIds, unreferencedRefs } = await pruneSuperseded(db, {
+        const { prunedIds, unreferencedRefs, retainedRefs } = await pruneSuperseded(db, {
           siteId: payload.siteId,
           keepLast,
         });
+        // Asset GC: keys referenced only by the bundles being deleted. Read
+        // the pruned manifests BEFORE deleting them, subtract every key a
+        // retained bundle still references, and only ever touch this site's
+        // scoped prefix. Executors re-put assets unconditionally, so the
+        // worst concurrent-build race rewrites bytes instead of dangling.
+        const assetPrefix = `sites/${payload.siteId}/assets/`;
+        const assetKeysOf = async (refs: string[]): Promise<Set<string>> => {
+          const keys = new Set<string>();
+          for (const ref of refs) {
+            const bytes = await store.get(ref);
+            if (!bytes) continue;
+            const parsed = JSON.parse(bytes.toString("utf8")) as {
+              site?: { assets?: Record<string, { key?: string }> };
+            };
+            for (const entry of Object.values(parsed.site?.assets ?? {})) {
+              if (entry.key?.startsWith(assetPrefix)) keys.add(entry.key);
+            }
+          }
+          return keys;
+        };
+        const dead = await assetKeysOf(unreferencedRefs);
+        if (dead.size > 0) {
+          for (const live of await assetKeysOf(retainedRefs)) dead.delete(live);
+        }
         for (const ref of unreferencedRefs) await store.delete(ref);
+        for (const key of dead) await store.delete(key);
         if (prunedIds.length > 0) {
           logger?.info("deployments pruned", {
             pruned: prunedIds.length,
             artifactsDeleted: unreferencedRefs.length,
+            assetsDeleted: dead.size,
             keepLast,
           });
         }

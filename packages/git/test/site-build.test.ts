@@ -194,11 +194,15 @@ describe.skipIf(!DATABASE_URL)("retention (integration)", () => {
   });
 
   it("prunes old snapshots and deletes unshared artifacts, never the current one", async () => {
-    // Three deployments with distinct content (distinct artifact refs).
+    // Three deployments with distinct content (distinct artifact refs). Each
+    // ships one shared asset (same bytes in every build) and one unique to
+    // the build, so asset GC has both a survivor and a casualty to prove.
     const providerFor = (marker: string): GitProvider => ({
       async fetchAtRef(_t, destDir) {
         await cp(FIXTURE, destDir, { recursive: true });
         await writeFile(join(destDir, "extra.md"), `# Extra\n\n${marker}\n`);
+        await writeFile(join(destDir, "shared.svg"), "<svg><title>shared</title></svg>");
+        await writeFile(join(destDir, "only.svg"), `<svg><title>${marker}</title></svg>`);
       },
     });
     const refs: string[] = [];
@@ -219,6 +223,24 @@ describe.skipIf(!DATABASE_URL)("retention (integration)", () => {
     const history = await listDeployments(db, { siteId: SITE, limit: 10 });
     expect(history.find((d) => d.bundle_ref === refs[0])?.status).toBe("pruned");
     expect((await getCurrentDeployment(db, { siteId: SITE }))?.bundle_ref).toBe(refs[2]);
+
+    // Asset GC: the pruned build's unique asset is gone, the asset shared by
+    // every build survives, and the retained builds' assets are untouched.
+    const storedAssets = await store.list(`sites/${SITE}/assets/`);
+    const manifestOf = async (ref: string) => {
+      const parsed = JSON.parse((await store.get(ref))?.toString("utf8") ?? "{}") as {
+        site?: { assets?: Record<string, { key: string }> };
+      };
+      return parsed.site?.assets ?? {};
+    };
+    const retainedKeys = new Set<string>();
+    for (const ref of [refs[1] ?? "", refs[2] ?? ""]) {
+      for (const entry of Object.values(await manifestOf(ref))) retainedKeys.add(entry.key);
+    }
+    // Everything retained bundles reference is still stored...
+    for (const key of retainedKeys) expect(storedAssets).toContain(key);
+    // ...and nothing else is: the pruned build's unique asset was collected.
+    expect(new Set(storedAssets)).toEqual(retainedKeys);
   });
 });
 
