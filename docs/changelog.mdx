@@ -1,12 +1,39 @@
 ---
 title: Changelog
 description: What shipped in each Readsmith release.
-date: "2026-07-11"
+date: "2026-07-12"
 ---
 
 # Changelog
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
+
+<Update label="0.2.0" title="Deploy on push">
+
+Connect a GitHub repository and Readsmith becomes a deployment pipeline. See
+[Deploy on push](/self-host/git-deploys) for the five-minute setup.
+
+- **Git-connected deployments**: a push to the connected branch fetches that
+  exact commit, builds it, and publishes atomically; readers only ever see the
+  old site or the whole new one
+- **Two ways in**: a GitHub App created for you by a one-click setup page, or a
+  fine-grained personal access token with two environment variables
+- **Instant rollback**: every deployment is an immutable snapshot; repointing
+  is one command, and history prunes itself
+- **Races resolved correctly**: when pushes overlap, the newer commit wins even
+  if its build finishes first
+- **Incremental rebuilds**: a persisted render cache means a one-page edit
+  re-renders one page, and a shared-snippet edit exactly its dependents
+- **Polling fallback** for instances GitHub cannot reach, and a manual
+  `site:build` trigger
+- **Hardened fetching**: repositories arrive as size-capped tarballs, never a
+  git checkout; no symlinks, no submodules, nothing outside the build scratch
+- **Strict builds** opt-in: fail the deploy instead of publishing a page error
+- Search and Ask AI reindex automatically after every publish and rollback
+- Monorepo-friendly: `docs.yaml` at the repository root with `content.root`
+  pointing at your docs directory (this site now ships that shape)
+
+</Update>
 
 <Update label="0.1.0" title="First public release, in development">
 
