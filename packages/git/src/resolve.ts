@@ -114,6 +114,20 @@ export interface CurrentBundleSource {
   invalidate(siteId?: string): void;
 }
 
+/**
+ * Every live bundle source in the process, across Next's module graphs. The
+ * boot instrumentation and the route handlers each bundle their own copy of
+ * the serving shell, but this package is server-external (one module instance
+ * per process), so a registry here is the one place a LISTEN/NOTIFY signal can
+ * reach every pointer cache at once.
+ */
+const liveSources = new Set<CurrentBundleSource>();
+
+/** Drop the pointer cache for a site (or all) in every source in the process. */
+export function invalidateAllBundleSources(siteId?: string): void {
+  for (const source of liveSources) source.invalidate(siteId);
+}
+
 export function createDeploymentBundleSource(deps: {
   db: Db;
   store: BundleStore;
@@ -154,7 +168,7 @@ export function createDeploymentBundleSource(deps: {
     return loader;
   }
 
-  return {
+  const source: CurrentBundleSource = {
     load(siteId: string): Promise<CurrentBundle | null> {
       return loaderFor(siteId).load();
     },
@@ -166,4 +180,6 @@ export function createDeploymentBundleSource(deps: {
       loaders.get(siteId)?.invalidate();
     },
   };
+  liveSources.add(source);
+  return source;
 }

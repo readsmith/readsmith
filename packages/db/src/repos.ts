@@ -402,6 +402,8 @@ export async function publishDeployment(
     const row = await tx.one(sql`
       UPDATE app.deployments SET is_current = true, status = 'ready' WHERE id = ${input.id}
       RETURNING ${DEPLOYMENT_COLUMNS}`);
+    // Cross-instance pointer invalidation; delivered on commit, never on abort.
+    await tx.query(sql`SELECT pg_notify('readsmith_deployment_published', ${target.site_id})`);
     return { flipped: true, row: deploymentRowSchema.parse(row) };
   });
 }
@@ -434,6 +436,8 @@ export async function repointCurrent(
     const row = await tx.one(sql`
       UPDATE app.deployments SET is_current = true WHERE id = ${input.deploymentId}
       RETURNING ${DEPLOYMENT_COLUMNS}`);
+    // Rollback is a flip too: same cross-instance invalidation signal.
+    await tx.query(sql`SELECT pg_notify('readsmith_deployment_published', ${input.siteId})`);
     return deploymentRowSchema.parse(row);
   });
 }

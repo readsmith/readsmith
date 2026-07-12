@@ -4,6 +4,7 @@ import {
   createJobRunner,
   createLogger,
   hasDatabase,
+  listenForDeploymentPublishes,
   loadDbConfig,
   migrationsDir,
   runMigrations,
@@ -12,6 +13,7 @@ import {
   createInProcessExecutor,
   createPoller,
   ensureGitConnection,
+  invalidateAllBundleSources,
   runSiteBuild,
   siteBuildJob,
   siteBuildSingletonKey,
@@ -38,6 +40,20 @@ export async function boot(): Promise<void> {
     const dir = process.env.READSMITH_MIGRATIONS_DIR ?? migrationsDir();
     const applied = await runMigrations(db, { dir, logger: log });
     log.info("database ready", { migrationsApplied: applied.length });
+
+    // Cross-instance pointer freshness: another instance's publish or rollback
+    // NOTIFYs, and every bundle source in this process (both module graphs)
+    // drops that site's pointer cache immediately instead of waiting out the
+    // TTL. Best-effort: a lost connection reconnects, and TTL remains the floor.
+    const listener = await listenForDeploymentPublishes(
+      config,
+      (siteId) => invalidateAllBundleSources(siteId),
+      log,
+    ).catch((err) => {
+      log.warn("deployment listener unavailable; pointer TTL only", { err: String(err) });
+      return null;
+    });
+    (globalThis as { __rsDeploymentListener?: unknown }).__rsDeploymentListener = listener;
 
     const runner = createJobRunner({ config, logger: log });
     await runner.start();

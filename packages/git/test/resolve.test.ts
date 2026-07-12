@@ -5,14 +5,21 @@ import {
   type Db,
   createDb,
   insertDeployment,
+  listDeployments,
+  listenForDeploymentPublishes,
   publishDeployment,
+  repointCurrent,
   runMigrations,
   sql,
   upsertSite,
 } from "@readsmith/db";
 import { type BundleStore, createBundleStore } from "@readsmith/storage";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createDeploymentBundleSource, createStaticSiteResolver } from "../src/resolve.js";
+import {
+  createDeploymentBundleSource,
+  createStaticSiteResolver,
+  invalidateAllBundleSources,
+} from "../src/resolve.js";
 
 describe("createStaticSiteResolver", () => {
   it("maps every host to the configured site, always active", () => {
@@ -94,5 +101,86 @@ describe.skipIf(!DATABASE_URL)("createDeploymentBundleSource (integration)", () 
     expect(await source.load("multi-c")).not.toBeNull(); // evicts multi-a
     // Evicted site still serves, through a fresh loader.
     expect(JSON.parse((await source.load("multi-a"))?.json ?? "{}").site).toBe("multi-a");
+  });
+});
+
+describe.skipIf(!DATABASE_URL)("LISTEN/NOTIFY pointer invalidation (integration)", () => {
+  let db: Db;
+  let store: BundleStore;
+
+  beforeAll(async () => {
+    db = createDb({
+      databaseUrl: DATABASE_URL ?? "",
+      storageRoot: ".rs-test",
+      workerConcurrency: 2,
+      logLevel: "error",
+    });
+    await runMigrations(db);
+    await upsertSite(db, { id: "notify-site", name: "Notify" });
+    await db.query(sql`DELETE FROM app.deployments WHERE site_id = ${"notify-site"}`);
+    store = createBundleStore({ driver: "local", root: await mkdtemp(join(tmpdir(), "rs-nt-")) });
+  });
+
+  afterAll(async () => {
+    await db?.close();
+  });
+
+  async function publish(siteId: string, content: string): Promise<string> {
+    const ref = `bundles/${siteId}-${content}.json`;
+    await store.put(ref, JSON.stringify({ site: siteId, content }));
+    const row = await insertDeployment(db, {
+      siteId,
+      gitRef: "refs/heads/main",
+      commitSha: `sha-${content}`,
+    });
+    await publishDeployment(db, { id: row.id, bundleRef: ref, bundleHash: `h-${content}` });
+    return ref;
+  }
+
+  it("a publish notifies listeners, which invalidate cached pointers instantly", async () => {
+    const notified: string[] = [];
+    const listener = await listenForDeploymentPublishes(
+      {
+        databaseUrl: DATABASE_URL ?? "",
+        storageRoot: ".rs-test",
+        workerConcurrency: 2,
+        logLevel: "error",
+      },
+      (siteId) => {
+        notified.push(siteId);
+        invalidateAllBundleSources(siteId);
+      },
+    );
+    try {
+      // A source with a long TTL: without the signal it would serve stale.
+      const source = createDeploymentBundleSource({ db, store, ttlMs: 3_600_000 });
+      const first = await publish("notify-site", "v1");
+      expect((await source.load("notify-site"))?.ref).toBe(first);
+
+      // Only signals from the NEXT flip count (the v1 publish notified too).
+      notified.length = 0;
+      const second = await publish("notify-site", "v2");
+      // Wait for the notification (delivered on commit), not a TTL.
+      const deadline = Date.now() + 5000;
+      while (!notified.includes("notify-site") && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      expect(notified).toContain("notify-site");
+      expect((await source.load("notify-site"))?.ref).toBe(second);
+
+      // Rollback flips notify too.
+      notified.length = 0;
+      const history = await listDeployments(db, { siteId: "notify-site", limit: 2 });
+      const prior = history.find((d) => !d.is_current);
+      await repointCurrent(db, { siteId: "notify-site", deploymentId: prior?.id ?? "" });
+      const rollbackDeadline = Date.now() + 5000;
+      while (notified.length === 0 && Date.now() < rollbackDeadline) {
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      expect(notified).toContain("notify-site");
+      expect((await source.load("notify-site"))?.ref).toBe(first);
+    } finally {
+      await listener.close();
+    }
   });
 });

@@ -59,5 +59,10 @@ export {
   vectorSearchChunks,
 } from "./repos.js";
 export { type JobDefinition, type JobRunner, createJobRunner, defineJob } from "./jobs.js";
+export {
+  DEPLOYMENT_PUBLISHED_CHANNEL,
+  type DeploymentListener,
+  listenForDeploymentPublishes,
+} from "./notify.js";
 export { type Logger, type LogLevel, createLogger } from "./log.js";
 export { maskUrlCredentials, redactConnectionString, redactForLog } from "./redact.js";
