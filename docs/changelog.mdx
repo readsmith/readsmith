@@ -8,6 +8,16 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.9.1" title="Instance AI defaults and host model tiers">
+
+Two small seams for operators of multi-site installs: `READSMITH_AI_DEFAULTS`
+(JSON, the same shape as docs.yaml `ai:`) applies instance-wide when a site
+configures nothing, and `getAiServicesForSite` accepts an `ai` override so a
+host that owns model selection can serve tiers. Self-host behavior is
+unchanged: a site's own config always wins over the instance default.
+
+</Update>
+
 <Update label="0.9.0" title="Search and Ask AI for every site">
 
 The AI stack now composes per site: `getAiServicesForSite` builds search,

@@ -88,7 +88,19 @@ function retrievalStore(db: Db): RetrievalStore {
   };
 }
 
-function build(siteId: string, bundle: Bundle): AiServices | null {
+/** Instance-wide AI defaults (JSON, same shape as docs.yaml `ai:`): applied when a site configures nothing. */
+function envAiDefaults(): unknown {
+  const raw = process.env.READSMITH_AI_DEFAULTS;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    console.warn("[readsmith] READSMITH_AI_DEFAULTS is not valid JSON; ignoring");
+    return null;
+  }
+}
+
+function build(siteId: string, bundle: Bundle, aiOverride?: unknown): AiServices | null {
   const db = getDb();
   if (!db) return null; // docs-only: no server search/ask.
 
@@ -98,7 +110,7 @@ function build(siteId: string, bundle: Bundle): AiServices | null {
   let provider: ModelProvider = NULL_PROVIDER;
   let aiConfig = null as ReturnType<typeof resolveAiConfig>;
   try {
-    aiConfig = resolveAiConfig(site.ai ?? null);
+    aiConfig = resolveAiConfig(aiOverride ?? site.ai ?? envAiDefaults());
     if (aiConfig) provider = createModelProvider(aiConfig, envKeySource());
   } catch (err) {
     console.warn("[readsmith] AI config invalid; search degrades to full-text only:", err);
@@ -264,20 +276,39 @@ function build(siteId: string, bundle: Bundle): AiServices | null {
  * they embed (chunks, spec, skills, ai config) actually changed - and old
  * entries die with their bundles.
  */
-const perBundle = new WeakMap<Bundle, AiServices | null>();
+const perBundle = new WeakMap<Bundle, Map<string, AiServices | null>>();
 
-/** The AI services for one site's current deployment (null = no DB or nothing deployed). */
-export async function getAiServicesForSite(siteId: string): Promise<AiServices | null> {
+/**
+ * The AI services for one site's current deployment (null = no DB or nothing
+ * deployed). A host that owns model selection (hosted tiers) passes an `ai`
+ * override, same shape as docs.yaml `ai:`; variants cache side by side under
+ * the same bundle and die with it.
+ */
+export async function getAiServicesForSite(
+  siteId: string,
+  options: { ai?: unknown } = {},
+): Promise<AiServices | null> {
   const bundle = await loadBundleForSite(siteId);
   if (!bundle) return null;
-  if (!perBundle.has(bundle)) perBundle.set(bundle, build(siteId, bundle));
-  return perBundle.get(bundle) ?? null;
+  let variants = perBundle.get(bundle);
+  if (!variants) {
+    variants = new Map();
+    perBundle.set(bundle, variants);
+  }
+  const key = options.ai === undefined ? "" : JSON.stringify(options.ai);
+  if (!variants.has(key)) variants.set(key, build(siteId, bundle, options.ai));
+  return variants.get(key) ?? null;
 }
 
 /** The default site's AI services (the single-site app's path). */
 export async function getAiServices(): Promise<AiServices | null> {
   const bundle = await getBundle().catch(() => null);
   if (!bundle) return null;
-  if (!perBundle.has(bundle)) perBundle.set(bundle, build("default", bundle));
-  return perBundle.get(bundle) ?? null;
+  let variants = perBundle.get(bundle);
+  if (!variants) {
+    variants = new Map();
+    perBundle.set(bundle, variants);
+  }
+  if (!variants.has("")) variants.set("", build("default", bundle));
+  return variants.get("") ?? null;
 }
