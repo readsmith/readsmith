@@ -46,7 +46,7 @@ The compose file in the repository root is the reference deployment. It wires th
 
 ## Content is baked at build time
 
-Docs pages are prerendered into the image when it builds. Publishing a content change means rebuilding the image (`docker compose up -d --build`); rolling back means running the previous image. Deploys are therefore reproducible artifacts, not mutable state on a server.
+Docs pages are prerendered into the image when it builds. Publishing a content change means rebuilding the image (`docker compose up -d --build`); rolling back means running the previous image. Deploys are therefore reproducible artifacts, not mutable state on a server. To publish on `git push` instead, without rebuilding the image, [connect a repository](/self-host/git-deploys).
 
 ## What runs without a database
 

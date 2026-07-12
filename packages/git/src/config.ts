@@ -12,6 +12,8 @@ export interface GitConfig {
   repo: string | null;
   /** Branch override; null = the repo's default branch. */
   branch: string | null;
+  /** Polling fallback interval, seconds; null = webhooks only. */
+  pollIntervalSec: number | null;
 }
 
 export interface GitEnv {
@@ -21,6 +23,7 @@ export interface GitEnv {
   GITHUB_PAT?: string | undefined;
   GITHUB_REPO?: string | undefined;
   GITHUB_BRANCH?: string | undefined;
+  GITHUB_POLL_INTERVAL?: string | undefined;
   [key: string]: string | undefined;
 }
 
@@ -62,10 +65,20 @@ export function resolveGitConfig(env: GitEnv): GitConfig | null {
     return null;
   }
 
+  let pollIntervalSec: number | null = null;
+  if (env.GITHUB_POLL_INTERVAL !== undefined && env.GITHUB_POLL_INTERVAL.trim() !== "") {
+    const parsed = Number(env.GITHUB_POLL_INTERVAL);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new GitConfigError("GITHUB_POLL_INTERVAL must be a positive integer (seconds)");
+    }
+    pollIntervalSec = parsed;
+  }
+
   return {
     auth,
     webhookSecret: env.GITHUB_WEBHOOK_SECRET ?? null,
     repo: env.GITHUB_REPO?.trim() || null,
     branch: env.GITHUB_BRANCH?.trim() || null,
+    pollIntervalSec,
   };
 }

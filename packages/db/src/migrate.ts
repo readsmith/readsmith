@@ -46,16 +46,31 @@ export function migrationsDir(): string {
   return join(moduleDir, "..", "migrations");
 }
 
+/** Instance-wide advisory lock key: serializes concurrent migration runs. */
+const MIGRATION_LOCK_KEY = 743_902_162;
+
 /**
  * Apply all pending migrations in order, each in its own transaction, recording
  * applied files in `app.schema_migrations`. Idempotent: already-applied files are
- * skipped, so running twice is a no-op. Returns the names applied this run.
+ * skipped, so running twice is a no-op. Concurrent runs (two app instances
+ * booting, parallel test files) serialize on a Postgres advisory lock held for
+ * the duration, so `CREATE EXTENSION`/`CREATE SCHEMA` never race. Returns the
+ * names applied this run.
  */
 export async function runMigrations(
   db: Db,
   options: { dir?: string; logger?: Logger } = {},
 ): Promise<string[]> {
   const dir = options.dir ?? migrationsDir();
+  // The lock lives in its own transaction (released on commit); the work below
+  // intentionally runs outside it on the pool, keeping one tx per migration.
+  return db.tx(async (lock) => {
+    await lock.query({ text: "SELECT pg_advisory_xact_lock($1)", values: [MIGRATION_LOCK_KEY] });
+    return applyPending(db, dir, options.logger);
+  });
+}
+
+async function applyPending(db: Db, dir: string, logger?: Logger): Promise<string[]> {
   await bootstrap(db);
 
   const applied = new Set(
@@ -82,7 +97,7 @@ export async function runMigrations(
       });
     });
     ran.push(migration.name);
-    options.logger?.info("migration applied", { migration: migration.name });
+    logger?.info("migration applied", { migration: migration.name });
   }
   return ran;
 }

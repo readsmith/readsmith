@@ -10,6 +10,7 @@ import {
 } from "@readsmith/db";
 import {
   createInProcessExecutor,
+  createPoller,
   ensureGitConnection,
   runSiteBuild,
   siteBuildJob,
@@ -73,6 +74,20 @@ export async function boot(): Promise<void> {
         );
       });
       jobs.push("site.build");
+      // The polling fallback: for self-hosts webhooks cannot reach. Idempotent
+      // against webhook delivery (the singleton key dedupes).
+      if (git.config.pollIntervalSec) {
+        const poller = createPoller({
+          db,
+          provider: git.provider,
+          logger: log,
+          enqueue: (p) =>
+            runner.enqueue(siteBuildJob, p, { singletonKey: siteBuildSingletonKey(p) }),
+        });
+        poller.start(git.config.pollIntervalSec);
+        (globalThis as { __rsGitPoller?: unknown }).__rsGitPoller = poller;
+        log.info("git polling enabled", { intervalSec: git.config.pollIntervalSec });
+      }
       if (git.config.repo) {
         try {
           await ensureGitConnection(

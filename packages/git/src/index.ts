@@ -2,6 +2,8 @@ export * from "./bind.js";
 export * from "./config.js";
 export * from "./executor.js";
 export * from "./github.js";
+export * from "./manifest.js";
+export * from "./poller.js";
 export * from "./provider.js";
 export * from "./resolve.js";
 export * from "./site-build.js";

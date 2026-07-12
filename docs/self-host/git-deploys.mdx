@@ -1,0 +1,114 @@
+---
+title: Deploy on push
+description: Connect a GitHub repository and every push builds and publishes your docs atomically. Rollback is one command.
+---
+
+# Deploy on push
+
+Connect a repository and Readsmith becomes a deployment pipeline: a push to the
+connected branch fetches that exact commit, compiles it into an immutable
+bundle, and atomically flips the site to it. Nothing is half-published, a stale
+build can never overwrite a newer one, and rolling back is repointing to a
+previous deployment, not rebuilding anything.
+
+Git deploys need the database (deployments live there), so this page assumes
+the [Docker Compose deployment](/self-host/deploy) or an equivalent with
+`DATABASE_URL` set.
+
+## Two ways to authenticate
+
+<Tabs>
+  <Tab title="Personal access token (quick start)">
+    The two-variable path. Create a
+    [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new)
+    scoped to the one docs repository with read-only **Contents** permission,
+    then set:
+
+    ```bash
+    GITHUB_PAT=github_pat_...
+    GITHUB_REPO=owner/docs-repo
+    ```
+
+    Restart, and the first build enqueues automatically. Give the token an
+    expiry and rotate it like any credential; it lives only in your
+    environment, never in the database.
+  </Tab>
+  <Tab title="GitHub App (recommended for teams)">
+    An App you own, with short-lived per-repository tokens and the webhook
+    managed by GitHub. Visit `/_readsmith/setup/github` on your instance: one
+    click creates the App with read-only `contents` + `metadata` permissions,
+    the `push` event, and your webhook URL already configured, then shows you
+    the three variables to set:
+
+    ```bash
+    GITHUB_APP_ID=...
+    GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
+    GITHUB_WEBHOOK_SECRET=...
+    GITHUB_REPO=owner/docs-repo
+    ```
+
+    Install the App on the docs repository, restart, and you are connected.
+    The setup pages disappear as soon as credentials are configured.
+
+    <Accordion title="Manual App creation (no-JS fallback, GitHub Enterprise Server)">
+      Create a GitHub App under **Settings → Developer settings** with:
+      repository permissions **Contents: read-only** and **Metadata: read-only**;
+      the **Push** event subscribed; the webhook URL set to
+      `https://your-docs-host/_readsmith/api/git/webhook` with a secret you
+      generate. Save the App id, generate a private key, and land all three in
+      the environment variables above.
+    </Accordion>
+  </Tab>
+</Tabs>
+
+Configure exactly one mode. Setting both the App pair and a PAT fails fast at
+boot with a message naming the conflict.
+
+## How updates arrive
+
+<Steps>
+  <Step title="Webhooks (default)">
+    With an App, GitHub delivers pushes automatically. In PAT mode, add a plain
+    repository webhook pointing at
+    `https://your-docs-host/_readsmith/api/git/webhook` with content type
+    `application/json` and the secret you set in `GITHUB_WEBHOOK_SECRET`.
+    Every delivery is verified against that secret before anything is parsed.
+  </Step>
+  <Step title="Polling (firewalled hosts)">
+    If GitHub cannot reach your instance at all, set
+    `GITHUB_POLL_INTERVAL=120` (seconds). Readsmith compares the branch head to
+    the last built commit with one API call per tick and builds on change.
+    Polling and webhooks can coexist safely; duplicate triggers deduplicate.
+  </Step>
+</Steps>
+
+Pushes to other branches and repositories are ignored. Set `GITHUB_BRANCH` to
+build something other than the repository's default branch.
+
+## Deployments, atomicity, and rollback
+
+Every build is an immutable, content-addressed snapshot. Publishing means
+flipping a pointer once the artifact is fully verified, so readers only ever
+see the old site or the whole new one. If two pushes race, the newer commit
+wins even when its build finishes first; the stale build is recorded as
+superseded and never served.
+
+```bash
+# The deployment history, newest first (* marks what is serving)
+pnpm site:rollback --list
+
+# Repoint to any prior ready deployment: instant, no rebuild
+pnpm site:rollback dep:default:41
+```
+
+A running server reflects a publish or rollback within about a minute (pages
+regenerate on a short cadence); a restart reflects it immediately. Search and
+Ask-AI reindex automatically after every change of what is being served.
+
+## What the build will not do
+
+The build fetches one tarball of your repository over HTTPS from GitHub, with
+hard limits on size and file count, and compiles it. It runs no code from the
+repository, materializes no symlinks, follows no submodules, and writes nothing
+outside its scratch directory, which is deleted after every build, success or
+failure. Tokens are held in memory and never logged.
