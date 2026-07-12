@@ -6,9 +6,9 @@ import {
   getGitConnection,
   insertDeployment,
   markDeploymentFailed,
-  setDeploymentDiagnostics,
   pruneSuperseded,
   publishDeployment,
+  setDeploymentDiagnostics,
   setLastSyncedSha,
 } from "@readsmith/db";
 import { contentHash } from "@readsmith/model";
@@ -123,7 +123,11 @@ export async function runSiteBuild(
   const stored = await store.get(result.bundleKey);
   if (!stored || contentHash(stored.toString("utf8")) !== result.bundleHash) {
     await markDeploymentFailed(db, opened.id, [
-      { severity: "error", code: "artifact-verify-failed", message: "stored artifact does not match the executor's hash" },
+      {
+        severity: "error",
+        code: "artifact-verify-failed",
+        message: "stored artifact does not match the executor's hash",
+      },
       ...keptDiagnostics,
     ]);
     logger?.warn("artifact verification failed", {

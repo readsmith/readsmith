@@ -193,3 +193,29 @@ describe("asset fingerprinting", () => {
     expect(a.bundleJson).toBe(b.bundleJson);
   });
 });
+
+describe("siteUrl override rebasing", () => {
+  it("re-derives logo and favicon prefixes when the served URL moves the base path", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "rs-rebase-"));
+    await mkdir(join(dir, "brand"), { recursive: true });
+    await writeFile(join(dir, "brand", "logo.svg"), "<svg/>");
+    await writeFile(join(dir, "index.md"), "# Home\n");
+    await writeFile(
+      join(dir, "docs.yaml"),
+      [
+        "site:",
+        "  name: Rebase",
+        "  url: https://example.com/docs",
+        '  logo: "/brand/logo.svg"',
+        "",
+      ].join("\n"),
+    );
+    // Authored config bakes the /docs base path into the logo...
+    const authored = await compileSite({ contentDir: dir });
+    expect(authored.bundle.site.logo?.light).toBe("/docs/brand/logo.svg");
+    // ...and a host-assigned root URL re-derives it, so the asset resolves.
+    const hosted = await compileSite({ contentDir: dir, siteUrl: "https://rebase.example.app" });
+    expect(hosted.bundle.site.logo?.light).toMatch(/^\/brand\/logo(\.[0-9a-f]{10})?\.svg$/);
+    expect(hosted.bundle.site.url).toBe("https://rebase.example.app");
+  });
+});

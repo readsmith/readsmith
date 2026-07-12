@@ -8,6 +8,16 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.9.3" title="Brand assets follow the served URL">
+
+A host-assigned site URL now re-derives logo and favicon paths too:
+config resolution prefixes root-relative brand images with the authored
+URL's base path, and the override previously left that stale prefix in
+place, so a site authored for a subpath but served at a domain root
+pointed at brand images that did not exist.
+
+</Update>
+
 <Update label="0.9.2" title="Builds that explain themselves">
 
 Deployments now carry their build diagnostics: a failed build records why

@@ -301,6 +301,30 @@ async function readSkills(contentRoot: string): Promise<AuthoredSkill[]> {
  * Pure with respect to its inputs: no clock, no randomness, no writes; the
  * caller decides where the bytes land.
  */
+/**
+ * Apply a host-assigned site URL. Config resolution has already prefixed
+ * root-relative logo/favicon paths with the AUTHORED url's base path, so the
+ * override must re-derive them too: strip the old prefix, apply the new one.
+ * Anything absolute or un-prefixed passes through untouched.
+ */
+function withSiteUrl(resolved: ResolvedConfig, siteUrl: string): ResolvedConfig {
+  const oldBase = siteBasePath(resolved.site.url);
+  const newBase = siteBasePath(siteUrl);
+  const rebase = (path: string): string =>
+    oldBase && path.startsWith(`${oldBase}/`) ? newBase + path.slice(oldBase.length) : path;
+  const asImage = (image?: { light: string; dark: string }) =>
+    image ? { light: rebase(image.light), dark: rebase(image.dark) } : image;
+  return {
+    ...resolved,
+    site: {
+      ...resolved.site,
+      url: siteUrl,
+      logo: asImage(resolved.site.logo),
+      favicon: asImage(resolved.site.favicon),
+    },
+  };
+}
+
 /** `/images/logo.svg` + hash -> `/images/logo.{hash10}.svg`; null when extensionless. */
 function fingerprintPath(path: string, hash: string): string | null {
   const dot = path.lastIndexOf(".");
@@ -312,9 +336,7 @@ function fingerprintPath(path: string, hash: string): string | null {
 export async function compileSite(input: CompileSiteInput): Promise<CompileSiteResult> {
   const siteId = input.siteId ?? "default";
   const resolved = await resolveConfig(input.contentDir);
-  const config = input.siteUrl
-    ? { ...resolved, site: { ...resolved.site, url: input.siteUrl } }
-    : resolved;
+  const config = input.siteUrl ? withSiteUrl(resolved, input.siteUrl) : resolved;
   const contentRoot = contentRootOf(input.contentDir, config);
   const { reference, diagnostics: apiReferenceDiagnostics } = await buildApiReference(
     config,
