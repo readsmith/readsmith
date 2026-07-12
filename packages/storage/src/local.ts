@@ -84,5 +84,15 @@ export function createLocalStore(root: string): BundleStore {
         throw new StorageError("list", undefined, { cause });
       }
     },
+
+    async delete(key): Promise<void> {
+      const target = resolveKey("delete", key);
+      try {
+        await unlink(target);
+      } catch (cause) {
+        if ((cause as NodeJS.ErrnoException).code === "ENOENT") return;
+        throw new StorageError("delete", key, { cause });
+      }
+    },
   };
 }

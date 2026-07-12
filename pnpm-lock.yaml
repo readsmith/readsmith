@@ -190,6 +190,12 @@ importers:
       '@readsmith/model':
         specifier: workspace:*
         version: link:../model
+      '@readsmith/storage':
+        specifier: workspace:*
+        version: link:../storage
+      zod:
+        specifier: ^4.0.5
+        version: 4.4.3
 
   packages/cache:
     dependencies:

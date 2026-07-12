@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 import { normalizeDocument, parseAndBundle } from "@readsmith/api-reference";
 import { createRegistry, themeToCss } from "@readsmith/components";
 import { type ResolvedConfig, contentRootOf, resolveConfig } from "@readsmith/config";
-import { type AuthoredSkill, type SiteBuild, assembleSite } from "@readsmith/mdx";
+import { type AuthoredSkill, type RenderCache, type SiteBuild, assembleSite } from "@readsmith/mdx";
 import {
   type Diagnostic,
   type NormalizedSpec,
@@ -25,6 +25,12 @@ export interface CompileSiteInput {
   contentDir: string;
   /** Stable site identity baked into the bundle; single-site installs use the default. */
   siteId?: string;
+  /**
+   * Optional page-render cache (see `openRenderCache` for the persisted one).
+   * Purely an accelerator: with or without it, and warm or cold, the produced
+   * `bundleJson` is byte-identical for the same content.
+   */
+  renderCache?: RenderCache;
 }
 
 /** The API reference as it rides inside the bundle. */
@@ -69,6 +75,13 @@ export interface CompileSiteResult {
   bundleHash: string;
   /** Parse/normalize diagnostics for the API spec (empty when none is configured). */
   apiReferenceDiagnostics: Diagnostic[];
+  /**
+   * Paths actually re-rendered this compile (everything, on a cold cache).
+   * Deliberately NOT part of the bundle: the artifact is normalized so warm and
+   * cold builds of the same content stay byte-identical (the content address
+   * must never depend on cache state).
+   */
+  rebuiltPages: string[];
 }
 
 interface ApiReferenceOutcome {
@@ -242,6 +255,7 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
     config,
     readPage: (path) => readFile(join(contentRoot, path), "utf8"),
     registry: createRegistry({ apiSpec: reference?.spec ?? null }),
+    renderCache: input.renderCache,
     baseUrl: config.site.url,
     apiReference:
       reference && config.apiReference
@@ -256,8 +270,11 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
     skills: await readSkills(contentRoot),
     snippets: await readSnippets(contentRoot),
   });
+  // The artifact must not remember how it was built: `rebuilt` varies with
+  // cache warmth, so it is normalized out of the serialized bundle (and
+  // returned separately) to keep the content address cache-independent.
   const site: CompiledSiteEnvelope = {
-    build,
+    build: { ...build, rebuilt: [] },
     name: config.site.name,
     branding: config.branding,
     url: config.site.url,
@@ -280,5 +297,6 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
     bundleJson,
     bundleHash: contentHash(bundleJson),
     apiReferenceDiagnostics,
+    rebuiltPages: build.rebuilt,
   };
 }

@@ -6,7 +6,7 @@
 // Keeping the filesystem-heavy pipeline out of Next's route graph is what makes
 // the build deterministic and the serving layer trivial.
 import { join } from "node:path";
-import { compileSite } from "@readsmith/build";
+import { compileSite, openRenderCache } from "@readsmith/build";
 import { createBundleStore, resolveStorageConfig } from "@readsmith/storage";
 
 const CONTENT_DIR = process.env.READSMITH_CONTENT ?? join(process.cwd(), "content");
@@ -19,8 +19,12 @@ const store = createBundleStore(
 const BUNDLE_KEY = "bundle.json";
 
 async function main() {
-  const { config, bundle, bundleJson, apiReferenceDiagnostics } = await compileSite({
+  // The persisted render cache makes repeated local builds pay only for the
+  // diff; it is an accelerator only and never changes the produced bytes.
+  const persisted = await openRenderCache(store).catch(() => null);
+  const { config, bundle, bundleJson, apiReferenceDiagnostics, rebuiltPages } = await compileSite({
     contentDir: CONTENT_DIR,
+    renderCache: persisted?.cache,
   });
 
   // Config diagnostics (reserved paths, asset mounts, home page) matter as much as
@@ -55,7 +59,11 @@ async function main() {
   }
 
   await store.put(BUNDLE_KEY, bundleJson);
-  console.log(`[readsmith] wrote content bundle: ${build.pages.length} page(s) -> ${BUNDLE_KEY}`);
+  await persisted?.flush().catch(() => {});
+  const cached = Math.max(0, build.pages.length - rebuiltPages.length);
+  console.log(
+    `[readsmith] wrote content bundle: ${build.pages.length} page(s) -> ${BUNDLE_KEY} (${rebuiltPages.length} rendered, ${cached} from cache)`,
+  );
 }
 
 main().catch((err) => {

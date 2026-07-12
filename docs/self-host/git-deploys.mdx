@@ -105,6 +105,12 @@ A running server reflects a publish or rollback within about a minute (pages
 regenerate on a short cadence); a restart reflects it immediately. Search and
 Ask-AI reindex automatically after every change of what is being served.
 
+Rebuilds are incremental: a persisted render cache means a one-page edit
+re-renders one page, and a shared-snippet edit re-renders exactly the pages
+that embed it. History keeps the last 20 non-current snapshots by default
+(`READSMITH_KEEP_DEPLOYMENTS`); older ones are pruned after each publish, and
+the currently-served deployment is never touched.
+
 ## What the build will not do
 
 The build fetches one tarball of your repository over HTTPS from GitHub, with

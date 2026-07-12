@@ -6,6 +6,7 @@ import {
   getGitConnection,
   insertDeployment,
   markDeploymentFailed,
+  pruneSuperseded,
   publishDeployment,
   setLastSyncedSha,
 } from "@readsmith/db";
@@ -48,6 +49,13 @@ export interface RunSiteBuildDeps {
   afterFlip?: (row: DeploymentRow) => void | Promise<void>;
   /** Build wall-clock budget, seconds. */
   timeoutSec?: number;
+  /**
+   * Rollback-history retention, applied after every publish: non-current
+   * snapshots beyond the most recent `keepLast` are marked pruned and their
+   * artifacts deleted when no live deployment still references them (content
+   * addresses are shared). The current deployment is never pruned. 0 disables.
+   */
+  retention?: { keepLast: number };
 }
 
 /**
@@ -117,11 +125,33 @@ export async function runSiteBuild(
     deployment: row.id,
     commit: payload.commitSha,
     pages: result.pageCount,
+    rendered: result.rendered,
+    cached: Math.max(0, result.pageCount - result.rendered),
     wallMs: result.usage.wallMs,
   });
   if (flipped) {
     if (connection && connection.repo.toLowerCase() === payload.repo.toLowerCase()) {
       await setLastSyncedSha(db, { id: connection.id, sha: payload.commitSha });
+    }
+    const keepLast = deps.retention?.keepLast ?? 20;
+    if (keepLast > 0) {
+      // Retention is housekeeping: a fault here never fails a published build.
+      try {
+        const { prunedIds, unreferencedRefs } = await pruneSuperseded(db, {
+          siteId: payload.siteId,
+          keepLast,
+        });
+        for (const ref of unreferencedRefs) await store.delete(ref);
+        if (prunedIds.length > 0) {
+          logger?.info("deployments pruned", {
+            pruned: prunedIds.length,
+            artifactsDeleted: unreferencedRefs.length,
+            keepLast,
+          });
+        }
+      } catch (err) {
+        logger?.warn("deployment pruning failed", { err: String(err) });
+      }
     }
     await deps.afterFlip?.(row);
   }

@@ -5,6 +5,7 @@ import {
   type Db,
   createDb,
   getCurrentDeployment,
+  listDeployments,
   repointCurrent,
   runMigrations,
   sql,
@@ -105,6 +106,7 @@ describe.skipIf(!DATABASE_URL)("site.build orchestration (integration)", () => {
           bundleKey: key,
           bundleHash: "not-the-real-hash",
           pageCount: 1,
+          rendered: 1,
           diagnostics: [],
           usage: { wallMs: 1 },
         };
@@ -166,5 +168,56 @@ describe.skipIf(!DATABASE_URL)("site.build orchestration (integration)", () => {
     await upsertSite(db, { id: "empty-site", name: "Empty" });
     const loader = createCurrentBundleLoader({ db, store, siteId: "empty-site" });
     expect(await loader.load()).toBeNull();
+  });
+});
+
+describe.skipIf(!DATABASE_URL)("retention (integration)", () => {
+  const SITE = "retain-test";
+  let db: Db;
+  let store: BundleStore;
+
+  beforeAll(async () => {
+    db = createDb({
+      databaseUrl: DATABASE_URL ?? "",
+      storageRoot: ".rs-test",
+      workerConcurrency: 2,
+      logLevel: "error",
+    });
+    await runMigrations(db);
+    await upsertSite(db, { id: SITE, name: "Retain Test" });
+    await db.query(sql`DELETE FROM app.deployments WHERE site_id = ${SITE}`);
+    store = createBundleStore({ driver: "local", root: await mkdtemp(join(tmpdir(), "rs-ret-")) });
+  });
+
+  afterAll(async () => {
+    await db?.close();
+  });
+
+  it("prunes old snapshots and deletes unshared artifacts, never the current one", async () => {
+    // Three deployments with distinct content (distinct artifact refs).
+    const providerFor = (marker: string): GitProvider => ({
+      async fetchAtRef(_t, destDir) {
+        await cp(FIXTURE, destDir, { recursive: true });
+        await writeFile(join(destDir, "extra.md"), `# Extra\n\n${marker}\n`);
+      },
+    });
+    const refs: string[] = [];
+    for (const marker of ["one", "two", "three"]) {
+      const executor = createInProcessExecutor({ provider: providerFor(marker), store });
+      const row = await runSiteBuild(
+        { db, store, executor, retention: { keepLast: 1 } },
+        { siteId: SITE, repo: "acme/docs", ref: "refs/heads/main", commitSha: `ret-${marker}` },
+      );
+      expect(row.is_current).toBe(true);
+      refs.push(row.bundle_ref ?? "");
+    }
+    // keepLast=1: the first snapshot is pruned and its artifact removed; the
+    // second survives as rollback history; the third is current.
+    expect(await store.has(refs[0] ?? "")).toBe(false);
+    expect(await store.has(refs[1] ?? "")).toBe(true);
+    expect(await store.has(refs[2] ?? "")).toBe(true);
+    const history = await listDeployments(db, { siteId: SITE, limit: 10 });
+    expect(history.find((d) => d.bundle_ref === refs[0])?.status).toBe("pruned");
+    expect((await getCurrentDeployment(db, { siteId: SITE }))?.bundle_ref).toBe(refs[2]);
   });
 });

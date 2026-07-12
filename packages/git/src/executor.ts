@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { compileSite } from "@readsmith/build";
+import { compileSite, openRenderCache } from "@readsmith/build";
 import type { Diagnostic } from "@readsmith/model";
 import type { BundleStore } from "@readsmith/storage";
 import type { GitProvider } from "./provider.js";
@@ -30,6 +30,8 @@ export interface ExecutorResult {
   /** Hash the executor claims for the artifact; the dispatcher verifies it before publish. */
   bundleHash: string | null;
   pageCount: number;
+  /** Pages actually re-rendered (the rest came from the persisted render cache). */
+  rendered: number;
   diagnostics: Diagnostic[];
   usage: { wallMs: number };
 }
@@ -81,17 +83,26 @@ export function createInProcessExecutor(deps: {
         // local clone). A random name here would poison the content address.
         const dir = join(workDir, job.source.repo.split("/").pop() || "site");
         await mkdir(dir);
+        // The persisted render cache is an accelerator, never a dependency: if
+        // it cannot be read or written the build simply renders everything.
+        const persisted = await openRenderCache(deps.store).catch(() => null);
         const compiled = await withTimeout(job.limits.timeoutSec, async () => {
           await deps.provider.fetchAtRef(job.source, dir);
-          return compileSite({ contentDir: dir, siteId: job.siteId });
+          return compileSite({
+            contentDir: dir,
+            siteId: job.siteId,
+            renderCache: persisted?.cache,
+          });
         });
         const bundleKey = `${job.artifact.bundlePrefix}${compiled.bundleHash}.json`;
         await deps.store.put(bundleKey, compiled.bundleJson);
+        await persisted?.flush().catch(() => {});
         return {
           ok: true,
           bundleKey,
           bundleHash: compiled.bundleHash,
           pageCount: compiled.bundle.site.build.pages.length,
+          rendered: compiled.rebuiltPages.length,
           diagnostics: [
             ...compiled.apiReferenceDiagnostics,
             ...compiled.bundle.site.build.diagnostics,
@@ -104,6 +115,7 @@ export function createInProcessExecutor(deps: {
           bundleKey: null,
           bundleHash: null,
           pageCount: 0,
+          rendered: 0,
           diagnostics: [
             {
               severity: "error",

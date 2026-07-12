@@ -24,6 +24,8 @@
     "@readsmith/components": "workspace:*",
     "@readsmith/config": "workspace:*",
     "@readsmith/mdx": "workspace:*",
-    "@readsmith/model": "workspace:*"
+    "@readsmith/model": "workspace:*",
+    "@readsmith/storage": "workspace:*",
+    "zod": "^4.0.5"
   }
 }

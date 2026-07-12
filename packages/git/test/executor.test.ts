@@ -98,3 +98,27 @@ describe("InProcessExecutor", () => {
     expect(result.diagnostics[0]?.message).toContain("timed out");
   });
 });
+
+describe("InProcessExecutor render cache", () => {
+  it("persists renders across executor runs through the store", async () => {
+    const store = createBundleStore({
+      driver: "local",
+      root: await mkdtemp(join(tmpdir(), "rs-cache-")),
+    });
+    const job = {
+      kind: "site.build" as const,
+      siteId: "default",
+      source: { repo: "acme/docs", commitSha: "c1" },
+      limits: { timeoutSec: 60 },
+      artifact: { bundlePrefix: "bundles/" },
+    };
+    const executor = createInProcessExecutor({ provider: fixtureProvider(), store });
+    const cold = await executor.run(job);
+    expect(cold.rendered).toBe(cold.pageCount);
+
+    // A fresh executor run (new scratch dir, same store): everything cached.
+    const warm = await executor.run({ ...job, source: { ...job.source, commitSha: "c2" } });
+    expect(warm.rendered).toBe(0);
+    expect(warm.bundleKey).toBe(cold.bundleKey); // identical content dedupes
+  });
+});

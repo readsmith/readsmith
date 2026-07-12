@@ -62,7 +62,22 @@ export function runBundleStoreConformance(makeStore: () => Promise<BundleStore> 
     for (const bad of ["../escape", "/etc/passwd", "a/../../b", ""]) {
       await expect(store.put(bad, "x")).rejects.toBeInstanceOf(StorageKeyError);
       await expect(store.get(bad)).rejects.toBeInstanceOf(StorageKeyError);
+      await expect(store.delete(bad)).rejects.toBeInstanceOf(StorageKeyError);
     }
     expect(await store.list()).toEqual([]);
+  });
+
+  it("deletes a key idempotently and leaves neighbors alone", async () => {
+    const store = await makeStore();
+    await store.put("bundles/a.json", "1");
+    await store.put("bundles/b.json", "2");
+    await store.delete("bundles/a.json");
+    expect(await store.get("bundles/a.json")).toBeNull();
+    expect(await store.has("bundles/a.json")).toBe(false);
+    expect((await store.get("bundles/b.json"))?.toString("utf8")).toBe("2");
+    // Absent key: a no-op, never a throw.
+    await store.delete("bundles/a.json");
+    await store.delete("never-existed.json");
+    expect(await store.list("bundles/")).toEqual(["bundles/b.json"]);
   });
 }

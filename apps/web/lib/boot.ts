@@ -56,6 +56,10 @@ export async function boot(): Promise<void> {
         resolveStorageConfig(process.env, join(process.cwd(), ".readsmith")),
       );
       const executor = createInProcessExecutor({ provider: git.provider, store });
+      // Rollback history kept per site; older snapshots are pruned after each
+      // publish (their artifacts too, when no live deployment shares them).
+      const keepRaw = Number(process.env.READSMITH_KEEP_DEPLOYMENTS ?? "20");
+      const keepLast = Number.isInteger(keepRaw) && keepRaw >= 0 ? keepRaw : 20;
       await runner.work(siteBuildJob, async (payload) => {
         await runSiteBuild(
           {
@@ -63,6 +67,7 @@ export async function boot(): Promise<void> {
             store,
             executor,
             logger: log,
+            retention: { keepLast },
             afterFlip: async (row) => {
               // This graph's pointer cache re-resolves immediately (the routes'
               // copy follows via TTL + revalidation), then search converges.

@@ -18,6 +18,8 @@ export interface BundleStore {
   put(key: string, data: string | Uint8Array): Promise<void>;
   /** List stored keys, optionally filtered by prefix, sorted for determinism. */
   list(prefix?: string): Promise<string[]>;
+  /** Remove a key. Idempotent: deleting an absent key is a no-op, never a throw. */
+  delete(key: string): Promise<void>;
 }
 
 /** The driver names this build understands (v1: local only). */
