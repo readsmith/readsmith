@@ -163,3 +163,31 @@ describe("createApiApp: feedback", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("git webhook route", () => {
+  it("404s when git is not configured", async () => {
+    const app = createApiApp({ db: okDb, ai: null });
+    const res = await app.request(`${API_BASE_PATH}/git/webhook`, { method: "POST", body: "{}" });
+    expect(res.status).toBe(404);
+  });
+
+  it("delegates to the injected service with the raw request", async () => {
+    let seen: string | null = null;
+    const app = createApiApp({
+      db: okDb,
+      ai: null,
+      git: {
+        webhook: async (req) => {
+          seen = await req.text();
+          return new Response(null, { status: 202 });
+        },
+      },
+    });
+    const res = await app.request(`${API_BASE_PATH}/git/webhook`, {
+      method: "POST",
+      body: '{"x":1}',
+    });
+    expect(res.status).toBe(202);
+    expect(seen).toBe('{"x":1}');
+  });
+});

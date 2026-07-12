@@ -95,6 +95,16 @@ async function loadBundle(): Promise<Bundle> {
   return loadLocalBundle();
 }
 
+/**
+ * Drop the pointer cache so the next read re-resolves immediately. Called after
+ * a publish by the in-process worker (each module graph has its own copy of
+ * this state; the routes' copy relies on the pointer TTL + route revalidation).
+ */
+export function invalidateSiteCache(): void {
+  loader?.invalidate();
+  parsedCurrent = null;
+}
+
 export async function getSite(): Promise<Site> {
   return (await loadBundle()).site;
 }

@@ -492,3 +492,20 @@ export async function pruneSuperseded(
     return { prunedIds: ids, unreferencedRefs: refs.map((r) => r.bundle_ref) };
   });
 }
+
+/**
+ * Record or clear the App installation covering a connected repo (driven by
+ * `installation` webhooks). Matches case-insensitively (GitHub repo names are);
+ * returns whether a connection existed to update.
+ */
+export async function setInstallationId(
+  db: Db,
+  input: { siteId: string; repo: string; installationId: string | null },
+): Promise<boolean> {
+  const rows = await db.query<{ id: string }>(sql`
+    UPDATE app.git_connections
+    SET installation_id = ${input.installationId}, updated_at = now()
+    WHERE site_id = ${input.siteId} AND lower(repo) = lower(${input.repo})
+    RETURNING id`);
+  return rows.length > 0;
+}

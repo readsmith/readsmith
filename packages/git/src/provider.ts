@@ -9,6 +9,8 @@ export interface FetchTarget {
   repo: string;
   /** The exact commit to materialize (never a branch head: reproducibility). */
   commitSha: string;
+  /** App installation id when known (App drivers discover it from the repo otherwise). */
+  installationId?: string | null;
 }
 
 export interface GitProvider {

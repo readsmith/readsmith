@@ -53,12 +53,25 @@ export interface AiServices {
   mcp(request: Request): Promise<Response>;
 }
 
+/**
+ * The git-integration surface the routes call, host-agnostic. The host composes
+ * it from `@readsmith/git` + its job runner, so this package stays free of git
+ * and queue dependencies. The handler owns signature verification (it needs the
+ * raw request bytes) and returns an HTTP-ready response.
+ */
+export interface GitService {
+  /** Handle an inbound provider webhook delivery. */
+  webhook(request: Request): Promise<Response>;
+}
+
 /** Everything a host injects when constructing the API. */
 export interface ApiDeps {
   /** The database, or null when the host runs without persistence (docs-only). */
   db: ApiDatabase | null;
   /** The AI services, or null when AI is not configured (docs-only / FTS handled inside). */
   ai: AiServices | null;
+  /** Git integration (webhooks), or null when not configured. */
+  git?: GitService | null;
   /** Abuse protection. Null disables it, for a host that limits at its own edge. */
   rateLimit?: RateLimiter | null;
   /**

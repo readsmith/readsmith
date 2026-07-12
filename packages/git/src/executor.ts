@@ -18,7 +18,7 @@ import type { GitProvider } from "./provider.js";
 export interface ExecutorJob {
   kind: "site.build";
   siteId: string;
-  source: { repo: string; commitSha: string };
+  source: { repo: string; commitSha: string; installationId?: string | null };
   limits: { timeoutSec: number };
   artifact: { bundlePrefix: string };
 }

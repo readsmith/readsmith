@@ -3,9 +3,11 @@ import {
   type DeploymentRow,
   type Logger,
   defineJob,
+  getGitConnection,
   insertDeployment,
   markDeploymentFailed,
   publishDeployment,
+  setLastSyncedSha,
 } from "@readsmith/db";
 import { contentHash } from "@readsmith/model";
 import type { BundleStore } from "@readsmith/storage";
@@ -61,6 +63,7 @@ export async function runSiteBuild(
   payload: SiteBuildPayload,
 ): Promise<DeploymentRow> {
   const { db, store, executor, logger } = deps;
+  const connection = await getGitConnection(db, payload.siteId);
   const opened = await insertDeployment(db, {
     siteId: payload.siteId,
     gitRef: payload.ref,
@@ -75,7 +78,11 @@ export async function runSiteBuild(
   const result = await executor.run({
     kind: "site.build",
     siteId: payload.siteId,
-    source: { repo: payload.repo, commitSha: payload.commitSha },
+    source: {
+      repo: payload.repo,
+      commitSha: payload.commitSha,
+      installationId: connection?.installation_id ?? null,
+    },
     limits: { timeoutSec: deps.timeoutSec ?? 300 },
     artifact: { bundlePrefix: BUNDLE_PREFIX },
   });
@@ -112,6 +119,11 @@ export async function runSiteBuild(
     pages: result.pageCount,
     wallMs: result.usage.wallMs,
   });
-  if (flipped) await deps.afterFlip?.(row);
+  if (flipped) {
+    if (connection && connection.repo.toLowerCase() === payload.repo.toLowerCase()) {
+      await setLastSyncedSha(db, { id: connection.id, sha: payload.commitSha });
+    }
+    await deps.afterFlip?.(row);
+  }
   return row;
 }

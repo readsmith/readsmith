@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import {
   createDb,
   createJobRunner,
@@ -7,7 +8,17 @@ import {
   migrationsDir,
   runMigrations,
 } from "@readsmith/db";
+import {
+  createInProcessExecutor,
+  ensureGitConnection,
+  runSiteBuild,
+  siteBuildJob,
+  siteBuildSingletonKey,
+} from "@readsmith/git";
+import { createBundleStore, resolveStorageConfig } from "@readsmith/storage";
+import { getGitRuntime } from "./git";
 import { embedIndexJob, indexBundle } from "./indexing";
+import { invalidateSiteCache } from "./site";
 
 /**
  * One-time backbone boot: run pending migrations, then start the job worker.
@@ -29,14 +40,62 @@ export async function boot(): Promise<void> {
 
     const runner = createJobRunner({ config, logger: log });
     await runner.start();
-    // Re-index the compiled bundle on demand (the M2 GitHub App enqueues this on
-    // publish; `pnpm ai:index` is the inline path for v1 self-host).
+    // Re-index the served bundle on demand (enqueued after every publish;
+    // `pnpm ai:index` is the inline path for v1 self-host).
     await runner.work(embedIndexJob, async () => {
       await indexBundle(db);
     });
+
+    // Git-driven deployments: register the build handler and bind the
+    // configured repo (which auto-builds a site with no deployment history).
+    const jobs = ["embed.index"];
+    const git = getGitRuntime();
+    if (git) {
+      const store = createBundleStore(
+        resolveStorageConfig(process.env, join(process.cwd(), ".readsmith")),
+      );
+      const executor = createInProcessExecutor({ provider: git.provider, store });
+      await runner.work(siteBuildJob, async (payload) => {
+        await runSiteBuild(
+          {
+            db,
+            store,
+            executor,
+            logger: log,
+            afterFlip: async (row) => {
+              // This graph's pointer cache re-resolves immediately (the routes'
+              // copy follows via TTL + revalidation), then search converges.
+              invalidateSiteCache();
+              await runner.enqueue(embedIndexJob, { siteId: row.site_id });
+            },
+          },
+          payload,
+        );
+      });
+      jobs.push("site.build");
+      if (git.config.repo) {
+        try {
+          await ensureGitConnection(
+            {
+              db,
+              provider: git.provider,
+              enqueue: (p) =>
+                runner.enqueue(siteBuildJob, p, { singletonKey: siteBuildSingletonKey(p) }),
+              logger: log,
+            },
+            { siteId: "default", repo: git.config.repo, branch: git.config.branch },
+          );
+        } catch (err) {
+          log.error("git connection bind failed; builds remain push-driven", {
+            err: String(err),
+          });
+        }
+      }
+    }
+
     log.info("job runner started", {
       concurrency: config.workerConcurrency,
-      jobs: ["embed.index"],
+      jobs,
     });
     // Hold a reference so the runner is not garbage-collected.
     (globalThis as { __rsJobRunner?: unknown }).__rsJobRunner = runner;

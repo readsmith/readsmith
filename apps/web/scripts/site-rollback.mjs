@@ -9,11 +9,14 @@
 //   pnpm site:rollback <deployment-id>    make that deployment current
 import {
   createDb,
+  createJobRunner,
+  defineJob,
   hasDatabase,
   listDeployments,
   loadDbConfig,
   repointCurrent,
 } from "@readsmith/db";
+import { z } from "zod";
 
 const SITE_ID = "default";
 
@@ -50,9 +53,19 @@ async function main() {
       return;
     }
     const row = await repointCurrent(db, { siteId: SITE_ID, deploymentId: arg });
+    // Search must converge to the served content: index pruning follows whatever
+    // bundle it last indexed, so every pointer flip re-enqueues the index job.
+    const embedIndexJob = defineJob({
+      name: "embed.index",
+      schema: z.object({ siteId: z.string().optional() }).passthrough(),
+    });
+    const runner = createJobRunner({ config: loadDbConfig() });
+    await runner.start();
+    await runner.enqueue(embedIndexJob, { siteId: SITE_ID });
+    await runner.stop();
     const sha = row.commit_sha.slice(0, 12);
     console.log(
-      `[readsmith] current deployment -> ${row.id} (${sha}); a running server reflects it within about a minute.`,
+      `[readsmith] current deployment -> ${row.id} (${sha}); a running server reflects it within about a minute (search reindex queued).`,
     );
   } finally {
     await db.close();

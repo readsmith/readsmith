@@ -65,6 +65,13 @@ export function createApiApp(deps: ApiDeps, options: ApiAppOptions = {}): Hono {
     return c.json(deps.ai?.capabilities ?? { search: false, vectorSearch: false, askAi: false });
   });
 
+  // Inbound git-provider webhooks. The service owns signature verification (it
+  // needs the raw bytes) and does minimal work: verify, filter, enqueue.
+  app.post("/git/webhook", async (c) => {
+    if (!deps.git) return c.json({ error: "Git integration is not configured." }, 404);
+    return deps.git.webhook(c.req.raw);
+  });
+
   // Hybrid search for the command palette. No LLM. Returns `degraded: true` when
   // the vector arm was expected but the provider failed, so the UI can say the
   // results are keyword-only instead of silently serving worse ones.

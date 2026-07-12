@@ -1,6 +1,6 @@
 export { API_BASE_PATH, createApiApp } from "./app.js";
 export type { ApiAppOptions } from "./app.js";
-export type { AiCapabilities, AiServices, ApiDatabase, ApiDeps } from "./deps.js";
+export type { AiCapabilities, AiServices, ApiDatabase, ApiDeps, GitService } from "./deps.js";
 export {
   DEFAULT_RATE_LIMITS,
   RATE_LIMIT_BUCKETS,

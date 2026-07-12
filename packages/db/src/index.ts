@@ -50,6 +50,7 @@ export {
   repointCurrent,
   searchEndpoints,
   setAiQueryFeedback,
+  setInstallationId,
   setLastSyncedSha,
   upsertDocChunks,
   upsertGitConnection,
