@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, join, posix, relative, resolve as resolvePath, sep } from "node:path";
 import type { Diagnostic } from "@readsmith/model";
+import { analyticsCspSources } from "./analytics.js";
 import { discoverPages } from "./discover.js";
 import { defaultSiteName, loadConfig } from "./load.js";
 import { buildAutoNav, buildExplicitNav } from "./nav.js";
@@ -71,6 +72,20 @@ function resolveSiteImage(
  * asset copy must agree on it: when they disagreed, pointing Readsmith at a
  * repository published that repository's source tree.
  */
+/** Operator CSP extensions plus whatever the configured analytics providers need. */
+function withAnalyticsCsp(
+  csp: import("./security.js").CspExtensions,
+  analytics: import("./schema.js").AnalyticsConfig | undefined,
+): import("./security.js").CspExtensions {
+  const extra = analyticsCspSources(analytics);
+  if (extra.scriptSrc.length === 0 && extra.connectSrc.length === 0) return csp;
+  return {
+    ...csp,
+    scriptSrc: [...(csp.scriptSrc ?? []), ...extra.scriptSrc],
+    connectSrc: [...(csp.connectSrc ?? []), ...extra.connectSrc],
+  };
+}
+
 export function contentRootOf(root: string, config: { content: { root: string } }): string {
   return join(root, config.content.root);
 }
@@ -279,7 +294,8 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
       theme: input?.site.theme ?? {},
     },
     appearance: { default: input?.appearance?.default ?? "system" },
-    security: { csp: input?.security?.csp ?? {} },
+    security: { csp: withAnalyticsCsp(input?.security?.csp ?? {}, input?.analytics) },
+    analytics: input?.analytics,
     content: { root: contentRel, include, exclude, home: input?.content?.home },
     assets,
     links: {

@@ -25,6 +25,7 @@ import type { NormalizedSpec, SearchFilters } from "@readsmith/model";
 import { InMemoryEventStore } from "@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { siteBasePath, siteOrigin } from "@readsmith/config";
+import { logSearchQuery } from "./analytics";
 import { getDb } from "./db";
 import { getApiReference, getSite } from "./site";
 
@@ -180,12 +181,20 @@ async function build(): Promise<AiServices | null> {
   return {
     capabilities,
     async search(input) {
-      return hybridSearch(search, {
+      const result = await hybridSearch(search, {
         siteId: SITE_ID,
         query: input.query,
         filters: filtersFrom(input),
         topK,
       });
+      // The search-gaps dataset: fire-and-forget, never on the response path.
+      logSearchQuery({
+        query: input.query,
+        resultsCount: result.hits.length,
+        version: input.version,
+        locale: input.locale,
+      });
+      return result;
     },
     async ask(input) {
       const filters = filtersFrom(input);

@@ -24,6 +24,10 @@ const scopedQuery = z.object({
   locale: z.string().optional(),
 });
 const feedbackInput = z.object({ id: z.string().min(1), value: z.number().int() });
+const pageFeedbackInput = z.object({
+  path: z.string().min(1).max(500),
+  helpful: z.boolean(),
+});
 
 async function parseJson(request: Request): Promise<unknown> {
   return request.json().catch(() => null);
@@ -63,6 +67,17 @@ export function createApiApp(deps: ApiDeps, options: ApiAppOptions = {}): Hono {
   // controls (the degradation ladder). Always answers; defaults to all-off.
   app.get("/ai/capabilities", (c) => {
     return c.json(deps.ai?.capabilities ?? { search: false, vectorSearch: false, askAi: false });
+  });
+
+  // "Was this page helpful": persisted when a database exists, acked and
+  // dropped otherwise - the reader's gesture never errors. Shares the search
+  // rate bucket (both are cheap, reader-initiated writes).
+  app.post("/page-feedback", limit("search"), async (c) => {
+    const body = pageFeedbackInput.safeParse(await parseJson(c.req.raw));
+    if (!body.success) return c.json({ error: "path and helpful are required." }, 400);
+    if (!deps.analytics) return c.json({ ignored: "no persistence" }, 202);
+    await deps.analytics.pageFeedback(body.data);
+    return c.json({ ok: true }, 202);
   });
 
   // Inbound git-provider webhooks. The service owns signature verification (it

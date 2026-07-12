@@ -191,3 +191,33 @@ describe("git webhook route", () => {
     expect(seen).toBe('{"x":1}');
   });
 });
+
+describe("page feedback route", () => {
+  it("validates input, persists through the service, and drops without one", async () => {
+    const seen: { path: string; helpful: boolean }[] = [];
+    const app = createApiApp({
+      db: okDb,
+      ai: null,
+      analytics: {
+        pageFeedback: async (input) => {
+          seen.push(input);
+        },
+      },
+    });
+    const bad = await post(app, `${API_BASE_PATH}/page-feedback`, { path: "" });
+    expect(bad.status).toBe(400);
+    const ok = await post(app, `${API_BASE_PATH}/page-feedback`, {
+      path: "/quickstart",
+      helpful: true,
+    });
+    expect(ok.status).toBe(202);
+    expect(seen).toEqual([{ path: "/quickstart", helpful: true }]);
+
+    const bare = createApiApp({ db: okDb, ai: null });
+    const dropped = await post(bare, `${API_BASE_PATH}/page-feedback`, {
+      path: "/x",
+      helpful: false,
+    });
+    expect(dropped.status).toBe(202);
+  });
+});

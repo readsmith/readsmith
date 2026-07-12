@@ -36,6 +36,8 @@ export interface Site {
   favicon?: { light: string; dark: string };
   /** Precompiled per-site brand theme CSS (see @readsmith/components themeToCss). */
   themeCss?: string;
+  /** Precompiled bring-your-own analytics tags (docs.yaml `analytics:`). */
+  analyticsHtml?: string;
   /** First-visit color scheme; "system" follows the visitor's OS. */
   appearance?: { default: "system" | "light" | "dark" };
   /** The API-reference config from docs.yaml, when set (for the header cross-link). */

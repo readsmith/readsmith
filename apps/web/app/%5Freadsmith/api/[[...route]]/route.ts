@@ -1,4 +1,5 @@
 import { getAiServices } from "@/lib/ai";
+import { getAnalyticsService } from "@/lib/analytics";
 import { getDb } from "@/lib/db";
 import { getGitService } from "@/lib/git";
 import { getRateLimiter } from "@/lib/rate-limit";
@@ -18,7 +19,13 @@ function getApp(): Promise<ReturnType<typeof createApiApp>> {
     appPromise = Promise.all([getAiServices(), getRateLimiter()]).then(([ai, rateLimit]) =>
       // Next.js exposes no socket address, so the limiter identifies callers by the
       // operator's configured trusted proxy header (READSMITH_TRUSTED_IP_HEADER).
-      createApiApp({ db: getDb(), ai, git: getGitService(), rateLimit }),
+      createApiApp({
+        db: getDb(),
+        ai,
+        git: getGitService(),
+        analytics: getAnalyticsService(),
+        rateLimit,
+      }),
     );
   }
   return appPromise;

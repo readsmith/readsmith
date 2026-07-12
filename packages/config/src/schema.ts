@@ -148,12 +148,36 @@ export const configInputSchema = z.object({
    * follows the visitor's OS; "light"/"dark" pin that mode until the visitor
    * toggles, which persists their own choice. */
   appearance: z.object({ default: z.enum(["system", "light", "dark"]).optional() }).optional(),
+  /**
+   * Bring-your-own analytics: the site's own tags, injected at compile with
+   * the matching CSP sources. Identifier fields are strictly charset-checked
+   * because they interpolate into inline script and URLs.
+   */
+  analytics: z
+    .object({
+      ga4: z.object({ measurementId: z.string().regex(/^[A-Za-z0-9-]+$/) }).optional(),
+      posthog: z
+        .object({
+          apiKey: z.string().regex(/^[A-Za-z0-9_-]+$/),
+          host: z.string().url().optional(),
+        })
+        .optional(),
+      plausible: z
+        .object({
+          domain: z.string().regex(/^[A-Za-z0-9.-]+$/),
+          src: z.string().url().optional(),
+        })
+        .optional(),
+      fathom: z.object({ siteId: z.string().regex(/^[A-Za-z0-9]+$/) }).optional(),
+    })
+    .optional(),
   /** Content-Security-Policy sources this site needs beyond `'self'`. */
   security: z
     .object({
       csp: z
         .object({
           imgSrc: z.array(z.string()).optional(),
+          scriptSrc: z.array(z.string()).optional(),
           connectSrc: z.array(z.string()).optional(),
           fontSrc: z.array(z.string()).optional(),
           frameSrc: z.array(z.string()).optional(),
@@ -235,6 +259,13 @@ export interface NavTab {
 }
 
 /** The fully resolved, defaulted config plus the discovered content. */
+export interface AnalyticsConfig {
+  ga4?: { measurementId: string };
+  posthog?: { apiKey: string; host?: string };
+  plausible?: { domain: string; src?: string };
+  fathom?: { siteId: string };
+}
+
 export interface ResolvedConfig {
   site: {
     name: string;
@@ -253,6 +284,8 @@ export interface ResolvedConfig {
   appearance: { default: "system" | "light" | "dark" };
   /** Resolved CSP extensions (always present, possibly empty). */
   security: { csp: CspExtensions };
+  /** Bring-your-own analytics providers, validated; absent = none. */
+  analytics?: AnalyticsConfig;
   content: { root: string; include: string[]; exclude: string[]; home?: string };
   /** Validated asset mounts. `from` is content-root-relative POSIX, normalized. */
   assets: AssetMount[];

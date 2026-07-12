@@ -8,6 +8,23 @@ date: "2026-07-12"
 
 Releases land here, newest first, and this page feeds the site's RSS at `/rss.xml`.
 
+<Update label="0.4.0" title="Analytics, your way">
+
+Your analytics tool on your docs with one config block, plus identity-free
+reader signals recorded for you. See [Analytics](/configuration/analytics).
+
+- **Bring your own analytics**: declare GA4, PostHog, Plausible, or Fathom in
+  `docs.yaml` and the tags are compiled in with the Content-Security-Policy
+  extended for exactly those hosts; loaders are async and never block a page
+- **Search-gap logging**: every search is recorded with a zero-result flag,
+  so "what readers looked for and did not find" is one SQL query away
+- **Page feedback, persisted**: the "was this page helpful" control now
+  records its answer (path and verdict only)
+- **Nothing about the reader**: no identity, no headers, no cookies in any of
+  it, with 90-day retention defaults
+
+</Update>
+
 <Update label="0.3.0" title="S3-compatible storage">
 
 The compiled-site store now speaks S3: keep the zero-config local filesystem,

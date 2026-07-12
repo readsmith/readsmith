@@ -14,6 +14,8 @@ import {
   insertAiQuery,
   insertDeployment,
   insertEndpoints,
+  insertPageFeedback,
+  insertSearchQuery,
   insertSpec,
   listChunkHashes,
   listDeployments,
@@ -22,6 +24,8 @@ import {
   pruneSuperseded,
   publishDeployment,
   purgeAiQueries,
+  purgePageFeedback,
+  purgeSearchQueries,
   repointCurrent,
   searchEndpoints,
   setAiQueryFeedback,
@@ -594,5 +598,56 @@ describe.skipIf(!DATABASE_URL)("git connections + deployments (integration)", ()
     const history = await listDeployments(db, { siteId: SITE, limit: 50 });
     const pruned = history.filter((d) => d.status === "pruned");
     expect(pruned.map((d) => d.id)).toEqual(expect.arrayContaining(prunedIds));
+  });
+});
+
+// Analytics lite (0004): search-gap log + page feedback.
+describe.skipIf(!DATABASE_URL)("analytics tables (integration)", () => {
+  let db: Db;
+  const SITE = "analytics-test";
+
+  beforeAll(async () => {
+    db = createDb(config());
+    await runMigrations(db);
+    await upsertSite(db, { id: SITE, name: "Analytics Test" });
+  });
+
+  afterAll(async () => {
+    await db?.close();
+  });
+
+  it("logs searches with the zero-result flag and purges by age", async () => {
+    await insertSearchQuery(db, {
+      id: "sq-1",
+      siteId: SITE,
+      query: "deploy on push",
+      resultsCount: 4,
+    });
+    await insertSearchQuery(db, {
+      id: "sq-2",
+      siteId: SITE,
+      query: "quantum llamas",
+      resultsCount: 0,
+    });
+    const rows = await db.query<{ id: string; zero_result: boolean }>(sql`
+      SELECT id, zero_result FROM app.search_queries WHERE site_id = ${SITE} ORDER BY id`);
+    expect(rows).toEqual([
+      { id: "sq-1", zero_result: false },
+      { id: "sq-2", zero_result: true },
+    ]);
+    expect(await purgeSearchQueries(db, { olderThanDays: 0 })).toBeGreaterThanOrEqual(2);
+  });
+
+  it("round-trips page feedback with a validated row", async () => {
+    const row = await insertPageFeedback(db, {
+      id: "pf-1",
+      siteId: SITE,
+      path: "/quickstart",
+      helpful: true,
+    });
+    expect(row.helpful).toBe(true);
+    expect(row.comment).toBeNull();
+    expect(row.created_at).toBeInstanceOf(Date);
+    expect(await purgePageFeedback(db, { olderThanDays: 0 })).toBeGreaterThanOrEqual(1);
   });
 });

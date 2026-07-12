@@ -205,3 +205,29 @@ export const deploymentRowSchema = z.object({
   expires_at: z.date().nullable(),
 });
 export type DeploymentRow = z.infer<typeof deploymentRowSchema>;
+
+// --- Analytics lite: search-gap log + page feedback ---
+
+/** A logged search (the search-gaps dataset). Query text only, no identity. */
+export const searchQueryRowSchema = z.object({
+  id: z.string(),
+  site_id: z.string(),
+  query: z.string(),
+  results_count: z.number().int(),
+  zero_result: z.boolean(),
+  version_id: z.string(),
+  locale: z.string(),
+  created_at: z.date(),
+});
+export type SearchQueryRow = z.infer<typeof searchQueryRowSchema>;
+
+/** A reader's "was this page helpful" signal. `comment` is reserved for later UI. */
+export const pageFeedbackRowSchema = z.object({
+  id: z.string(),
+  site_id: z.string(),
+  path: z.string(),
+  helpful: z.boolean(),
+  comment: z.string().nullable(),
+  created_at: z.date(),
+});
+export type PageFeedbackRow = z.infer<typeof pageFeedbackRowSchema>;

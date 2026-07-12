@@ -3,7 +3,12 @@ import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { normalizeDocument, parseAndBundle } from "@readsmith/api-reference";
 import { createRegistry, themeToCss } from "@readsmith/components";
-import { type ResolvedConfig, contentRootOf, resolveConfig } from "@readsmith/config";
+import {
+  type ResolvedConfig,
+  analyticsHeadHtml,
+  contentRootOf,
+  resolveConfig,
+} from "@readsmith/config";
 import { type AuthoredSkill, type RenderCache, type SiteBuild, assembleSite } from "@readsmith/mdx";
 import {
   type Diagnostic,
@@ -59,6 +64,8 @@ export interface CompiledSiteEnvelope {
   favicon?: ResolvedConfig["site"]["favicon"];
   /** Precompiled per-site brand theme, injected into <head> by the shell. */
   themeCss: string;
+  /** Precompiled bring-your-own analytics tags; omitted when none configured. */
+  analyticsHtml?: string;
   appearance: ResolvedConfig["appearance"];
   apiReference?: ResolvedConfig["apiReference"];
   footer?: ResolvedConfig["footer"];
@@ -290,6 +297,7 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
     logo: config.site.logo,
     favicon: config.site.favicon,
     themeCss: themeToCss(config.site.theme),
+    analyticsHtml: analyticsHeadHtml(config.analytics),
     appearance: config.appearance,
     apiReference: config.apiReference,
     footer: config.footer,

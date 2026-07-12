@@ -413,9 +413,22 @@ function initContextMenu(root: ParentNode): void {
 
 function initFeedback(root: ParentNode): void {
   const buttons = [...root.querySelectorAll<HTMLElement>("[data-rs-feedback]")];
+  let sent = false;
   for (const button of buttons) {
     button.addEventListener("click", () => {
       for (const other of buttons) other.classList.toggle("is-selected", other === button);
+      // Persist once per page load; acknowledge optimistically and never
+      // surface a failure - the reader's gesture is a gift, not a transaction.
+      if (sent) return;
+      sent = true;
+      void fetch(`${api()}/page-feedback`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          path: location.pathname,
+          helpful: button.dataset.rsFeedback === "yes",
+        }),
+      }).catch(() => {});
     });
   }
 }

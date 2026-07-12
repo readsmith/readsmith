@@ -1,3 +1,5 @@
+import { cp, mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { compileSite } from "../src/compile.js";
@@ -68,5 +70,26 @@ describe("compileSite failOnError", () => {
       failOnError: true,
     });
     expect(bundle.site.build.ok).toBe(false);
+  });
+});
+
+describe("compileSite analytics injection", () => {
+  it("bakes configured provider tags into the envelope with their CSP sources", async () => {
+    const dir = join(await mkdtemp(join(tmpdir(), "rs-an-")), "site");
+    await mkdir(dir);
+    await cp(fixture("site"), dir, { recursive: true });
+    await writeFile(
+      join(dir, "docs.yaml"),
+      "site:\n  name: site\nanalytics:\n  ga4:\n    measurementId: G-TEST42\n",
+    );
+    const { bundle, config } = await compileSite({ contentDir: dir });
+    expect(bundle.site.analyticsHtml).toContain("G-TEST42");
+    expect(config.security.csp.scriptSrc).toContain("https://www.googletagmanager.com");
+  });
+
+  it("omits the field entirely when no analytics is configured", async () => {
+    const { bundle, bundleJson } = await compileSite({ contentDir: fixture("site") });
+    expect(bundle.site.analyticsHtml).toBeUndefined();
+    expect(bundleJson).not.toContain("analyticsHtml");
   });
 });

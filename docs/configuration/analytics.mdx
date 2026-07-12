@@ -1,0 +1,64 @@
+---
+title: Analytics
+description: Bring your own analytics tag, mine your search logs for content gaps, and collect page feedback. Readsmith stores no reader identity.
+---
+
+# Analytics
+
+Readsmith's analytics posture has two halves: **your** analytics tool runs on
+your docs with one config block, and Readsmith itself keeps three small,
+identity-free datasets that tell you what to write next.
+
+## Bring your own analytics
+
+Declare providers in `docs.yaml` and the matching script tags are compiled
+into the site, with the Content-Security-Policy extended for exactly those
+hosts and nothing more. Any combination works:
+
+```yaml
+analytics:
+  ga4:
+    measurementId: G-XXXXXXXXXX
+  posthog:
+    apiKey: phc_xxxxxxxx
+    # host: https://eu.i.posthog.com   # defaults to PostHog US cloud
+  plausible:
+    domain: docs.example.com
+    # src: https://plausible.io/js/script.js
+  fathom:
+    siteId: XXXXXXXX
+```
+
+Every loader is async or deferred: analytics never blocks a docs page. The
+tag is yours, and so is its data and compliance; Readsmith adds no cookies
+and stores nothing from it. An invalid identifier fails config validation
+loudly rather than emitting a broken tag.
+
+<Info>
+Need a provider that is not listed? Extend the policy yourself with
+`security.csp.scriptSrc` and open an issue naming the provider.
+</Info>
+
+## What Readsmith records for you
+
+With the database running, three datasets accumulate, none of which contain
+reader identity, headers, or cookies:
+
+| Dataset | What it answers |
+| --- | --- |
+| Search queries, with a zero-result flag | What do readers look for, and what do they look for **and not find**? The zero-result rows are your writing backlog |
+| Page feedback | Which pages do readers mark helpful or not (the control at the bottom of every page) |
+| Ask AI queries | What readers ask in their own words, with citations and thumbs (see [Search and Ask AI](/ai/search-and-ask)) |
+
+Each keeps 90 days by default and is queryable straight from Postgres today;
+for example, the search gaps:
+
+```sql
+SELECT query, count(*) AS asked
+FROM app.search_queries
+WHERE zero_result AND created_at > now() - interval '30 days'
+GROUP BY query ORDER BY asked DESC LIMIT 20;
+```
+
+Docs-only installs (no database) skip all recording; the feedback control
+still renders and simply drops the signal.

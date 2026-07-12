@@ -9,6 +9,7 @@ import {
   type NewAiQuery,
   type NewDocChunk,
   type NewEndpoint,
+  type PageFeedbackRow,
   type SearchChunkRow,
   type SiteRow,
   aiQueryRowSchema,
@@ -17,6 +18,7 @@ import {
   deploymentRowSchema,
   docChunkRowSchema,
   gitConnectionRowSchema,
+  pageFeedbackRowSchema,
   searchChunkRowSchema,
   siteRowSchema,
 } from "./schema.js";
@@ -512,4 +514,57 @@ export async function setInstallationId(
     WHERE site_id = ${input.siteId} AND lower(repo) = lower(${input.repo})
     RETURNING id`);
   return rows.length > 0;
+}
+
+// --- Analytics lite: search-gap log + page feedback ---
+
+/** Log an answered search. Callers fire-and-forget: never on a response path. */
+export async function insertSearchQuery(
+  db: Db,
+  input: {
+    id: string;
+    siteId: string;
+    query: string;
+    resultsCount: number;
+    versionId?: string;
+    locale?: string;
+  },
+): Promise<void> {
+  await db.query(sql`
+    INSERT INTO app.search_queries (id, site_id, query, results_count, zero_result, version_id, locale)
+    VALUES (${input.id}, ${input.siteId}, ${input.query}, ${input.resultsCount},
+            ${input.resultsCount === 0}, ${input.versionId ?? "current"}, ${input.locale ?? "en"})`);
+}
+
+/** Purge search logs older than the retention window (default 90 days). */
+export async function purgeSearchQueries(
+  db: Db,
+  input: { olderThanDays: number },
+): Promise<number> {
+  const res = await db.query<{ id: string }>(sql`
+    DELETE FROM app.search_queries
+    WHERE created_at < now() - make_interval(days => ${input.olderThanDays})
+    RETURNING id`);
+  return res.length;
+}
+
+/** Record a reader's page-helpfulness signal. */
+export async function insertPageFeedback(
+  db: Db,
+  input: { id: string; siteId: string; path: string; helpful: boolean; comment?: string | null },
+): Promise<PageFeedbackRow> {
+  const row = await db.one(sql`
+    INSERT INTO app.page_feedback (id, site_id, path, helpful, comment)
+    VALUES (${input.id}, ${input.siteId}, ${input.path}, ${input.helpful}, ${input.comment ?? null})
+    RETURNING id, site_id, path, helpful, comment, created_at`);
+  return pageFeedbackRowSchema.parse(row);
+}
+
+/** Purge feedback older than the retention window (default 90 days). */
+export async function purgePageFeedback(db: Db, input: { olderThanDays: number }): Promise<number> {
+  const res = await db.query<{ id: string }>(sql`
+    DELETE FROM app.page_feedback
+    WHERE created_at < now() - make_interval(days => ${input.olderThanDays})
+    RETURNING id`);
+  return res.length;
 }

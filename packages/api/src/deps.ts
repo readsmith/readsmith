@@ -64,6 +64,14 @@ export interface GitService {
   webhook(request: Request): Promise<Response>;
 }
 
+/**
+ * Reader-signal persistence, host-composed (this package stays driver-free).
+ * Absent = signals are acked and dropped (docs-only installs).
+ */
+export interface AnalyticsService {
+  pageFeedback(input: { path: string; helpful: boolean }): Promise<void>;
+}
+
 /** Everything a host injects when constructing the API. */
 export interface ApiDeps {
   /** The database, or null when the host runs without persistence (docs-only). */
@@ -72,6 +80,8 @@ export interface ApiDeps {
   ai: AiServices | null;
   /** Git integration (webhooks), or null when not configured. */
   git?: GitService | null;
+  /** Reader-signal persistence (page feedback), or null without a database. */
+  analytics?: AnalyticsService | null;
   /** Abuse protection. Null disables it, for a host that limits at its own edge. */
   rateLimit?: RateLimiter | null;
   /**

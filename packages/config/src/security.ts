@@ -18,6 +18,8 @@
 /** Extra source tokens an operator or a site may admit, by directive. */
 export interface CspExtensions {
   imgSrc?: string[];
+  /** External script hosts (analytics providers add theirs automatically). */
+  scriptSrc?: string[];
   connectSrc?: string[];
   fontSrc?: string[];
   frameSrc?: string[];
@@ -71,7 +73,10 @@ export function buildContentSecurityPolicy(options: SecurityHeaderOptions = {}):
     ["form-action", ["'self'"]],
     ["frame-ancestors", frameAncestors.length > 0 ? frameAncestors : ["'none'"]],
     // See the module header: inline is required, eval is not.
-    ["script-src", ["'self'", "'unsafe-inline'", ...(dev ? ["'unsafe-eval'"] : [])]],
+    [
+      "script-src",
+      ["'self'", "'unsafe-inline'", ...(dev ? ["'unsafe-eval'"] : []), ...clean(ext.scriptSrc)],
+    ],
     ["style-src", ["'self'", "'unsafe-inline'"]],
     ["img-src", ["'self'", "data:", "blob:", ...clean(ext.imgSrc)]],
     ["font-src", ["'self'", "data:", ...clean(ext.fontSrc)]],

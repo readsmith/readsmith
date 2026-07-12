@@ -111,6 +111,11 @@ The `ai` block configures search, Ask AI, and MCP behavior. API keys are never w
 | `ai.askAi.maxOutputTokens` | integer | `1024` | Answer length ceiling |
 | `ai.askAi.timeoutMs` | integer | `30000` | Per-question time budget |
 | `ai.analytics.retentionDays` | integer | `90` | How long Ask AI question records are kept |
+| `analytics.ga4.measurementId` | string | unset | Google Analytics 4 tag, injected with matching CSP ([Analytics](/configuration/analytics)) |
+| `analytics.posthog.apiKey` | string | unset | PostHog project key; `analytics.posthog.host` overrides the US cloud default |
+| `analytics.plausible.domain` | string | unset | Plausible site domain; `analytics.plausible.src` overrides the script source |
+| `analytics.fathom.siteId` | string | unset | Fathom site id |
+| `security.csp.scriptSrc` | string[] | `[]` | Extra script-src hosts beyond what configured analytics add automatically |
 | `ai.limits.ask` | `{limit, windowMs}` | `10` per minute | Rate limit for Ask AI requests |
 | `ai.limits.search` | `{limit, windowMs}` | `60` per minute | Rate limit for search requests |
 | `ai.limits.mcp` | `{limit, windowMs}` | `60` per minute | Rate limit for MCP requests |

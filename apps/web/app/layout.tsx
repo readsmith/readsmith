@@ -40,7 +40,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const { themeCss, appearance, url } = await getSite();
+  const { themeCss, appearance, url, analyticsHtml } = await getSite();
   return (
     // data-rs-base tells the client islands where the site is mounted (SP-5),
     // so no island hardcodes a root path.
@@ -56,7 +56,15 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: enum-parameterized inline theme init */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript(appearance?.default) }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Bring-your-own analytics tags, precompiled and escaped at build.
+            Script elements in the SSR stream execute regardless of wrapper. */}
+        {analyticsHtml ? (
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: compile-time escaped, charset-validated provider tags
+          <div hidden dangerouslySetInnerHTML={{ __html: analyticsHtml }} />
+        ) : null}
+      </body>
     </html>
   );
 }
