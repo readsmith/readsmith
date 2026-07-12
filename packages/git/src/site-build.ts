@@ -6,6 +6,7 @@ import {
   getGitConnection,
   insertDeployment,
   markDeploymentFailed,
+  setDeploymentDiagnostics,
   pruneSuperseded,
   publishDeployment,
   setLastSyncedSha,
@@ -107,8 +108,9 @@ export async function runSiteBuild(
     siteUrl,
   });
 
+  const keptDiagnostics = result.diagnostics.slice(0, 50);
   if (!result.ok || result.bundleKey === null || result.bundleHash === null) {
-    await markDeploymentFailed(db, opened.id);
+    await markDeploymentFailed(db, opened.id, keptDiagnostics);
     logger?.warn("build failed", {
       deployment: opened.id,
       commit: payload.commitSha,
@@ -120,7 +122,10 @@ export async function runSiteBuild(
 
   const stored = await store.get(result.bundleKey);
   if (!stored || contentHash(stored.toString("utf8")) !== result.bundleHash) {
-    await markDeploymentFailed(db, opened.id);
+    await markDeploymentFailed(db, opened.id, [
+      { severity: "error", code: "artifact-verify-failed", message: "stored artifact does not match the executor's hash" },
+      ...keptDiagnostics,
+    ]);
     logger?.warn("artifact verification failed", {
       deployment: opened.id,
       key: result.bundleKey,
@@ -133,6 +138,13 @@ export async function runSiteBuild(
     bundleRef: result.bundleKey,
     bundleHash: result.bundleHash,
   });
+  if (keptDiagnostics.length > 0) {
+    // Published builds keep their warnings: "live, but three pages complained"
+    // is exactly what an operator wants to see without log archaeology.
+    await setDeploymentDiagnostics(db, { id: opened.id, diagnostics: keptDiagnostics }).catch(
+      () => {},
+    );
+  }
   logger?.info(flipped ? "deployment published" : "deployment superseded", {
     deployment: row.id,
     commit: payload.commitSha,

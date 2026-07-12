@@ -285,7 +285,8 @@ const GIT_CONNECTION_COLUMNS = sql`id, site_id, provider, installation_id, repo,
   last_synced_sha, created_at, updated_at`;
 
 const DEPLOYMENT_COLUMNS = sql`id, site_id, version_id, kind, git_ref, commit_sha, build_seq,
-  bundle_ref, bundle_hash, url, status, is_current, created_at, published_at, expires_at`;
+  bundle_ref, bundle_hash, url, status, is_current, created_at, published_at, expires_at,
+  diagnostics`;
 
 export interface NewGitConnection {
   id: string;
@@ -372,8 +373,26 @@ export async function insertDeployment(db: Db, input: NewDeployment): Promise<De
   });
 }
 
-export async function markDeploymentFailed(db: Db, id: string): Promise<void> {
-  await db.query(sql`UPDATE app.deployments SET status = 'failed' WHERE id = ${id}`);
+export async function markDeploymentFailed(
+  db: Db,
+  id: string,
+  diagnostics?: unknown,
+): Promise<void> {
+  await db.query(sql`
+    UPDATE app.deployments
+    SET status = 'failed',
+        diagnostics = ${diagnostics === undefined ? null : JSON.stringify(diagnostics)}
+    WHERE id = ${id}`);
+}
+
+/** Attach build diagnostics to a deployment (published builds keep their warnings too). */
+export async function setDeploymentDiagnostics(
+  db: Db,
+  input: { id: string; diagnostics: unknown },
+): Promise<void> {
+  await db.query(sql`
+    UPDATE app.deployments SET diagnostics = ${JSON.stringify(input.diagnostics)}
+    WHERE id = ${input.id}`);
 }
 
 /**

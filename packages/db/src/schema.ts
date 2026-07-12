@@ -203,6 +203,8 @@ export const deploymentRowSchema = z.object({
   created_at: z.date(),
   published_at: z.date().nullable(),
   expires_at: z.date().nullable(),
+  /** Build diagnostics (parse/render errors and warnings), when any were emitted. */
+  diagnostics: z.unknown().nullable(),
 });
 export type DeploymentRow = z.infer<typeof deploymentRowSchema>;
 
