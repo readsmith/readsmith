@@ -77,3 +77,93 @@ export function createCurrentBundleLoader(deps: {
     },
   };
 }
+
+/**
+ * The site-resolution port: how a request Host becomes a site. The self-host
+ * default resolves every host to the one configured site; a multi-tenant host
+ * injects a resolver backed by its own tenancy data. Routes never learn about
+ * organizations or plans: `suspended` is the entire moderation surface the
+ * serving shell sees (it renders a neutral 410), and `null` is an unknown host
+ * (404). Resolvers should cache internally; this is a hot-path call.
+ */
+export interface SiteResolution {
+  siteId: string;
+  status: "active" | "suspended";
+}
+
+export interface SiteResolver {
+  /** Map a request Host (hostname, possibly with port) to a site. */
+  resolve(host: string): Promise<SiteResolution | null> | SiteResolution | null;
+}
+
+/** The self-host default: every host is the configured site, always active. */
+export function createStaticSiteResolver(siteId = "default"): SiteResolver {
+  const resolution: SiteResolution = { siteId, status: "active" };
+  return { resolve: () => resolution };
+}
+
+/**
+ * Multi-site current-bundle resolution: one pointer-cached loader per site,
+ * capped so a long tail of sites cannot hold every bundle in memory (least
+ * recently used sites drop their loader and simply re-resolve on the next
+ * request). Single-site mode is this source with one permanently-hot entry.
+ */
+export interface CurrentBundleSource {
+  load(siteId: string): Promise<CurrentBundle | null>;
+  /** Drop one site's pointer cache, or every site's. */
+  invalidate(siteId?: string): void;
+}
+
+export function createDeploymentBundleSource(deps: {
+  db: Db;
+  store: BundleStore;
+  versionId?: string;
+  /** Pointer re-check interval per site, milliseconds. */
+  ttlMs?: number;
+  /** Max sites with a live loader (and cached bundle bytes) at once. */
+  maxSites?: number;
+  now?: () => number;
+  logger?: Logger;
+}): CurrentBundleSource {
+  const maxSites = deps.maxSites ?? 64;
+  const loaders = new Map<string, CurrentBundleLoader>();
+
+  function loaderFor(siteId: string): CurrentBundleLoader {
+    const existing = loaders.get(siteId);
+    if (existing) {
+      // Refresh recency (Map iteration order is insertion order).
+      loaders.delete(siteId);
+      loaders.set(siteId, existing);
+      return existing;
+    }
+    const loader = createCurrentBundleLoader({
+      db: deps.db,
+      store: deps.store,
+      siteId,
+      versionId: deps.versionId,
+      ttlMs: deps.ttlMs,
+      now: deps.now,
+      logger: deps.logger,
+    });
+    loaders.set(siteId, loader);
+    while (loaders.size > maxSites) {
+      const oldest = loaders.keys().next().value;
+      if (oldest === undefined) break;
+      loaders.delete(oldest);
+    }
+    return loader;
+  }
+
+  return {
+    load(siteId: string): Promise<CurrentBundle | null> {
+      return loaderFor(siteId).load();
+    },
+    invalidate(siteId?: string): void {
+      if (siteId === undefined) {
+        for (const loader of loaders.values()) loader.invalidate();
+        return;
+      }
+      loaders.get(siteId)?.invalidate();
+    },
+  };
+}

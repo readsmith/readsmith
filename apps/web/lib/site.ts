@@ -1,5 +1,12 @@
 import { join } from "node:path";
-import { type CurrentBundleLoader, createCurrentBundleLoader } from "@readsmith/git";
+import { createMemoryCache } from "@readsmith/cache";
+import {
+  type CurrentBundleSource,
+  type SiteResolution,
+  type SiteResolver,
+  createDeploymentBundleSource,
+  createStaticSiteResolver,
+} from "@readsmith/git";
 import type { SiteBuild } from "@readsmith/mdx";
 import type { NormalizedSpec } from "@readsmith/model";
 import { createBundleStore, resolveStorageConfig } from "@readsmith/storage";
@@ -48,27 +55,56 @@ export interface ApiReference {
   layout?: "single" | "pages";
 }
 
-interface Bundle {
+export interface Bundle {
   site: Site;
   apiReference: ApiReference | null;
 }
 
 const BUNDLE_KEY = "bundle.json";
-const SITE_ID = "default";
+const DEFAULT_SITE_ID = "default";
 const store = createBundleStore(
   resolveStorageConfig(process.env, join(process.cwd(), ".readsmith")),
 );
 
-let cached: Promise<Bundle> | null = null;
-let loader: CurrentBundleLoader | null | undefined;
-let parsedCurrent: { ref: string; bundle: Bundle } | null = null;
+/**
+ * Hydrated (parsed) sites, LRU-capped and keyed by `siteId:ref`. Refs are
+ * immutable content addresses, so entries never need invalidating, only
+ * evicting; a pointer flip changes the key. Single-site installs live entirely
+ * inside one permanently-hot entry.
+ */
+const siteCacheMax = Number(process.env.READSMITH_SITE_CACHE_MAX ?? "16");
+const parsedSites = createMemoryCache({
+  max: Number.isInteger(siteCacheMax) && siteCacheMax > 0 ? siteCacheMax : 16,
+  defaultTtlMs: Number.MAX_SAFE_INTEGER,
+});
 
-function currentLoader(): CurrentBundleLoader | null {
-  if (loader === undefined) {
+let cached: Promise<Bundle> | null = null;
+let source: CurrentBundleSource | null | undefined;
+let resolver: SiteResolver = createStaticSiteResolver(DEFAULT_SITE_ID);
+
+/**
+ * Replace the host-to-site resolver (the multi-tenant seam). The default maps
+ * every host to the single configured site, which keeps self-host serving
+ * byte-identical; a multi-tenant composition injects one backed by its own
+ * tenancy data. Routes themselves never learn about tenants.
+ */
+export function configureSiteResolver(next: SiteResolver): void {
+  resolver = next;
+}
+
+/** Resolve a request Host to a site (null = unknown, suspended = serve a 410). */
+export function resolveSiteForHost(
+  host: string,
+): Promise<SiteResolution | null> | SiteResolution | null {
+  return resolver.resolve(host);
+}
+
+function bundleSource(): CurrentBundleSource | null {
+  if (source === undefined) {
     const db = getDb();
-    loader = db ? createCurrentBundleLoader({ db, store, siteId: SITE_ID }) : null;
+    source = db ? createDeploymentBundleSource({ db, store }) : null;
   }
-  return loader;
+  return source;
 }
 
 function loadLocalBundle(): Promise<Bundle> {
@@ -83,16 +119,31 @@ function loadLocalBundle(): Promise<Bundle> {
   return cached;
 }
 
-async function loadBundle(): Promise<Bundle> {
-  const current = await currentLoader()?.load();
+/**
+ * The bundle a site serves: its current deployment when one exists, hydrated
+ * through the LRU. Only the default site may fall back to the locally-compiled
+ * bundle (the docs-only path); any other site without a deployment is null,
+ * which a multi-site host maps to a 404.
+ */
+export async function loadBundleForSite(siteId: string): Promise<Bundle | null> {
+  const current = await bundleSource()?.load(siteId);
   if (current) {
-    // Parse once per deployment: the artifact behind a ref is immutable.
-    if (parsedCurrent?.ref !== current.ref) {
-      parsedCurrent = { ref: current.ref, bundle: JSON.parse(current.json) as Bundle };
-    }
-    return parsedCurrent.bundle;
+    const key = `${siteId}:${current.ref}`;
+    const hit = await parsedSites.get<Bundle>(key);
+    if (hit) return hit;
+    const bundle = JSON.parse(current.json) as Bundle;
+    await parsedSites.set(key, bundle);
+    return bundle;
   }
-  return loadLocalBundle();
+  return siteId === DEFAULT_SITE_ID ? loadLocalBundle() : null;
+}
+
+async function loadBundle(): Promise<Bundle> {
+  const bundle = await loadBundleForSite(DEFAULT_SITE_ID);
+  if (!bundle) {
+    throw new Error("content bundle missing - run the content build (pnpm build / predev)");
+  }
+  return bundle;
 }
 
 /**
@@ -100,9 +151,8 @@ async function loadBundle(): Promise<Bundle> {
  * a publish by the in-process worker (each module graph has its own copy of
  * this state; the routes' copy relies on the pointer TTL + route revalidation).
  */
-export function invalidateSiteCache(): void {
-  loader?.invalidate();
-  parsedCurrent = null;
+export function invalidateSiteCache(siteId?: string): void {
+  bundleSource()?.invalidate(siteId);
 }
 
 export async function getSite(): Promise<Site> {
