@@ -1,3 +1,5 @@
+import { InMemoryEventStore } from "@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import {
   type ModelProvider,
   type RetrievalStore,
@@ -12,6 +14,7 @@ import {
 } from "@readsmith/ai";
 import type { AiCapabilities, AiServices } from "@readsmith/api";
 import { createCache, resolveCacheConfig } from "@readsmith/cache";
+import { siteBasePath, siteOrigin } from "@readsmith/config";
 import {
   type Db,
   type SearchChunkRow,
@@ -21,10 +24,6 @@ import {
   vectorSearchChunks,
 } from "@readsmith/db";
 import type { NormalizedSpec, SearchFilters } from "@readsmith/model";
-
-import { InMemoryEventStore } from "@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { siteBasePath, siteOrigin } from "@readsmith/config";
 import { logSearchQuery } from "./analytics.js";
 import { getDb } from "./db.js";
 import { type Bundle, getBundle, loadBundleForSite } from "./site.js";
@@ -211,7 +210,14 @@ function build(siteId: string, bundle: Bundle, aiOverride?: unknown): AiServices
     async ask(input) {
       const filters = filtersFrom(input);
       const { result, completion } = askDocs(
-        { provider, search, siteName: site.name, bounds: aiConfig?.askAi, topK },
+        {
+          provider,
+          search,
+          siteName: site.name,
+          bounds: aiConfig?.askAi,
+          topK,
+          instructions: aiConfig?.askAi.instructions,
+        },
         { siteId, query: input.query, filters },
       );
 

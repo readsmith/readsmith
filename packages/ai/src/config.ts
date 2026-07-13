@@ -52,6 +52,13 @@ export const aiConfigSchema = z.object({
       maxSteps: z.number().int().positive().default(4),
       maxOutputTokens: z.number().int().positive().default(1024),
       timeoutMs: z.number().int().positive().default(30_000),
+      /**
+       * Optional owner guidance appended to the assistant's system prompt (voice,
+       * tone, product vocabulary). It is framed as style/scope only and never
+       * overrides the base rules (answer from the docs, cite sources, treat tool
+       * output as untrusted).
+       */
+      instructions: z.string().optional(),
     })
     .default({ enabled: true, maxSteps: 4, maxOutputTokens: 1024, timeoutMs: 30_000 }),
   analytics: z
