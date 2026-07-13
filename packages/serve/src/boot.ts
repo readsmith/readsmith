@@ -21,7 +21,7 @@ import {
 import { createBundleStore, resolveStorageConfig } from "@readsmith/storage";
 import { getGitRuntime } from "./git.js";
 import { embedIndexJob, indexBundle } from "./indexing.js";
-import { invalidateSiteCache, resolveSiteUrl } from "./site.js";
+import { getAfterPublishHook, invalidateSiteCache, resolveSiteUrl } from "./site.js";
 
 /**
  * One-time backbone boot: run pending migrations, then start the job worker.
@@ -114,6 +114,20 @@ export async function boot(): Promise<void> {
               // copy follows via TTL + revalidation), then search converges.
               invalidateSiteCache();
               await runner.enqueue(embedIndexJob, { siteId: row.site_id });
+              // A host may register a post-publish side effect (for example edge
+              // invalidation). It runs only here, in the worker role. A failure
+              // is logged and never fails the publish.
+              const afterPublish = getAfterPublishHook();
+              if (afterPublish) {
+                try {
+                  await afterPublish(row.site_id);
+                } catch (err) {
+                  log.warn("after-publish hook failed", {
+                    site: row.site_id,
+                    err: String(err),
+                  });
+                }
+              }
             },
           },
           payload,

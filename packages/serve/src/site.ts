@@ -115,6 +115,27 @@ export async function resolveSiteUrl(siteId: string): Promise<string | null> {
   return (await siteUrlResolver?.(siteId)) ?? null;
 }
 
+let afterPublishHook: ((siteId: string) => void | Promise<void>) | null = null;
+
+/**
+ * Register a host hook fired after a deployment's pointer flips to current (a
+ * publish). A multi-tenant host uses it for edge-cache invalidation or similar
+ * side effects; because publishing happens only in the worker role, the hook
+ * (and any credential it closes over) never runs in a serve instance. Default:
+ * none, so self-host serving and building are byte-identical without it. Pass
+ * null to clear.
+ */
+export function configureAfterPublish(
+  next: ((siteId: string) => void | Promise<void>) | null,
+): void {
+  afterPublishHook = next;
+}
+
+/** The registered after-publish hook, or null when none is configured. */
+export function getAfterPublishHook(): ((siteId: string) => void | Promise<void>) | null {
+  return afterPublishHook;
+}
+
 /** Resolve a request Host to a site (null = unknown, suspended = serve a 410). */
 export function resolveSiteForHost(
   host: string,

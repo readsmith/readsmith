@@ -11,13 +11,85 @@ import {
   setDeploymentDiagnostics,
   setLastSyncedSha,
 } from "@readsmith/db";
-import { contentHash } from "@readsmith/model";
+import { type Diagnostic, contentHash } from "@readsmith/model";
 import type { BundleStore } from "@readsmith/storage";
 import { z } from "zod";
 import type { Executor } from "./executor.js";
 
 /** Where deployment artifacts live in the store, content-addressed. */
 export const BUNDLE_PREFIX = "bundles/";
+
+/**
+ * Per-deployment build log key: site-scoped (not content-addressed like
+ * bundles), because a log belongs to one build and is never shared. One growing
+ * text object per deployment, which the host can read to show build output.
+ */
+export function deploymentLogKey(siteId: string, deploymentId: string): string {
+  return `sites/${siteId}/logs/${deploymentId}.txt`;
+}
+
+export interface BuildLogInput {
+  deploymentId: string;
+  repo: string;
+  ref: string;
+  commitSha: string;
+  status: "published" | "superseded" | "failed";
+  pageCount: number;
+  rendered: number;
+  wallMs: number;
+  diagnostics: Diagnostic[];
+}
+
+/**
+ * Assemble a build's log as fixed-order plain text: header, outcome, then every
+ * diagnostic. Pure and deterministic (no clock beyond the executor's measured
+ * wall-ms), so the same build yields the same bytes and this is unit-testable
+ * without a store. Keeps ALL diagnostics, not the 50-row cap the DB column
+ * keeps: the store has no size pressure at beta page caps.
+ */
+export function buildLogText(input: BuildLogInput): string {
+  const cached = Math.max(0, input.pageCount - input.rendered);
+  const lines = [
+    "Readsmith build log",
+    `deployment: ${input.deploymentId}`,
+    `repo: ${input.repo}`,
+    `ref: ${input.ref}`,
+    `commit: ${input.commitSha}`,
+    `status: ${input.status}`,
+    `pages: ${input.pageCount} (rendered ${input.rendered}, cached ${cached})`,
+    `duration: ${input.wallMs}ms`,
+    "",
+  ];
+  if (input.diagnostics.length === 0) {
+    lines.push("diagnostics: none");
+  } else {
+    lines.push(`diagnostics (${input.diagnostics.length}):`);
+    for (const d of input.diagnostics) {
+      const where = d.pos ? `${d.source}:${d.pos.line}:${d.pos.col}` : d.source;
+      lines.push(`[${d.severity}] ${d.code}: ${d.message}${where ? ` (${where})` : ""}`);
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * Persist a build log, best-effort: a failed write logs a warning and never
+ * fails or delays the build (mirrors the retention-GC posture). Extracted so
+ * the swallow-errors contract is unit-testable with a throwing store.
+ */
+export async function writeBuildLog(
+  store: BundleStore,
+  siteId: string,
+  deploymentId: string,
+  text: string,
+  logger?: Logger,
+): Promise<void> {
+  try {
+    await store.put(deploymentLogKey(siteId, deploymentId), text);
+  } catch (err) {
+    logger?.warn("build log write failed", { deployment: deploymentId, err: String(err) });
+  }
+}
 
 export const siteBuildPayloadSchema = z.object({
   siteId: z.string(),
@@ -109,8 +181,27 @@ export async function runSiteBuild(
   });
 
   const keptDiagnostics = result.diagnostics.slice(0, 50);
+  const logFailed = (diagnostics: Diagnostic[]) =>
+    writeBuildLog(
+      store,
+      payload.siteId,
+      opened.id,
+      buildLogText({
+        deploymentId: opened.id,
+        repo: payload.repo,
+        ref: payload.ref,
+        commitSha: payload.commitSha,
+        status: "failed",
+        pageCount: result.pageCount,
+        rendered: result.rendered,
+        wallMs: result.usage.wallMs,
+        diagnostics,
+      }),
+      logger,
+    );
   if (!result.ok || result.bundleKey === null || result.bundleHash === null) {
     await markDeploymentFailed(db, opened.id, keptDiagnostics);
+    await logFailed(result.diagnostics);
     logger?.warn("build failed", {
       deployment: opened.id,
       commit: payload.commitSha,
@@ -122,14 +213,14 @@ export async function runSiteBuild(
 
   const stored = await store.get(result.bundleKey);
   if (!stored || contentHash(stored.toString("utf8")) !== result.bundleHash) {
-    await markDeploymentFailed(db, opened.id, [
-      {
-        severity: "error",
-        code: "artifact-verify-failed",
-        message: "stored artifact does not match the executor's hash",
-      },
-      ...keptDiagnostics,
-    ]);
+    const verify: Diagnostic = {
+      severity: "error",
+      code: "artifact-verify-failed",
+      message: "stored artifact does not match the executor's hash",
+      source: payload.repo,
+    };
+    await markDeploymentFailed(db, opened.id, [verify, ...keptDiagnostics]);
+    await logFailed([verify, ...result.diagnostics]);
     logger?.warn("artifact verification failed", {
       deployment: opened.id,
       key: result.bundleKey,
@@ -157,6 +248,23 @@ export async function runSiteBuild(
     cached: Math.max(0, result.pageCount - result.rendered),
     wallMs: result.usage.wallMs,
   });
+  await writeBuildLog(
+    store,
+    payload.siteId,
+    opened.id,
+    buildLogText({
+      deploymentId: opened.id,
+      repo: payload.repo,
+      ref: payload.ref,
+      commitSha: payload.commitSha,
+      status: flipped ? "published" : "superseded",
+      pageCount: result.pageCount,
+      rendered: result.rendered,
+      wallMs: result.usage.wallMs,
+      diagnostics: result.diagnostics,
+    }),
+    logger,
+  );
   if (flipped) {
     if (connection && connection.repo.toLowerCase() === payload.repo.toLowerCase()) {
       await setLastSyncedSha(db, { id: connection.id, sha: payload.commitSha });
@@ -195,6 +303,11 @@ export async function runSiteBuild(
         }
         for (const ref of unreferencedRefs) await store.delete(ref);
         for (const key of dead) await store.delete(key);
+        // A pruned deployment's log is no longer reachable from the dashboard,
+        // so collect it too (best-effort; a stray log never fails a build).
+        for (const id of prunedIds) {
+          await store.delete(deploymentLogKey(payload.siteId, id)).catch(() => {});
+        }
         if (prunedIds.length > 0) {
           logger?.info("deployments pruned", {
             pruned: prunedIds.length,

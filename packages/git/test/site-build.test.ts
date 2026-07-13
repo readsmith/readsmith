@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type Executor, createInProcessExecutor } from "../src/executor.js";
 import type { GitProvider } from "../src/provider.js";
 import { createCurrentBundleLoader } from "../src/resolve.js";
-import { runSiteBuild } from "../src/site-build.js";
+import { deploymentLogKey, runSiteBuild } from "../src/site-build.js";
 
 const DATABASE_URL = process.env.TEST_DATABASE_URL;
 const FIXTURE = join(import.meta.dirname, "fixtures", "repo");
@@ -85,6 +85,10 @@ describe.skipIf(!DATABASE_URL)("site.build orchestration (integration)", () => {
     expect(flips).toEqual([row.id]);
     expect(await store.has(row.bundle_ref ?? "")).toBe(true);
     expect((await getCurrentDeployment(db, { siteId: SITE }))?.id).toBe(row.id);
+    // AC-D2: a build log is written to the site-scoped log key on success.
+    const log = (await store.get(deploymentLogKey(SITE, row.id)))?.toString("utf8") ?? "";
+    expect(log).toContain("status: published");
+    expect(log).toMatch(/pages: \d+ \(rendered \d+, cached \d+\)/);
   });
 
   it("dedupes identical content to the same artifact ref across deployments", async () => {
@@ -115,6 +119,10 @@ describe.skipIf(!DATABASE_URL)("site.build orchestration (integration)", () => {
     const row = await runSiteBuild({ db, store, executor: lying }, payload("sha-forged"));
     expect(row.status).toBe("failed");
     expect((await getCurrentDeployment(db, { siteId: SITE }))?.id).toBe(before?.id);
+    // AC-D3: the failed build still writes a log, and it names the failure.
+    const log = (await store.get(deploymentLogKey(SITE, row.id)))?.toString("utf8") ?? "";
+    expect(log).toContain("status: failed");
+    expect(log).toContain("artifact-verify-failed");
   });
 
   it("supersede race: an older build finishing late never flips the pointer backward", async () => {
