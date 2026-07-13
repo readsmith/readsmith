@@ -11,6 +11,16 @@ export {
   isExecError,
 } from "./errors.js";
 export { isForbiddenIp, isIpLiteral, parseIpv4, parseIpv6 } from "./ip.js";
+export { buildRequest, redactHeaders } from "./request.js";
+export type {
+  AuthInjection,
+  ExecBody,
+  ExecPolicy,
+  ExecRequest,
+  ExecResult,
+  MultipartPart,
+  PreparedRequest,
+} from "./types.js";
 export { type ParsedTarget, parseTarget } from "./url.js";
 export {
   type AllowlistEntry,
