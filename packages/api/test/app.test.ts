@@ -1,7 +1,8 @@
+import type { ExecResult } from "@readsmith/exec";
 import type { SearchHit } from "@readsmith/model";
 import { describe, expect, it } from "vitest";
 import { API_BASE_PATH, createApiApp } from "../src/app.js";
-import type { AiServices, ApiDatabase } from "../src/deps.js";
+import type { AiServices, ApiDatabase, ExecService } from "../src/deps.js";
 
 const okDb: ApiDatabase = { query: async () => [] };
 const failDb: ApiDatabase = {
@@ -41,6 +42,82 @@ const post = (app: ReturnType<typeof createApiApp>, path: string, body: unknown)
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+
+function mockExec(over: Partial<ExecService> = {}): ExecService {
+  return {
+    enabled: true,
+    run: async (): Promise<ExecResult> => ({
+      ok: true,
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: new TextEncoder().encode('{"ok":true}'),
+      truncated: false,
+      timing: { totalMs: 5 },
+      finalUrl: "https://api.example.com/v1",
+    }),
+    ...over,
+  };
+}
+
+describe("createApiApp: proxy (Try It)", () => {
+  const REQ = { method: "GET", url: "https://api.example.com/v1" };
+
+  it("returns 503 when the playground is not enabled", async () => {
+    const res = await post(createApiApp({ db: okDb, ai: null }), `${API_BASE_PATH}/proxy`, REQ);
+    expect(res.status).toBe(503);
+  });
+
+  it("relays a successful response as data (base64 body, upstream status in payload)", async () => {
+    const res = await post(
+      createApiApp({ db: okDb, ai: null, exec: mockExec() }),
+      `${API_BASE_PATH}/proxy`,
+      REQ,
+    );
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { status: number; bodyBase64: string; truncated: boolean };
+    expect(json.status).toBe(200);
+    expect(atob(json.bodyBase64)).toBe('{"ok":true}');
+    expect(json.truncated).toBe(false);
+  });
+
+  it("rejects a malformed request body with 400", async () => {
+    const res = await post(
+      createApiApp({ db: okDb, ai: null, exec: mockExec() }),
+      `${API_BASE_PATH}/proxy`,
+      {
+        method: "GET",
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("maps an exec deny to 403 with the machine code", async () => {
+    const exec = mockExec({
+      run: async () => ({ ok: false, code: "DENIED_PRIVATE_IP", message: "blocked" }),
+    });
+    const res = await post(
+      createApiApp({ db: okDb, ai: null, exec }),
+      `${API_BASE_PATH}/proxy`,
+      REQ,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
+      "DENIED_PRIVATE_IP",
+    );
+  });
+
+  it("maps an origin timeout to 504", async () => {
+    const exec = mockExec({
+      run: async () => ({ ok: false, code: "TIMEOUT_TOTAL", message: "timed out" }),
+    });
+    const res = await post(
+      createApiApp({ db: okDb, ai: null, exec }),
+      `${API_BASE_PATH}/proxy`,
+      REQ,
+    );
+    expect(res.status).toBe(504);
+  });
+});
 
 describe("createApiApp: health", () => {
   it("reports the database disabled when none is injected", async () => {

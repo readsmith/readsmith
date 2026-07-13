@@ -144,6 +144,9 @@ importers:
 
   packages/api:
     dependencies:
+      '@readsmith/exec':
+        specifier: workspace:*
+        version: link:../exec
       '@readsmith/model':
         specifier: workspace:*
         version: link:../model
@@ -265,7 +268,11 @@ importers:
         specifier: ^8.11.10
         version: 8.20.0
 
-  packages/exec: {}
+  packages/exec:
+    dependencies:
+      zod:
+        specifier: ^4.0.5
+        version: 4.4.3
 
   packages/git:
     dependencies:

@@ -1,7 +1,68 @@
+import {
+  type ExecError,
+  type ExecErrorCode,
+  type ExecResult,
+  isExecError,
+  parseProxyRequest,
+} from "@readsmith/exec";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { ApiDeps } from "./deps.js";
 import { rateLimitMiddleware } from "./rate-limit.js";
+
+/** Map an exec deny/limit/timeout to a caller-facing HTTP status. */
+function statusForExecError(code: ExecErrorCode): 400 | 403 | 413 | 429 | 502 | 504 {
+  switch (code) {
+    case "DENIED_SCHEME":
+    case "DENIED_MALFORMED_URL":
+      return 400;
+    case "DENIED_NOT_ALLOWLISTED":
+    case "DENIED_PRIVATE_IP":
+    case "DENIED_PORT":
+    case "DENIED_METHOD":
+    case "DENIED_REDIRECT_TARGET":
+      return 403;
+    case "LIMIT_SIZE_REQUEST":
+      return 413;
+    case "LIMIT_RATE":
+      return 429;
+    case "TIMEOUT_CONNECT":
+    case "TIMEOUT_TOTAL":
+      return 504;
+    default:
+      return 502; // ORIGIN_*, LIMIT_SIZE_RESPONSE
+  }
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
+}
+
+/**
+ * Shape the executor's result for the browser. The upstream response is DATA in
+ * our JSON body (status/headers/base64 body), never re-emitted as our own
+ * response headers, so a `Set-Cookie` from the target can never set a cookie on
+ * our origin (spec SR-13). Our own HTTP status is 200 when the call completed;
+ * the target's status lives in the payload.
+ */
+function proxyResponse(result: ExecResult | ExecError): Response {
+  if (isExecError(result)) {
+    return Response.json(
+      { error: { code: result.code, message: result.message } },
+      { status: statusForExecError(result.code) },
+    );
+  }
+  return Response.json({
+    status: result.status,
+    headers: result.headers,
+    bodyBase64: toBase64(result.body),
+    truncated: result.truncated,
+    timing: result.timing,
+    finalUrl: result.finalUrl,
+  });
+}
 
 /**
  * Where the JSON API is mounted.
@@ -50,7 +111,7 @@ async function parseJson(request: Request): Promise<unknown> {
 export function createApiApp(deps: ApiDeps, options: ApiAppOptions = {}): Hono {
   const app = new Hono().basePath(options.basePath ?? API_BASE_PATH);
   const limiter = deps.rateLimit ?? null;
-  const limit = (bucket: "ask" | "search") =>
+  const limit = (bucket: "ask" | "search" | "exec") =>
     rateLimitMiddleware(limiter, bucket, deps.clientAddress);
 
   app.get("/health", async (c) => {
@@ -108,6 +169,21 @@ export function createApiApp(deps: ApiDeps, options: ApiAppOptions = {}): Hono {
     const body = scopedQuery.safeParse(await parseJson(c.req.raw));
     if (!body.success) return c.json({ error: "A non-empty query is required." }, 400);
     return deps.ai.ask(body.data);
+  });
+
+  // API playground "Try It": send the reader's request through the SSRF-safe
+  // proxy and return the response as data. The rate limiter runs first (each
+  // call is an outbound request on our IP); the executor (host-composed with
+  // this site's allowlist) owns all target validation.
+  app.post("/proxy", limit("exec"), async (c) => {
+    if (!deps.exec?.enabled) {
+      return c.json({ error: "The API playground is not available on this site." }, 503);
+    }
+    const parsed = parseProxyRequest(await parseJson(c.req.raw));
+    if (isExecError(parsed)) {
+      return c.json({ error: { code: parsed.code, message: parsed.message } }, 400);
+    }
+    return proxyResponse(await deps.exec.run(parsed));
   });
 
   // A reader's thumbs signal on a logged answer.

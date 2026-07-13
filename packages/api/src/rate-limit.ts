@@ -33,7 +33,7 @@ export const rateLimitPolicySchema = z.object({
 export type RateLimitPolicy = z.infer<typeof rateLimitPolicySchema>;
 
 /** The buckets we limit. `mcp` is enforced by the host: it is served outside `/api`. */
-export const RATE_LIMIT_BUCKETS = ["ask", "search", "mcp"] as const;
+export const RATE_LIMIT_BUCKETS = ["ask", "search", "mcp", "exec"] as const;
 export type RateLimitBucket = (typeof RATE_LIMIT_BUCKETS)[number];
 
 /**
@@ -45,6 +45,9 @@ export const DEFAULT_RATE_LIMITS: Record<RateLimitBucket, RateLimitPolicy> = {
   ask: { limit: 10, windowMs: 60_000 },
   search: { limit: 60, windowMs: 60_000 },
   mcp: { limit: 60, windowMs: 60_000 },
+  // `exec` (the API-playground proxy) is a human-driven "Try It" surface, and
+  // each call is an outbound request on our IP, so it is bounded but generous.
+  exec: { limit: 30, windowMs: 60_000 },
 };
 
 export const rateLimitConfigSchema = z.object({
@@ -58,6 +61,7 @@ export const rateLimitConfigSchema = z.object({
   ask: rateLimitPolicySchema.default(DEFAULT_RATE_LIMITS.ask),
   search: rateLimitPolicySchema.default(DEFAULT_RATE_LIMITS.search),
   mcp: rateLimitPolicySchema.default(DEFAULT_RATE_LIMITS.mcp),
+  exec: rateLimitPolicySchema.default(DEFAULT_RATE_LIMITS.exec),
 });
 export type RateLimitConfig = z.infer<typeof rateLimitConfigSchema>;
 
@@ -228,5 +232,6 @@ export function resolveRateLimitConfig(
     ask: parsePolicy(env.READSMITH_RATE_LIMIT_ASK, base.ask),
     search: parsePolicy(env.READSMITH_RATE_LIMIT_SEARCH, base.search),
     mcp: parsePolicy(env.READSMITH_RATE_LIMIT_MCP, base.mcp),
+    exec: parsePolicy(env.READSMITH_RATE_LIMIT_EXEC, base.exec),
   };
 }

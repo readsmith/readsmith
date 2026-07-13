@@ -20,6 +20,7 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@readsmith/exec": "workspace:*",
     "@readsmith/model": "workspace:*",
     "hono": "^4.6.14",
     "zod": "^4.0.5"

@@ -12,6 +12,7 @@ export {
 } from "./errors.js";
 export { isForbiddenIp, isIpLiteral, parseIpv4, parseIpv6 } from "./ip.js";
 export { buildRequest, redactHeaders } from "./request.js";
+export { type ProxyRequestWire, parseProxyRequest, proxyRequestSchema } from "./schema.js";
 export type {
   AuthInjection,
   ExecBody,

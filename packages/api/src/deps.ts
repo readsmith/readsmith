@@ -17,6 +17,7 @@ export interface ApiDatabase {
   }): Promise<T[]>;
 }
 
+import type { ExecError, ExecRequest, ExecResult } from "@readsmith/exec";
 import type { SearchResult } from "@readsmith/model";
 import type { RateLimiter } from "./rate-limit.js";
 
@@ -72,6 +73,17 @@ export interface AnalyticsService {
   pageFeedback(input: { path: string; helpful: boolean }): Promise<void>;
 }
 
+/**
+ * The API-playground execution surface, host-composed from `@readsmith/exec`
+ * (the SSRF-safe primitive) with this site's allowlist and policy baked in, so
+ * the route stays free of the executor/transport and never sees the allowlist.
+ * `enabled` is false when the site has no spec servers to allow.
+ */
+export interface ExecService {
+  enabled: boolean;
+  run(req: ExecRequest): Promise<ExecResult | ExecError>;
+}
+
 /** Everything a host injects when constructing the API. */
 export interface ApiDeps {
   /** The database, or null when the host runs without persistence (docs-only). */
@@ -82,6 +94,8 @@ export interface ApiDeps {
   git?: GitService | null;
   /** Reader-signal persistence (page feedback), or null without a database. */
   analytics?: AnalyticsService | null;
+  /** The API-playground proxy, or null/absent when the site has no interactive spec. */
+  exec?: ExecService | null;
   /** Abuse protection. Null disables it, for a host that limits at its own edge. */
   rateLimit?: RateLimiter | null;
   /**

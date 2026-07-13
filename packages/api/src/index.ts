@@ -6,6 +6,7 @@ export type {
   AnalyticsService,
   ApiDatabase,
   ApiDeps,
+  ExecService,
   GitService,
 } from "./deps.js";
 export {
