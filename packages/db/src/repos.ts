@@ -195,14 +195,19 @@ export async function vectorSearchChunks(
     locale: string;
     embedding: number[];
     limit: number;
+    /** Restrict to these top-level path sections; empty = no restriction. */
+    sections?: readonly string[];
   },
 ): Promise<SearchChunkRow[]> {
   const emb = vectorLiteral(input.embedding);
+  const sections = (input.sections ?? []) as string[];
   const rows = await db.query(sql`
     SELECT id, kind, page_id, path, header_path, anchor, method, text
     FROM app.doc_chunks
     WHERE site_id = ${input.siteId} AND version_id = ${input.versionId} AND locale = ${input.locale}
       AND embedding IS NOT NULL
+      AND (cardinality(${sections}::text[]) = 0
+           OR split_part(ltrim(path, '/'), '/', 1) = ANY(${sections}::text[]))
     ORDER BY embedding <=> ${emb}::halfvec
     LIMIT ${input.limit}`);
   return rows.map((r) => searchChunkRowSchema.parse(r));
@@ -211,13 +216,24 @@ export async function vectorSearchChunks(
 /** Full-text (websearch) over the chunk index, hard-filtered by site/version/locale. */
 export async function ftsSearchChunks(
   db: Db,
-  input: { siteId: string; versionId: string; locale: string; query: string; limit: number },
+  input: {
+    siteId: string;
+    versionId: string;
+    locale: string;
+    query: string;
+    limit: number;
+    /** Restrict to these top-level path sections; empty = no restriction. */
+    sections?: readonly string[];
+  },
 ): Promise<SearchChunkRow[]> {
+  const sections = (input.sections ?? []) as string[];
   const rows = await db.query(sql`
     SELECT id, kind, page_id, path, header_path, anchor, method, text
     FROM app.doc_chunks
     WHERE site_id = ${input.siteId} AND version_id = ${input.versionId} AND locale = ${input.locale}
       AND search_tsv @@ websearch_to_tsquery('english', ${input.query})
+      AND (cardinality(${sections}::text[]) = 0
+           OR split_part(ltrim(path, '/'), '/', 1) = ANY(${sections}::text[]))
     ORDER BY ts_rank(search_tsv, websearch_to_tsquery('english', ${input.query})) DESC
     LIMIT ${input.limit}`);
   return rows.map((r) => searchChunkRowSchema.parse(r));

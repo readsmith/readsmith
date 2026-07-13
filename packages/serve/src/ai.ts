@@ -71,6 +71,7 @@ function retrievalStore(db: Db): RetrievalStore {
         locale: filters.locale,
         embedding,
         limit,
+        sections: filters.sections,
       });
       return rows.map(toRetrieved);
     },
@@ -81,6 +82,7 @@ function retrievalStore(db: Db): RetrievalStore {
         locale: filters.locale,
         query,
         limit,
+        sections: filters.sections,
       });
       return rows.map(toRetrieved);
     },
@@ -208,7 +210,9 @@ function build(siteId: string, bundle: Bundle, aiOverride?: unknown): AiServices
       return result;
     },
     async ask(input) {
-      const filters = filtersFrom(input);
+      // The assistant may be scoped to a subset of sections (config); the free
+      // search box above is not, so this restriction lives on the ask path only.
+      const filters = { ...filtersFrom(input), sections: aiConfig?.askAi.sections };
       const { result, completion } = askDocs(
         {
           provider,

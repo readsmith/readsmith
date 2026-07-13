@@ -59,6 +59,11 @@ export const aiConfigSchema = z.object({
        * output as untrusted).
        */
       instructions: z.string().optional(),
+      /**
+       * Restrict the assistant's retrieval to these top-level sections (a page
+       * path's first segment). Empty/omitted = the whole site.
+       */
+      sections: z.array(z.string()).optional(),
     })
     .default({ enabled: true, maxSteps: 4, maxOutputTokens: 1024, timeoutMs: 30_000 }),
   analytics: z

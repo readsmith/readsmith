@@ -468,22 +468,45 @@ function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
   };
 
   const suggestions = (): string => {
-    const titles = [...root.querySelectorAll<HTMLElement>(".rs-nav__link")]
-      .map((a) => (a.querySelector(".rs-apinav__label") ?? a).textContent?.trim() ?? "")
-      .filter((t, i, all) => t.length > 2 && all.indexOf(t) === i)
-      .slice(0, 3);
-    if (titles.length === 0) return "";
-    return `<div class="rs-ask__chips">${titles
+    // Owner-configured starter questions (stamped on <html> by the host) win;
+    // each chip asks that exact question. Otherwise derive up to three from the
+    // nav titles ("Tell me about X").
+    let items: { ask: string; label: string }[] = [];
+    try {
+      const raw = document.documentElement.dataset.rsStarters;
+      const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+      if (Array.isArray(parsed)) {
+        items = parsed
+          .filter((q): q is string => typeof q === "string" && q.trim().length > 0)
+          .slice(0, 4)
+          .map((q) => ({ ask: q.trim(), label: q.trim() }));
+      }
+    } catch {
+      /* malformed config falls through to the nav-derived defaults */
+    }
+    if (items.length === 0) {
+      items = [...root.querySelectorAll<HTMLElement>(".rs-nav__link")]
+        .map((a) => (a.querySelector(".rs-apinav__label") ?? a).textContent?.trim() ?? "")
+        .filter((t, i, all) => t.length > 2 && all.indexOf(t) === i)
+        .slice(0, 3)
+        .map((t) => ({ ask: `Tell me about ${t}`, label: t }));
+    }
+    if (items.length === 0) return "";
+    return `<div class="rs-ask__chips">${items
       .map(
-        (t) =>
-          `<button class="rs-ask__chip" type="button" data-ask-suggest="Tell me about ${escapeAttr(t)}">${escapeHtml(t)}</button>`,
+        (it) =>
+          `<button class="rs-ask__chip" type="button" data-ask-suggest="${escapeAttr(it.ask)}">${escapeHtml(it.label)}</button>`,
       )
       .join("")}</div>`;
   };
 
   const resetView = (): void => {
+    const title = document.documentElement.dataset.rsGreetingTitle?.trim() || "Ask the docs.";
+    const intro =
+      document.documentElement.dataset.rsGreetingBody?.trim() ||
+      "Answers are drawn only from these docs and cite their sources.";
     scroll.innerHTML = caps.askAi
-      ? `<div class="rs-ask__empty"><span class="rs-ask__mark">${SPARKLE}</span><h2>Ask the docs.</h2><p>Answers are drawn only from these docs and cite their sources.</p>${suggestions()}</div>`
+      ? `<div class="rs-ask__empty"><span class="rs-ask__mark">${SPARKLE}</span><h2>${escapeHtml(title)}</h2><p>${escapeHtml(intro)}</p>${suggestions()}</div>`
       : `<div class="rs-ask__empty"><span class="rs-ask__mark">${SPARKLE}</span><h2>Ask AI isn&rsquo;t enabled.</h2><p>The maintainer can add an AI provider key to turn on cited answers over these docs.</p></div>`;
   };
 

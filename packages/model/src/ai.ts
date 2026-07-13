@@ -19,6 +19,12 @@ export type ChunkKind = z.infer<typeof chunkKindSchema>;
 export const searchFiltersSchema = z.object({
   version: z.string().default("current"),
   locale: z.string().default("en"),
+  /**
+   * Restrict retrieval to these top-level sections (a chunk path's first
+   * segment, e.g. "guides"). Empty/omitted means no restriction. Used to scope
+   * the Ask-AI assistant to part of a site.
+   */
+  sections: z.array(z.string()).optional(),
 });
 export type SearchFilters = z.infer<typeof searchFiltersSchema>;
 
