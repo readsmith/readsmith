@@ -265,6 +265,8 @@ importers:
         specifier: ^8.11.10
         version: 8.20.0
 
+  packages/exec: {}
+
   packages/git:
     dependencies:
       '@readsmith/build':
