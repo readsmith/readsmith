@@ -28,12 +28,20 @@ import { invalidateSiteCache, resolveSiteUrl } from "./site.js";
  * Imported only from the Node.js instrumentation branch, so this module (and its
  * Postgres dependencies) never reaches the edge bundle. The DB is optional; with
  * no DATABASE_URL this returns immediately and the app serves docs only.
+ *
+ * READSMITH_ROLE splits serving from building for multi-process deployments:
+ * `serve` runs migrations and the pointer-freshness listener but registers no
+ * job worker, so a heavy build never blocks the request event loop; `worker`
+ * (or `all`, the default) runs the build/index worker and the git poller. A
+ * single-box self-host leaves it unset and keeps both in one process.
  */
 export async function boot(): Promise<void> {
   if (!hasDatabase()) return;
 
   const config = loadDbConfig();
   const log = createLogger(config.logLevel);
+  const role = (process.env.READSMITH_ROLE ?? "all").toLowerCase();
+  const runsWorker = role !== "serve";
 
   try {
     const db = createDb(config);
@@ -54,6 +62,13 @@ export async function boot(): Promise<void> {
       return null;
     });
     (globalThis as { __rsDeploymentListener?: unknown }).__rsDeploymentListener = listener;
+
+    // A serve-role instance stops here: it resolves and serves published
+    // bundles, but never picks up a build. Building lives in the worker role.
+    if (!runsWorker) {
+      log.info("serve role: job worker disabled", { role });
+      return;
+    }
 
     const runner = createJobRunner({ config, logger: log });
     await runner.start();
@@ -79,6 +94,10 @@ export async function boot(): Promise<void> {
       const failOnError = ["1", "true", "yes"].includes(
         (process.env.READSMITH_FAIL_ON_ERROR ?? "").toLowerCase(),
       );
+      // Wall-clock budget per build; a hosted operator can tighten it to bound
+      // how long one tenant's build occupies the worker. Falsy/invalid = default.
+      const timeoutRaw = Number(process.env.READSMITH_BUILD_TIMEOUT_SEC);
+      const timeoutSec = Number.isInteger(timeoutRaw) && timeoutRaw > 0 ? timeoutRaw : undefined;
       await runner.work(siteBuildJob, async (payload) => {
         await runSiteBuild(
           {
@@ -88,6 +107,7 @@ export async function boot(): Promise<void> {
             logger: log,
             retention: { keepLast },
             failOnError,
+            timeoutSec,
             resolveSiteUrl,
             afterFlip: async (row) => {
               // This graph's pointer cache re-resolves immediately (the routes'
