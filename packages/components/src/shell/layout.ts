@@ -294,11 +294,13 @@ function renderTab(tab: ShellTab): string {
 }
 
 function topbar(site: ShellSite, page: ShellPage): string {
-  // page.url carries any subpath prefix; the /md route lives under the same
-  // prefix, so rebuild as base + /md + the page's base-relative path (SP-2).
+  // The /md route keys by slug, so build base + /md + the page's SLUG, never
+  // its baked url (page.url carries a subpath prefix, which would double up as
+  // /md/docs/... and miss the slug). base is the /md route's own mount prefix
+  // (site.basePath), empty on a proxy-served subpath tenant where the /md route
+  // sits at the root and the proxy re-adds the prefix (SP-2).
   const bp = site.basePath ?? "";
-  const rel = bp && page.url.startsWith(bp) ? page.url.slice(bp.length) || "/" : page.url;
-  const mdUrl = `${bp}/md${rel === "/" ? "" : rel}`;
+  const mdUrl = `${bp}/md${page.slug === "" ? "" : `/${page.slug}`}`;
   const origin = siteOriginOf(site.url);
   const absMd = origin ? origin + mdUrl : mdUrl;
   const prompt = encodeURIComponent(

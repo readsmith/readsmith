@@ -113,6 +113,18 @@ describe("renderShellBody", () => {
     expect(html).toContain('data-rs-mcp-url="https://acme.dev/docs/_readsmith/mcp"');
   });
 
+  it("builds the /md url from the page slug, not its baked (subpath) url", () => {
+    // A subpath-baked page: url carries /docs, slug does not. The /md link must
+    // key by slug (/md/guide/setup), never /md/docs/guide/setup.
+    const subpath = renderShellBody(site, {
+      ...page,
+      url: "/docs/guide/setup",
+      slug: "guide/setup",
+    });
+    expect(subpath).toContain('data-rs-md-url="/md/guide/setup"');
+    expect(subpath).not.toContain("/md/docs/");
+  });
+
   it("honors a trimmed contextual.options list", () => {
     const html = renderShellBody({ ...site, contextual: ["copy"] }, page);
     expect(html).toContain("Copy as Markdown");
