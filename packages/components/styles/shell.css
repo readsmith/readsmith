@@ -934,6 +934,12 @@
   .rs-main {
     padding: 24px 22px 70px;
   }
+  /* Signal that the tab bar scrolls (the scrollbar is hidden); a right-edge
+     fade shows there is more when tabs run past the viewport. */
+  .rs-tabbar {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
   /* Enlarge the drawer's touch targets on mobile (its only nav surface). */
   .rs-nav__link {
     display: flex;

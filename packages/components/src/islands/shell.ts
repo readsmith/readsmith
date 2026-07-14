@@ -30,6 +30,19 @@ export function initShell(root: ParentNode = document): void {
   initContextMenu(root);
   initFeedback(root);
   initAsk(root, getCaps);
+  revealActiveTab(root);
+}
+
+/**
+ * On a narrow viewport the section tab bar scrolls horizontally, so the active
+ * tab can start off-screen with no indicator visible. Center it on hydrate.
+ * Sets scrollLeft directly (not scrollIntoView) to avoid scrolling the page.
+ */
+function revealActiveTab(root: ParentNode): void {
+  const bar = root.querySelector<HTMLElement>(".rs-tabbar");
+  const active = bar?.querySelector<HTMLElement>(".rs-tab.is-active");
+  if (!bar || !active || bar.scrollWidth <= bar.clientWidth) return;
+  bar.scrollLeft = active.offsetLeft - (bar.clientWidth - active.offsetWidth) / 2;
 }
 
 type GetCapabilities = () => Promise<Capabilities>;
