@@ -152,6 +152,13 @@ export function resolveLinks(body: Root, ctx: TransformContext, diagnostics: Dia
 
   visit(body, "link", (node) => {
     const url = node.url;
+    // A root-relative internal link (`/guide`) is site-root-relative: on a
+    // subpath deploy it must carry the base path, exactly like a resolved
+    // relative link does. Left untouched it would point above the site.
+    if (isAbsoluteInternalLink(url)) {
+      node.url = withBasePath(url, ctx.basePath ?? "");
+      return;
+    }
     if (!isRelativeFileLink(url)) return;
 
     const hashIndex = url.indexOf("#");
@@ -196,6 +203,12 @@ export function resolveImages(body: Root, ctx: TransformContext, diagnostics: Di
 
   visit(body, "image", (node) => {
     const url = node.url;
+    // A root-relative image (`/logo.svg`) is served from the site root, so on a
+    // subpath deploy it needs the base path too.
+    if (isAbsoluteInternalLink(url)) {
+      node.url = withBasePath(url, ctx.basePath ?? "");
+      return;
+    }
     if (!isRelativeFileLink(url) || url === "") return;
 
     const joined = toContentRelative(posix.normalize(posix.join(dir, url)), ctx.contentRel);
@@ -219,6 +232,17 @@ function isRelativeFileLink(url: string): boolean {
   if (url.startsWith("/")) return false; // already absolute-internal
   if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return false; // has a scheme (http:, mailto:, tel:)
   return true;
+}
+
+/** A site-root-relative internal URL (`/guide`), not protocol-relative (`//host`). */
+function isAbsoluteInternalLink(url: string): boolean {
+  return url.startsWith("/") && !url.startsWith("//");
+}
+
+/** Prefix a root-relative URL with the base path, once (a no-op at the root). */
+function withBasePath(url: string, base: string): string {
+  if (!base || url === base || url.startsWith(`${base}/`)) return url;
+  return base + url;
 }
 
 function pageUrl(slug: string, base: string): string {

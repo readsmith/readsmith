@@ -17,12 +17,18 @@ const MOUNTS = [{ from: "../media", to: "media" }];
 function run(
   path: string,
   source: string,
-  opts: { assets?: { from: string; to: string }[]; repo?: string; contentRel?: string } = {},
+  opts: {
+    assets?: { from: string; to: string }[];
+    repo?: string;
+    contentRel?: string;
+    basePath?: string;
+  } = {},
 ) {
   const parsed = parse({ path, raw: source });
   const diagnostics: Diagnostic[] = [];
   const result = transform(parsed.body, {
     path,
+    basePath: opts.basePath,
     resolvePage: (target) => (target === "policy" ? "policy" : null),
     resolveAsset: makeResolveAsset(opts.assets ?? []),
     resolveOutsidePage: makeResolveOutsidePage(
@@ -89,6 +95,43 @@ describe("resolveImages", () => {
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.code).toBe("broken-asset");
     expect(diagnostics[0]?.severity).toBe("warning");
+  });
+});
+
+describe("base path on root-relative links and images (subpath hosting)", () => {
+  it("prefixes a root-relative internal link with the base path", () => {
+    const { links } = run("index.md", "[Guide](/guide) and [anchored](/guide#top)", {
+      basePath: "/docs",
+    });
+    expect(links).toEqual(["/docs/guide", "/docs/guide#top"]);
+  });
+
+  it("prefixes a root-relative image with the base path", () => {
+    const { images } = run("index.md", "![logo](/logo.svg)", { basePath: "/docs" });
+    expect(images).toEqual(["/docs/logo.svg"]);
+  });
+
+  it("also prefixes a resolved relative link (unchanged behavior)", () => {
+    const { links } = run("index.md", "[Policy](policy)", { basePath: "/docs" });
+    expect(links).toEqual(["/docs/policy"]);
+  });
+
+  it("does not double-prefix a link already under the base path", () => {
+    const { links } = run("index.md", "[Guide](/docs/guide)", { basePath: "/docs" });
+    expect(links).toEqual(["/docs/guide"]);
+  });
+
+  it("leaves protocol-relative and external URLs untouched", () => {
+    const { links } = run("index.md", "[cdn](//cdn.example/x) and [ext](https://a.dev)", {
+      basePath: "/docs",
+    });
+    expect(links).toEqual(["//cdn.example/x", "https://a.dev"]);
+  });
+
+  it("is a no-op at the root (no base path)", () => {
+    const { links, images } = run("index.md", "[Guide](/guide) ![logo](/logo.svg)");
+    expect(links).toEqual(["/guide"]);
+    expect(images).toEqual(["/logo.svg"]);
   });
 });
 
