@@ -1,0 +1,57 @@
+/* Expandable: a light progressive-disclosure block on native <details>. Zero JS.
+ * Lighter than Accordion (no card surface): a hairline left rule, tuned for
+ * nesting details inline in prose or under an API field. */
+
+.rs-expandable {
+  margin: var(--rs-space-4) 0;
+  border-left: 2px solid var(--rs-rule-strong);
+  padding-left: var(--rs-space-3);
+}
+
+.rs-expandable__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--rs-space-2);
+  cursor: pointer;
+  list-style: none;
+  color: var(--rs-ink);
+  font-size: var(--rs-text-small);
+}
+.rs-expandable__summary::-webkit-details-marker {
+  display: none;
+}
+.rs-expandable__summary:hover {
+  color: var(--rs-accent);
+}
+
+.rs-expandable__title {
+  font-weight: 600;
+}
+
+.rs-expandable__chevron {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--rs-ink-faint);
+  transition: transform var(--rs-dur) var(--rs-ease);
+}
+.rs-expandable[open] .rs-expandable__chevron {
+  transform: rotate(90deg);
+}
+
+.rs-expandable__body {
+  padding: var(--rs-space-2) 0 var(--rs-space-1) calc(14px + var(--rs-space-2));
+  color: var(--rs-ink-muted);
+}
+.rs-expandable__body > :first-child {
+  margin-top: 0;
+}
+.rs-expandable__body > :last-child {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-expandable__chevron {
+    transition: none;
+  }
+}

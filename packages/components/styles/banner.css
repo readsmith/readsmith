@@ -1,0 +1,114 @@
+/* Banner: a prominent top-of-page announcement strip. Static by default; the
+ * dismissible variant carries a close control that `initBanners` wires. The
+ * default tint is the accent wash; variants swap the semantic color. */
+
+.rs-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--rs-space-3);
+  margin: 0 0 var(--rs-space-6);
+  padding: var(--rs-space-3) var(--rs-space-4);
+  border: 1px solid color-mix(in srgb, var(--rs-accent) 30%, transparent);
+  border-radius: var(--rs-radius);
+  background: var(--rs-accent-wash);
+  color: var(--rs-ink);
+  font-size: var(--rs-text-small);
+}
+
+.rs-banner[hidden] {
+  display: none;
+}
+
+.rs-banner__icon {
+  flex: 0 0 auto;
+  width: 1.15em;
+  height: 1.15em;
+  color: var(--rs-accent);
+}
+
+.rs-banner__content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rs-banner__content > :first-child {
+  margin-top: 0;
+}
+.rs-banner__content > :last-child {
+  margin-bottom: 0;
+}
+
+.rs-banner__dismiss {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px -6px -4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--rs-radius-sm);
+  background: transparent;
+  color: var(--rs-ink-muted);
+  cursor: pointer;
+  transition: background var(--rs-dur-fast) var(--rs-ease), color var(--rs-dur-fast) var(--rs-ease);
+}
+.rs-banner__dismiss:hover {
+  background: var(--rs-surface-2);
+  color: var(--rs-ink);
+}
+.rs-banner__dismiss-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Variants: retint the border, wash, and icon from a semantic color. */
+.rs-banner--info {
+  border-color: color-mix(in srgb, var(--rs-info) 30%, transparent);
+  background: color-mix(in srgb, var(--rs-info) 9%, transparent);
+}
+.rs-banner--info .rs-banner__icon {
+  color: var(--rs-info);
+}
+.rs-banner--tip {
+  border-color: color-mix(in srgb, var(--rs-tip) 30%, transparent);
+  background: color-mix(in srgb, var(--rs-tip) 9%, transparent);
+}
+.rs-banner--tip .rs-banner__icon {
+  color: var(--rs-tip);
+}
+.rs-banner--warning {
+  border-color: color-mix(in srgb, var(--rs-warning) 30%, transparent);
+  background: color-mix(in srgb, var(--rs-warning) 9%, transparent);
+}
+.rs-banner--warning .rs-banner__icon {
+  color: var(--rs-warning);
+}
+.rs-banner--danger {
+  border-color: color-mix(in srgb, var(--rs-danger) 30%, transparent);
+  background: color-mix(in srgb, var(--rs-danger) 9%, transparent);
+}
+.rs-banner--danger .rs-banner__icon {
+  color: var(--rs-danger);
+}
+.rs-banner--accent {
+  border-color: color-mix(in srgb, var(--rs-accent) 30%, transparent);
+  background: var(--rs-accent-wash);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-banner__dismiss {
+    transition: none;
+  }
+}
+
+@media (max-width: 34rem) {
+  .rs-banner {
+    align-items: flex-start;
+    gap: var(--rs-space-2);
+    padding: var(--rs-space-3);
+  }
+  .rs-banner__icon {
+    margin-top: 2px;
+  }
+}

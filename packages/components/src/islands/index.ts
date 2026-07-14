@@ -1,3 +1,4 @@
+import { initBanners } from "./banner.js";
 import { enhanceCodeGroup } from "./codegroup.js";
 import { mountCopyButtons } from "./copy.js";
 import { initMermaid } from "./mermaid.js";
@@ -6,6 +7,7 @@ import { initReference } from "./reference.js";
 import { initShell } from "./shell.js";
 import { enhanceTabs } from "./tabs.js";
 
+export { initBanners } from "./banner.js";
 export { mountCopyButtons } from "./copy.js";
 export { enhanceTabs } from "./tabs.js";
 export { enhanceCodeGroup } from "./codegroup.js";
@@ -31,6 +33,7 @@ export function hydrate(root: ParentNode = document): void {
   initShell(root);
   void initMermaid(root);
   initReference(root);
+  initBanners(root);
   mountCopyButtons(root);
   for (const mount of root.querySelectorAll<HTMLElement>("[data-island]")) {
     if (mount.dataset.rsHydrated === "true") continue;

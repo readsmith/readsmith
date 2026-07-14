@@ -2,13 +2,15 @@ import type { ComponentRegistry } from "@readsmith/mdx";
 import type { NormalizedSpec } from "@readsmith/model";
 import type { IconResolver } from "../lucide/resolve.js";
 import { accordion, accordionGroup } from "./accordion.js";
+import { makeBanner } from "./banner.js";
 import { callout, calloutOfKind } from "./callout.js";
 import { card, cardGroup } from "./card.js";
 import { update } from "./changelog.js";
 import { codeGroup } from "./codegroup.js";
+import { expandable } from "./expandable.js";
 import { frame } from "./frame.js";
 import { makeIcon } from "./icon.js";
-import { badge, kbd, tooltip } from "./inline.js";
+import { kbd, makeBadge, tooltip } from "./inline.js";
 import { operationEmbed } from "./operation.js";
 import { step, steps } from "./steps.js";
 import { tab, tabs } from "./tabs.js";
@@ -49,11 +51,15 @@ export function createRegistry(options: RegistryOptions = {}): ComponentRegistry
     // accordion (native details, static)
     Accordion: { render: accordion },
     AccordionGroup: { render: accordionGroup },
+    // expandable (native details, lighter than Accordion, for nesting)
+    Expandable: { render: expandable },
+    // banner (top-of-page announcement; dismissible variant enhanced by initBanners)
+    Banner: { render: makeBanner(options.resolveIcon) },
     // changelog
     Update: { render: update },
     // inline
     Kbd: { render: kbd },
-    Badge: { render: badge },
+    Badge: { render: makeBadge(options.resolveIcon) },
     Tooltip: { render: tooltip },
     Icon: { render: makeIcon(options.resolveIcon) },
     // islands

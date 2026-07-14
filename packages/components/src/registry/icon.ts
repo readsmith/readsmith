@@ -83,3 +83,23 @@ export function makeIcon(resolve?: IconResolver): (args: ComponentArgs) => Eleme
     );
   };
 }
+
+/**
+ * Render a named icon inline for composition inside another component (Badge,
+ * Banner). Returns null when no name is given, so callers can prepend it only
+ * when present. Reuses the full `<Icon>` behaviour: build-time SVG, an http(s)
+ * name as an image, and the neutral-glyph fallback for an unknown name.
+ */
+export function inlineIcon(
+  resolve: IconResolver | undefined,
+  name: string,
+  sizePx: number,
+  className: string,
+): ElementContent | null {
+  if (!name) return null;
+  return makeIcon(resolve)({
+    name: "Icon",
+    props: { icon: name, size: sizePx, className },
+    children: [],
+  });
+}

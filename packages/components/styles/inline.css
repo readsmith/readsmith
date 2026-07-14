@@ -15,6 +15,7 @@
 .rs-badge {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   font-family: var(--rs-font-mono);
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -25,16 +26,33 @@
   border-radius: var(--rs-radius-sm);
   padding: 2px 8px;
 }
+.rs-badge__icon {
+  width: 0.92em;
+  height: 0.92em;
+  flex: 0 0 auto;
+  margin-left: -1px;
+}
 .rs-badge--new,
 .rs-badge--tip {
   color: var(--rs-tip);
   background: transparent;
   border-color: color-mix(in srgb, var(--rs-tip) 40%, transparent);
 }
+.rs-badge--info,
+.rs-badge--note {
+  color: var(--rs-info);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--rs-info) 40%, transparent);
+}
 .rs-badge--warning {
   color: var(--rs-warning);
   background: transparent;
   border-color: color-mix(in srgb, var(--rs-warning) 40%, transparent);
+}
+.rs-badge--danger {
+  color: var(--rs-danger);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--rs-danger) 40%, transparent);
 }
 .rs-badge--accent {
   color: var(--rs-accent);
