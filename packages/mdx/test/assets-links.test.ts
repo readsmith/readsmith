@@ -40,13 +40,26 @@ function run(
 
   const images: string[] = [];
   const links: string[] = [];
-  const walk = (node: { type: string; url?: string; children?: unknown[] }): void => {
+  const componentUrls: string[] = [];
+  const walk = (node: {
+    type: string;
+    url?: string;
+    attributes?: { type: string; name?: string; value?: unknown }[];
+    children?: unknown[];
+  }): void => {
     if (node.type === "image" && node.url) images.push(node.url);
     if (node.type === "link" && node.url) links.push(node.url);
+    if (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") {
+      for (const attr of node.attributes ?? []) {
+        if ((attr.name === "href" || attr.name === "src") && typeof attr.value === "string") {
+          componentUrls.push(attr.value);
+        }
+      }
+    }
     for (const child of (node.children ?? []) as (typeof node)[]) walk(child);
   };
   walk(result.body as unknown as { type: string; children?: unknown[] });
-  return { images, links, diagnostics };
+  return { images, links, componentUrls, diagnostics };
 }
 
 describe("resolveImages", () => {
@@ -132,6 +145,29 @@ describe("base path on root-relative links and images (subpath hosting)", () => 
     const { links, images } = run("index.md", "[Guide](/guide) ![logo](/logo.svg)");
     expect(links).toEqual(["/guide"]);
     expect(images).toEqual(["/logo.svg"]);
+  });
+
+  it("prefixes root-relative href/src on component attributes", () => {
+    const { componentUrls } = run(
+      "index.mdx",
+      '<Card href="/what-is-readsmith" /><Frame src="/media/x.png" />',
+      { basePath: "/docs" },
+    );
+    expect(componentUrls).toEqual(["/docs/what-is-readsmith", "/docs/media/x.png"]);
+  });
+
+  it("leaves external and already-prefixed component urls untouched", () => {
+    const { componentUrls } = run(
+      "index.mdx",
+      '<Card href="https://a.dev" /><Card href="/docs/guide" />',
+      { basePath: "/docs" },
+    );
+    expect(componentUrls).toEqual(["https://a.dev", "/docs/guide"]);
+  });
+
+  it("does not touch component urls at the root", () => {
+    const { componentUrls } = run("index.mdx", '<Card href="/guide" />');
+    expect(componentUrls).toEqual(["/guide"]);
   });
 });
 

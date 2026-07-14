@@ -65,6 +65,7 @@ export function transform(body: Root, ctx: TransformContext): TransformResult {
   assignHeadingSlugs(body);
   resolveLinks(body, ctx, diagnostics);
   resolveImages(body, ctx, diagnostics);
+  resolveComponentUrls(body, ctx);
   return { body, diagnostics };
 }
 
@@ -224,6 +225,32 @@ export function resolveImages(body: Root, ctx: TransformContext, diagnostics: Di
       return;
     }
     node.url = (ctx.basePath ?? "") + resolved;
+  });
+}
+
+/** Component attributes that carry a URL and so need the base-path prefix. */
+const URL_ATTRIBUTES = new Set(["href", "src"]);
+
+/**
+ * Prefix root-relative internal URLs in component attributes (`<Card href="/x">`,
+ * `<Frame src="/y">`) with the base path. Component props are opaque to the link
+ * and image visitors above, so a subpath deploy would otherwise leave them
+ * pointing above the site. A no-op at the root and for external/relative values.
+ */
+export function resolveComponentUrls(body: Root, ctx: TransformContext): void {
+  const base = ctx.basePath ?? "";
+  if (!base) return;
+  visit(body, (node) => {
+    const el = node as {
+      type: string;
+      attributes?: { type: string; name?: string | null; value?: unknown }[];
+    };
+    if (el.type !== "mdxJsxFlowElement" && el.type !== "mdxJsxTextElement") return;
+    for (const attr of el.attributes ?? []) {
+      if (attr.type !== "mdxJsxAttribute" || !attr.name) continue;
+      if (!URL_ATTRIBUTES.has(attr.name) || typeof attr.value !== "string") continue;
+      if (isAbsoluteInternalLink(attr.value)) attr.value = withBasePath(attr.value, base);
+    }
   });
 }
 

@@ -606,9 +606,9 @@ async function buildPage(
 
   const cacheKey = contentHash({
     // Bump when render/transform semantics change so persisted entries from an
-    // older library invalidate. "1": root-relative internal links now carry the
-    // base path (subpath hosting), which changes the rendered href of a cached page.
-    lib: input.libVersion ?? "1",
+    // older library invalidate. "1": root-relative internal links carry the base
+    // path (subpath hosting). "2": component href/src attributes do too.
+    lib: input.libVersion ?? "2",
     trust,
     theme: config.site.theme ?? {},
     // The base path is rendered into every internal href, so it must key the
