@@ -88,6 +88,7 @@ const feedbackInput = z.object({ id: z.string().min(1), value: z.number().int() 
 const pageFeedbackInput = z.object({
   path: z.string().min(1).max(500),
   helpful: z.boolean(),
+  comment: z.string().max(2000).optional(),
 });
 
 async function parseJson(request: Request): Promise<unknown> {

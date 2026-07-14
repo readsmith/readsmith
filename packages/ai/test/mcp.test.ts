@@ -4,11 +4,19 @@ import type { NormalizedSpec } from "@readsmith/model";
 import { describe, expect, it } from "vitest";
 import {
   type McpDeps,
+  type McpPage,
   type RetrievalStore,
   type RetrievedChunk,
   createMcpServer,
   createMockProvider,
 } from "../src/index.js";
+
+const samplePages: McpPage[] = [
+  { title: "Setup", path: "/setup", description: "Get started", markdown: "# Setup\n\nDo this." },
+  { title: "API", path: "/api/intro", markdown: "# API\n\nIntro." },
+];
+const text0 = (res: unknown): string =>
+  (res as { content?: { text?: string }[] }).content?.[0]?.text ?? "";
 
 const hit: RetrievedChunk = {
   id: "s1",
@@ -103,6 +111,88 @@ describe("MCP server", () => {
       .endpoint;
     expect(endpoint.method).toBe("get");
     expect(endpoint.path).toBe("/users");
+    await client.close();
+  });
+});
+
+describe("MCP docs tools (list_docs / get_page / submit_feedback)", () => {
+  it("registers the read tools only with pages, and the write tool only with feedback", async () => {
+    const none = (await (await connect(baseDeps())).listTools()).tools.map((t) => t.name);
+    expect(none).not.toContain("list_docs");
+    expect(none).not.toContain("submit_feedback");
+
+    const reads = (await (await connect(baseDeps({ pages: samplePages }))).listTools()).tools.map(
+      (t) => t.name,
+    );
+    expect(reads).toContain("list_docs");
+    expect(reads).toContain("get_page");
+    expect(reads).not.toContain("submit_feedback");
+
+    const withWrite = (
+      await (await connect(baseDeps({ pages: samplePages, feedback: async () => {} }))).listTools()
+    ).tools.map((t) => t.name);
+    expect(withWrite).toContain("submit_feedback");
+  });
+
+  it("list_docs lists every page with its path", async () => {
+    const client = await connect(baseDeps({ pages: samplePages }));
+    const res = await client.callTool({ name: "list_docs", arguments: {} });
+    expect(
+      (res.structuredContent as { pages: { path: string }[] }).pages.map((p) => p.path),
+    ).toEqual(["/setup", "/api/intro"]);
+    expect(text0(res)).toContain("Setup — /setup");
+    await client.close();
+  });
+
+  it("get_page returns markdown, batches an array, and flags unknown paths", async () => {
+    const client = await connect(baseDeps({ pages: samplePages }));
+    const one = await client.callTool({ name: "get_page", arguments: { path: "/setup" } });
+    expect(text0(one)).toContain("Do this.");
+
+    const many = await client.callTool({
+      name: "get_page",
+      arguments: { path: ["/setup", "/api/intro", "/nope"] },
+    });
+    const t = text0(many);
+    expect(t).toContain("Do this.");
+    expect(t).toContain("Intro.");
+    expect(t).toContain("No page found for: /nope");
+
+    const miss = await client.callTool({ name: "get_page", arguments: { path: "/nope" } });
+    expect(miss.isError).toBe(true);
+    await client.close();
+  });
+
+  it("get_page matches by a bare slug", async () => {
+    const client = await connect(baseDeps({ pages: samplePages }));
+    const res = await client.callTool({ name: "get_page", arguments: { path: "setup" } });
+    expect(text0(res)).toContain("Do this.");
+    await client.close();
+  });
+
+  it("submit_feedback validates the path and records helpful + comment", async () => {
+    const calls: { path: string; helpful: boolean; comment: string }[] = [];
+    const client = await connect(
+      baseDeps({
+        pages: samplePages,
+        feedback: async (input) => {
+          calls.push(input);
+        },
+      }),
+    );
+    const bad = await client.callTool({
+      name: "submit_feedback",
+      arguments: { path: "/nope", helpful: false, comment: "x" },
+    });
+    expect(bad.isError).toBe(true);
+    expect(calls).toHaveLength(0);
+
+    const ok = await client.callTool({
+      name: "submit_feedback",
+      arguments: { path: "/setup", helpful: false, comment: "This is outdated." },
+    });
+    expect(ok.isError).toBeFalsy();
+    expect(calls).toEqual([{ path: "/setup", helpful: false, comment: "This is outdated." }]);
     await client.close();
   });
 });

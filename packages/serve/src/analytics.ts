@@ -19,6 +19,7 @@ export function getAnalyticsService(siteId = "default"): AnalyticsService | null
         siteId,
         path: input.path,
         helpful: input.helpful,
+        comment: input.comment ?? null,
       });
     },
   };

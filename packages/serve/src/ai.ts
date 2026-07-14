@@ -1,6 +1,7 @@
 import { InMemoryEventStore } from "@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import {
+  type McpPage,
   type ModelProvider,
   type RetrievalStore,
   type RetrievedChunk,
@@ -20,6 +21,7 @@ import {
   type SearchChunkRow,
   ftsSearchChunks,
   insertAiQuery,
+  insertPageFeedback,
   setAiQueryFeedback,
   vectorSearchChunks,
 } from "@readsmith/db";
@@ -157,17 +159,43 @@ function build(siteId: string, bundle: Bundle, aiOverride?: unknown): AiServices
   // In-process is correct for single-instance self-host; the hosted phase backs
   // these with a shared store so any instance serves any session.
   const mcpSpec = apiRef?.spec ?? null;
+  // Public pages become the docs filesystem for list_docs / get_page. Unlisted
+  // and noindex pages are excluded, matching what the site exposes elsewhere.
+  const mcpPages: McpPage[] = site.build.pages
+    .filter((p) => !p.hidden && !p.noindex)
+    .map((p) => ({
+      title: p.title || p.slug || p.url,
+      path: p.url,
+      ...(p.description ? { description: p.description } : {}),
+      markdown: p.rawMd,
+    }));
   const sessions = new Map<string, WebStandardStreamableHTTPServerTransport>();
   const mcp = async (request: Request): Promise<Response> => {
     const sessionId = request.headers.get("mcp-session-id") ?? undefined;
-    const existing = sessionId ? sessions.get(sessionId) : undefined;
+    const existing = sessions.get(sessionId ?? "");
     if (existing) return existing.handleRequest(request);
 
+    // The one write tool is guarded per session on the unauthenticated /mcp:
+    // path is validated in the tool, comment is capped, and a session can only
+    // submit so many reports before it is refused.
+    let feedbackCount = 0;
     const server = createMcpServer({
       search,
       siteId,
       filters: DEFAULT_FILTERS,
       spec: mcpSpec,
+      pages: mcpPages,
+      feedback: async ({ path, helpful, comment }) => {
+        if (feedbackCount >= 20) throw new Error("Feedback limit reached for this session.");
+        feedbackCount++;
+        await insertPageFeedback(db, {
+          id: globalThis.crypto.randomUUID(),
+          siteId,
+          path,
+          helpful,
+          comment,
+        });
+      },
       // Skills ride along as resources: connected agents discover and read
       // them without installing anything (spec agent-skills SK-20).
       skills: site.build.skills ?? [],

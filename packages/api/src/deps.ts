@@ -70,7 +70,7 @@ export interface GitService {
  * Absent = signals are acked and dropped (docs-only installs).
  */
 export interface AnalyticsService {
-  pageFeedback(input: { path: string; helpful: boolean }): Promise<void>;
+  pageFeedback(input: { path: string; helpful: boolean; comment?: string }): Promise<void>;
 }
 
 /**
