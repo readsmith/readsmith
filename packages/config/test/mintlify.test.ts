@@ -87,6 +87,21 @@ describe("mintlifyCompat", () => {
     ]);
   });
 
+  it("carries a group icon in both the string and object Mintlify forms", () => {
+    const asString = data({
+      site: { name: "x" },
+      navigation: { groups: [{ group: "G", icon: "book", pages: ["a"] }] },
+    });
+    expect(asString.navigation).toEqual([{ group: "G", pages: ["a"], icon: "book" }]);
+    const asObject = data({
+      site: { name: "x" },
+      navigation: {
+        groups: [{ group: "G", icon: { name: "book", library: "lucide" }, pages: ["a"] }],
+      },
+    });
+    expect(asObject.navigation).toEqual([{ group: "G", pages: ["a"], icon: "book" }]);
+  });
+
   it("carries group tag and expanded from Mintlify groups", () => {
     const out = data({
       site: { name: "x" },

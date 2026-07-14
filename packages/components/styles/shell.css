@@ -387,6 +387,13 @@
   color: var(--rs-ink-muted);
   background: var(--rs-surface);
 }
+/* A group's leading icon: a bundled Lucide glyph, sized to the label. */
+.rs-nav__icon {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--rs-ink-faint);
+}
 /* A group's badge (e.g. NEW): a hallmark-gold stamp pushed to the row's end. */
 .rs-nav__tag {
   margin-left: auto;

@@ -22,6 +22,19 @@ describe("compileSite", () => {
     expect(bundle.apiReference).toBeNull();
   });
 
+  it("resolves a group icon name to inline SVG in the finalized nav", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "rs-navicon-"));
+    await writeFile(
+      join(dir, "docs.yaml"),
+      "site:\n  name: Iconed\nnavigation:\n  - group: Start\n    icon: rocket\n    pages:\n      - index\n",
+    );
+    await writeFile(join(dir, "index.md"), "# Home\n\nHi.\n");
+    const { bundle } = await compileSite({ contentDir: dir });
+    const group = bundle.site.build.nav.find((n) => n.type === "group");
+    expect(group?.icon).toContain('class="rs-nav__icon"');
+    expect(group?.icon).toContain("M12 15v5"); // real lucide rocket path, resolved + inlined
+  });
+
   it("carries group tag and expanded into the finalized nav model", async () => {
     const dir = await mkdtemp(join(tmpdir(), "rs-navtag-"));
     await writeFile(

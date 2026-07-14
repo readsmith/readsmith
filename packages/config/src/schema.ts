@@ -8,7 +8,7 @@ import type { CspExtensions } from "./security.js";
  */
 export type NavItemInput =
   | string
-  | { group: string; pages: NavItemInput[]; tag?: string; expanded?: boolean };
+  | { group: string; pages: NavItemInput[]; icon?: string; tag?: string; expanded?: boolean };
 
 const navItemInputSchema: z.ZodType<NavItemInput> = z.lazy(() =>
   z.union([
@@ -16,6 +16,8 @@ const navItemInputSchema: z.ZodType<NavItemInput> = z.lazy(() =>
     z.object({
       group: z.string(),
       pages: z.array(navItemInputSchema),
+      /** An icon name shown beside the group label (a bundled Lucide name). */
+      icon: z.string().optional(),
       /** A short badge shown beside the group label (Mintlify-compatible). */
       tag: z.string().optional(),
       /** Start collapsed when false; groups default to open. */
@@ -256,7 +258,14 @@ export interface PageRef {
 /** A resolved navigation node (the output tree the renderer consumes). */
 export type NavNode =
   | { type: "page"; slug: string }
-  | { type: "group"; label: string; children: NavNode[]; tag?: string; expanded?: boolean };
+  | {
+      type: "group";
+      label: string;
+      children: NavNode[];
+      icon?: string;
+      tag?: string;
+      expanded?: boolean;
+    };
 
 /** A resolved top-level tab: a label and its own navigation tree. */
 export interface NavTab {

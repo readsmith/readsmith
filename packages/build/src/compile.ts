@@ -3,7 +3,12 @@ import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { normalizeDocument, parseAndBundle } from "@readsmith/api-reference";
-import { createLucideResolver, createRegistry, themeToCss } from "@readsmith/components";
+import {
+  createLucideResolver,
+  createRegistry,
+  normalizeIconSvg,
+  themeToCss,
+} from "@readsmith/components";
 import {
   type ResolvedConfig,
   analyticsHeadHtml,
@@ -351,6 +356,10 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
       apiSpec: reference?.spec ?? null,
       resolveIcon: createLucideResolver(readLucideSvg),
     }),
+    resolveNavIcon: (name) => {
+      const raw = readLucideSvg(name);
+      return raw ? normalizeIconSvg(raw) : undefined;
+    },
     renderCache: input.renderCache,
     failOnError: input.failOnError,
     baseUrl: config.site.url,

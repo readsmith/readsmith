@@ -3,6 +3,7 @@ export type { ComponentArgs } from "./registry/index.js";
 export { calloutIcon } from "./registry/icons.js";
 export { createLucideResolver } from "./lucide/resolve.js";
 export type { IconResolver } from "./lucide/resolve.js";
+export { normalizeIconSvg } from "./lucide/nav-icon.js";
 export {
   renderShellBody,
   renderDocument,

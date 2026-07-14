@@ -38,7 +38,15 @@ import { transform } from "./transform.js";
 /** A resolved navigation node (matches the config package's output shape). */
 export type NavNode =
   | { type: "page"; slug: string }
-  | { type: "group"; label: string; children: NavNode[]; tag?: string; expanded?: boolean };
+  | {
+      type: "group";
+      label: string;
+      children: NavNode[];
+      /** An icon name (resolved to inline SVG during finalization). */
+      icon?: string;
+      tag?: string;
+      expanded?: boolean;
+    };
 
 export interface SitePage {
   /** Path relative to the content root, POSIX separators. */
@@ -81,6 +89,9 @@ export interface AssembleInput {
   /** Read a content file by its config-relative path. */
   readPage: (path: string) => string | Promise<string>;
   registry: ComponentRegistry;
+  /** Resolve a nav icon name to inline SVG at build time (nav renders at serve
+   * time, so icons are baked into the finalized nav here). Absent -> no icons. */
+  resolveNavIcon?: (name: string) => string | undefined;
   /** Snippet name (the `<Snippet file>` value) to its raw source. */
   snippets?: Record<string, string>;
   trust?: "owner" | "contributor" | "preview";
@@ -257,6 +268,8 @@ export type FinalNavNode =
       type: "group";
       label: string;
       children: FinalNavNode[];
+      /** Pre-resolved inline SVG for the group icon (from the bundled icon set). */
+      icon?: string;
       /** A short badge shown beside the group label. */
       tag?: string;
       /** Start collapsed when false; groups default to open. */
@@ -384,12 +397,12 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
 
   // Nav finalization needs titles and hidden flags from the built pages.
   const bySlug = new Map(models.map((m) => [m.slug, m]));
-  const nav = finalizeNav(config.nav, bySlug);
+  const nav = finalizeNav(config.nav, bySlug, input.resolveNavIcon);
   let tabs: FinalNavTab[] | undefined;
   if (config.tabs && config.tabs.length > 0) {
     // Each page belongs to exactly one tab; compute prev/next/breadcrumbs within it.
     tabs = config.tabs.map((tab) => {
-      const tabNav = finalizeNav(tab.nav, bySlug);
+      const tabNav = finalizeNav(tab.nav, bySlug, input.resolveNavIcon);
       applyNavRelations(tabNav, bySlug);
       return { label: tab.label, url: firstPageUrl(tabNav) ?? "/", nav: tabNav };
     });
@@ -397,13 +410,13 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
     // placed pages appear via their mirrors, which take relations here while
     // the authored originals keep their home tab's.
     if (refNav) {
-      const tabNav = finalizeNav(refNav.nodes, bySlug);
+      const tabNav = finalizeNav(refNav.nodes, bySlug, input.resolveNavIcon);
       applyNavRelations(tabNav, bySlug);
       tabs.push({ label: refNav.label, url: refNav.url, nav: tabNav });
     }
   } else {
     // A tabless site gets the reference nav appended to the main sidebar.
-    if (refNav) nav.push(...finalizeNav(refNav.nodes, bySlug));
+    if (refNav) nav.push(...finalizeNav(refNav.nodes, bySlug, input.resolveNavIcon));
     applyNavRelations(nav, bySlug);
   }
 
@@ -1262,7 +1275,11 @@ function navTitle(model: PageModel): string {
 }
 
 /** Attach titles and drop hidden pages and empty groups from the nav tree. */
-function finalizeNav(nav: NavNode[], bySlug: Map<string, PageModel>): FinalNavNode[] {
+function finalizeNav(
+  nav: NavNode[],
+  bySlug: Map<string, PageModel>,
+  resolveIcon?: (name: string) => string | undefined,
+): FinalNavNode[] {
   const out: FinalNavNode[] = [];
   for (const node of nav) {
     if (node.type === "page") {
@@ -1277,12 +1294,14 @@ function finalizeNav(nav: NavNode[], bySlug: Map<string, PageModel>): FinalNavNo
         ...(method !== undefined ? { method } : {}),
       });
     } else {
-      const children = finalizeNav(node.children, bySlug);
+      const children = finalizeNav(node.children, bySlug, resolveIcon);
       if (children.length > 0) {
+        const icon = node.icon !== undefined ? resolveIcon?.(node.icon) : undefined;
         out.push({
           type: "group",
           label: node.label,
           children,
+          ...(icon ? { icon } : {}),
           ...(node.tag !== undefined ? { tag: node.tag } : {}),
           ...(node.expanded !== undefined ? { expanded: node.expanded } : {}),
         });

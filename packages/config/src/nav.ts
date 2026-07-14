@@ -101,6 +101,7 @@ export function buildExplicitNav(
           type: "group",
           label: item.group,
           children: resolveItems(item.pages),
+          ...(item.icon !== undefined ? { icon: item.icon } : {}),
           ...(item.tag !== undefined ? { tag: item.tag } : {}),
           ...(item.expanded !== undefined ? { expanded: item.expanded } : {}),
         });

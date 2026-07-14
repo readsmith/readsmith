@@ -17,6 +17,13 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 
+/** Mintlify icon: a string name, or an object `{ name, library, style }`. */
+function iconName(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (isObj(v) && typeof v.name === "string") return v.name;
+  return "";
+}
+
 export interface MintlifyCompatResult {
   data: unknown;
   diagnostics: Diagnostic[];
@@ -136,7 +143,8 @@ function groupItem(g: Obj, warn: (c: string, m: string) => void): NavItemInput {
     group: g.group as string,
     pages: Array.isArray(g.pages) ? mapPages(g.pages, warn) : [],
   };
-  // icon / root are carried once the nav schema supports them (later slices).
+  const icon = iconName(g.icon);
+  if (icon) item.icon = icon;
   if (typeof g.tag === "string") item.tag = g.tag;
   if (typeof g.expanded === "boolean") item.expanded = g.expanded;
   return item;
