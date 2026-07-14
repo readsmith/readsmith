@@ -22,6 +22,23 @@ export interface HarRequest {
   postData?: { mimeType: string; text: string };
 }
 
+/**
+ * The minimal operation shape `buildHarRequest` reads. A full `Operation`
+ * satisfies it structurally, and so does the trimmed seed the playground island
+ * embeds (so the browser rebuilds the same request without the whole spec).
+ */
+export interface HarSource {
+  method: string;
+  path: string;
+  parameters: {
+    name: string;
+    in: "path" | "query" | "header" | "cookie";
+    example?: unknown;
+    schema: { example?: unknown; default?: unknown };
+  }[];
+  requestBody?: { content: Record<string, { schema: { example?: unknown } }> };
+}
+
 /** Reader-supplied overrides from the playground form; each falls back to the example. */
 export interface RequestOverrides {
   /** The selected server base URL. */
@@ -38,7 +55,7 @@ export interface RequestOverrides {
  * what "Try It" would send. One function, so the copyable curl and the sent
  * request are the same shape by construction (spec FR-14).
  */
-export function buildHarRequest(op: Operation, overrides: RequestOverrides = {}): HarRequest {
+export function buildHarRequest(op: HarSource, overrides: RequestOverrides = {}): HarRequest {
   const baseUrl = overrides.baseUrl ?? "";
   let path = op.path;
   const queryString: HarNameValue[] = [];
@@ -182,7 +199,7 @@ function quote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
-function exampleString(value: unknown): string {
+export function exampleString(value: unknown): string {
   if (value === undefined || value === null) return "";
   if (typeof value === "string") return value;
   return JSON.stringify(value);

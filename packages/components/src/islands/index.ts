@@ -1,6 +1,7 @@
 import { enhanceCodeGroup } from "./codegroup.js";
 import { mountCopyButtons } from "./copy.js";
 import { initMermaid } from "./mermaid.js";
+import { enhancePlayground } from "./playground.js";
 import { initReference } from "./reference.js";
 import { initShell } from "./shell.js";
 import { enhanceTabs } from "./tabs.js";
@@ -8,6 +9,7 @@ import { enhanceTabs } from "./tabs.js";
 export { mountCopyButtons } from "./copy.js";
 export { enhanceTabs } from "./tabs.js";
 export { enhanceCodeGroup } from "./codegroup.js";
+export { enhancePlayground } from "./playground.js";
 export { initShell } from "./shell.js";
 export { initMermaid } from "./mermaid.js";
 export { initReference } from "./reference.js";
@@ -16,6 +18,7 @@ export { initReference } from "./reference.js";
 const ENHANCERS: Record<string, (mount: HTMLElement) => void> = {
   Tabs: enhanceTabs,
   CodeGroup: enhanceCodeGroup,
+  Playground: enhancePlayground,
 };
 
 /**

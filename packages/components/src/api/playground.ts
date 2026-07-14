@@ -1,5 +1,4 @@
-import type { Operation } from "@readsmith/model";
-import { type HarRequest, buildHarRequest, curlSample } from "./code-samples.js";
+import { type HarRequest, type HarSource, buildHarRequest, curlSample } from "./code-samples.js";
 
 /**
  * The playground request model. A form's state maps to one canonical HAR (via
@@ -68,12 +67,12 @@ function applyAuth(har: HarRequest, auth: AuthInput): HarRequest {
 }
 
 /** The canonical HAR for a form (shared by the curl and the wire request). */
-export function formToHar(op: Operation, form: PlaygroundForm): HarRequest {
+export function formToHar(op: HarSource, form: PlaygroundForm): HarRequest {
   return buildHarRequest(op, { baseUrl: form.baseUrl, params: form.params, body: form.body });
 }
 
 /** The live curl a reader copies, reflecting the current form (params, body, auth). */
-export function formToCurl(op: Operation, form: PlaygroundForm): string {
+export function formToCurl(op: HarSource, form: PlaygroundForm): string {
   return curlSample(applyAuth(formToHar(op, form), form.auth ?? { kind: "none" }));
 }
 
@@ -100,7 +99,7 @@ function collectHeaders(har: HarRequest): Record<string, string> | undefined {
  * (the proxy injects it exactly as `applyAuth` renders it for the curl), so the
  * displayed curl and the sent request are the same effective request (FR-14).
  */
-export function formToWireRequest(op: Operation, form: PlaygroundForm): WireRequest {
+export function formToWireRequest(op: HarSource, form: PlaygroundForm): WireRequest {
   const har = formToHar(op, form);
   const req: WireRequest = { method: har.method, url: har.url };
   const query = collectQuery(har);
