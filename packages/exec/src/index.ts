@@ -26,6 +26,7 @@ export { type ParsedTarget, parseTarget } from "./url.js";
 export {
   type AllowlistEntry,
   type TargetAllowlist,
+  allowlistFromServers,
   checkResolvedIp,
   checkTarget,
 } from "./validate.js";

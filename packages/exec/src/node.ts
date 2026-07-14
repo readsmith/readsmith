@@ -5,7 +5,7 @@ import { type ExecError, execError, isExecError } from "./errors.js";
 import { buildRequest } from "./request.js";
 import type { ExecPolicy, ExecRequest, ExecResult, PreparedRequest } from "./types.js";
 import { parseTarget } from "./url.js";
-import { checkResolvedIp, checkTarget } from "./validate.js";
+import { type TargetAllowlist, checkResolvedIp, checkTarget } from "./validate.js";
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
@@ -23,6 +23,49 @@ export interface ExecNodeDeps {
     pinnedIp: string,
     opts: SendOptions,
   ) => Promise<ExecResult | ExecError>;
+}
+
+/** Sensible policy defaults for the playground; hosts may override any field. */
+export interface ExecServiceOptions {
+  allowlist: TargetAllowlist;
+  allowedMethods?: string[];
+  followRedirects?: "never" | "revalidate-each-hop";
+  maxRedirects?: number;
+  timeouts?: { connectMs: number; totalMs: number };
+  maxResponseBytes?: number;
+  maxRequestBytes?: number;
+}
+
+/** The structural shape a host wires into `ApiDeps.exec` (matched by duck typing). */
+export interface ExecServiceLike {
+  enabled: boolean;
+  run(req: ExecRequest): Promise<ExecResult | ExecError>;
+}
+
+/**
+ * Compose an ExecService from a site's allowlist. `enabled` is false when the
+ * site declares no servers, so the playground route stays off for docs-only
+ * sites. `run` binds the allowlist into a policy and executes via the pinned
+ * transport. This is the host-composition seam (self-host and cloud both wire
+ * it into `ApiDeps.exec`); the API route stays allowlist-free.
+ */
+export function createExecService(
+  opts: ExecServiceOptions,
+  deps: ExecNodeDeps = {},
+): ExecServiceLike {
+  const policy: ExecPolicy = {
+    allowlist: opts.allowlist,
+    allowedMethods: opts.allowedMethods ?? ["*"],
+    followRedirects: opts.followRedirects ?? "never",
+    maxRedirects: opts.maxRedirects ?? 3,
+    timeouts: opts.timeouts ?? { connectMs: 5000, totalMs: 30_000 },
+    maxResponseBytes: opts.maxResponseBytes ?? 10_000_000,
+    maxRequestBytes: opts.maxRequestBytes ?? 10_000_000,
+  };
+  return {
+    enabled: opts.allowlist.length > 0,
+    run: (req) => execNode(req, policy, deps),
+  };
 }
 
 async function defaultResolve(host: string): Promise<string[]> {

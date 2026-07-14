@@ -1,6 +1,6 @@
-import { type ExecError, execError } from "./errors.js";
+import { type ExecError, execError, isExecError } from "./errors.js";
 import { isForbiddenIp } from "./ip.js";
-import type { ParsedTarget } from "./url.js";
+import { type ParsedTarget, parseTarget } from "./url.js";
 
 /** A pre-validated allowlist entry, derived from a tenant's NormalizedSpec.servers. */
 export interface AllowlistEntry {
@@ -9,6 +9,28 @@ export interface AllowlistEntry {
   port: number;
 }
 export type TargetAllowlist = AllowlistEntry[];
+
+/**
+ * Build a validated allowlist from a site's OpenAPI server URLs. The spec is
+ * attacker-controllable (SR-2), so each declared server must itself parse to a
+ * valid http/https target; malformed, non-http, or userinfo-bearing servers are
+ * dropped rather than trusted. Templated servers should be resolved to concrete
+ * URLs (variable defaults) before this. Only scheme+host+port matter (the
+ * request path comes from the operation); deduped on that triple.
+ */
+export function allowlistFromServers(urls: string[]): TargetAllowlist {
+  const seen = new Set<string>();
+  const out: TargetAllowlist = [];
+  for (const raw of urls) {
+    const parsed = parseTarget(raw);
+    if (isExecError(parsed)) continue;
+    const key = `${parsed.scheme}://${parsed.host}:${parsed.port}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ scheme: parsed.scheme, host: parsed.host, port: parsed.port });
+  }
+  return out;
+}
 
 type Ok = { ok: true };
 

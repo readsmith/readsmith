@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { isExecError } from "../src/errors.js";
 import { parseTarget } from "../src/url.js";
-import { type TargetAllowlist, checkResolvedIp, checkTarget } from "../src/validate.js";
+import {
+  type TargetAllowlist,
+  allowlistFromServers,
+  checkResolvedIp,
+  checkTarget,
+} from "../src/validate.js";
 
 function target(raw: string) {
   const r = parseTarget(raw);
@@ -52,6 +57,29 @@ describe("checkTarget", () => {
     expect(checkTarget(target("https://8.8.8.8/"), allow)).toEqual({ ok: true });
     // public but not allowlisted -> denied
     expect(isExecError(checkTarget(target("https://1.1.1.1/"), allow))).toBe(true);
+  });
+});
+
+describe("allowlistFromServers (SR-2)", () => {
+  it("builds entries from valid server URLs, ignoring the path", () => {
+    expect(
+      allowlistFromServers(["https://api.example.com/v1", "http://localhost:3000/base"]),
+    ).toEqual([
+      { scheme: "https", host: "api.example.com", port: 443 },
+      { scheme: "http", host: "localhost", port: 3000 },
+    ]);
+  });
+
+  it("drops malformed, relative, non-http, and userinfo servers", () => {
+    expect(
+      allowlistFromServers(["/relative", "ftp://x", "not a url", "http://user@evil.com/"]),
+    ).toEqual([]);
+  });
+
+  it("dedupes on scheme+host+port", () => {
+    expect(
+      allowlistFromServers(["https://api.example.com/a", "https://api.example.com/b"]),
+    ).toEqual([{ scheme: "https", host: "api.example.com", port: 443 }]);
   });
 });
 

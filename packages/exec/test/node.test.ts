@@ -2,7 +2,13 @@ import { type Server, createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { isExecError } from "../src/errors.js";
-import { type ExecNodeDeps, execNode, planRedirect, sendPinned } from "../src/node.js";
+import {
+  type ExecNodeDeps,
+  createExecService,
+  execNode,
+  planRedirect,
+  sendPinned,
+} from "../src/node.js";
 import { buildRequest } from "../src/request.js";
 import type { ExecPolicy, ExecRequest, ExecResult, PreparedRequest } from "../src/types.js";
 
@@ -174,6 +180,21 @@ describe("execNode orchestration (injected resolve/send)", () => {
     });
     expect(isExecError(r) && r.code).toBe("DENIED_NOT_ALLOWLISTED");
     expect(resolveCalled).toBe(false);
+  });
+});
+
+describe("createExecService (host composition)", () => {
+  it("is disabled when the site declares no servers", () => {
+    expect(createExecService({ allowlist: [] }).enabled).toBe(false);
+  });
+
+  it("is enabled with servers and denies an off-allowlist target without any network", async () => {
+    const svc = createExecService({
+      allowlist: [{ scheme: "https", host: "api.example.com", port: 443 }],
+    });
+    expect(svc.enabled).toBe(true);
+    const r = await svc.run({ method: "GET", url: "https://evil.com/" });
+    expect(isExecError(r) && r.code).toBe("DENIED_NOT_ALLOWLISTED");
   });
 });
 
