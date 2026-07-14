@@ -22,6 +22,23 @@ describe("compileSite", () => {
     expect(bundle.apiReference).toBeNull();
   });
 
+  it("renders <Icon> to inline Lucide SVG through the wired resolver", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "rs-icon-"));
+    await writeFile(
+      join(dir, "index.mdx"),
+      '# Icons\n\n<Icon icon="rocket" size={20} />\n\n<Icon icon="definitely-missing" />\n',
+    );
+    const { bundle } = await compileSite({ contentDir: dir });
+    const html = bundle.site.build.pages.map((p) => p.html).join("\n");
+    expect(html).toContain('class="rs-icon"');
+    expect(html).toContain('aria-hidden="true"');
+    // A real fragment from lucide-static rocket.svg proves it was read + inlined.
+    expect(html).toContain("M12 15v5");
+    // The unknown name degrades to the fallback glyph, never throwing.
+    expect(html).toContain('data-rs-icon-missing="definitely-missing"');
+    expect(html).toContain("rs-icon--missing");
+  });
+
   it("serializes exactly the returned bundle object", async () => {
     const { bundle, bundleJson } = await compileSite({ contentDir: fixture("site") });
     expect(JSON.parse(bundleJson)).toEqual(JSON.parse(JSON.stringify(bundle)));

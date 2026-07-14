@@ -1,0 +1,10 @@
+/* Inline icon (Lucide, build-time SVG). Size comes from the width/height
+   attributes; here we only handle flow alignment and the missing-glyph hint. */
+.rs-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: -0.125em;
+}
+.rs-icon--missing {
+  opacity: 0.5;
+}

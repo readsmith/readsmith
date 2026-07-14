@@ -1,11 +1,13 @@
 import type { ComponentRegistry } from "@readsmith/mdx";
 import type { NormalizedSpec } from "@readsmith/model";
+import type { IconResolver } from "../lucide/resolve.js";
 import { accordion, accordionGroup } from "./accordion.js";
 import { callout, calloutOfKind } from "./callout.js";
 import { card, cardGroup } from "./card.js";
 import { update } from "./changelog.js";
 import { codeGroup } from "./codegroup.js";
 import { frame } from "./frame.js";
+import { makeIcon } from "./icon.js";
 import { badge, kbd, tooltip } from "./inline.js";
 import { operationEmbed } from "./operation.js";
 import { step, steps } from "./steps.js";
@@ -14,6 +16,8 @@ import { tab, tabs } from "./tabs.js";
 export interface RegistryOptions {
   /** The site's normalized API spec; powers `<Operation op="GET /x" />` embeds. */
   apiSpec?: NormalizedSpec | null;
+  /** Resolves an icon name to inline SVG children; powers `<Icon icon="..." />`. */
+  resolveIcon?: IconResolver;
 }
 
 /**
@@ -51,6 +55,7 @@ export function createRegistry(options: RegistryOptions = {}): ComponentRegistry
     Kbd: { render: kbd },
     Badge: { render: badge },
     Tooltip: { render: tooltip },
+    Icon: { render: makeIcon(options.resolveIcon) },
     // islands
     Tabs: { render: tabs, island: true },
     Tab: { render: tab },

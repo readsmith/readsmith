@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { normalizeDocument, parseAndBundle } from "@readsmith/api-reference";
-import { createRegistry, themeToCss } from "@readsmith/components";
+import { createLucideResolver, createRegistry, themeToCss } from "@readsmith/components";
 import {
   type ResolvedConfig,
   analyticsHeadHtml,
@@ -19,6 +19,7 @@ import {
   normalizedSpecSchema,
 } from "@readsmith/model";
 import { collectAssets } from "./assets.js";
+import { readLucideSvg } from "./lucide.js";
 import { assetContentType } from "./mime.js";
 
 /**
@@ -346,7 +347,10 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
   const build = await assembleSite({
     config,
     readPage: (path) => readFile(join(contentRoot, path), "utf8"),
-    registry: createRegistry({ apiSpec: reference?.spec ?? null }),
+    registry: createRegistry({
+      apiSpec: reference?.spec ?? null,
+      resolveIcon: createLucideResolver(readLucideSvg),
+    }),
     renderCache: input.renderCache,
     failOnError: input.failOnError,
     baseUrl: config.site.url,

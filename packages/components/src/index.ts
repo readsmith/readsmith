@@ -1,6 +1,8 @@
 export { createRegistry, callout } from "./registry/index.js";
 export type { ComponentArgs } from "./registry/index.js";
 export { calloutIcon } from "./registry/icons.js";
+export { createLucideResolver } from "./lucide/resolve.js";
+export type { IconResolver } from "./lucide/resolve.js";
 export {
   renderShellBody,
   renderDocument,
