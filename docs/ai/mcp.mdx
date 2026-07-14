@@ -9,17 +9,17 @@ Every Readsmith site is an MCP server. An agent that connects gets live tools ov
 
 ## Connect
 
-The endpoint answers at `/mcp` over the streamable HTTP transport:
+The endpoint answers at `/_readsmith/mcp` over the streamable HTTP transport:
 
 ```json title="An MCP client entry"
 {
   "readsmith-docs": {
-    "url": "https://readsmith.dev/docs/mcp"
+    "url": "https://readsmith.dev/docs/_readsmith/mcp"
   }
 }
 ```
 
-The friendly `/mcp` alias is a convenience on a standalone deploy. The canonical endpoint is `/_readsmith/mcp`, which answers on every host, so it is the reliable form to hand an agent. The quickest way to get the exact URL for your site is the **Copy MCP URL** action in any page's actions menu, which also offers one-click **Add to Cursor** and **Add to VS Code**. You can set a different alias with `mcp.path` in config.
+That canonical path answers on every host, whether the site is a standalone deploy or a hosted tenant, so it is the reliable form to hand an agent. A standalone deploy also exposes a friendly `/mcp` alias (configurable with `mcp.path`), but it is not guaranteed on a multi-tenant host, so prefer the canonical path when in doubt. The quickest way to get the exact URL for your site is the **Copy MCP URL** action in any page's actions menu, which also offers one-click **Add to Cursor** and **Add to VS Code**.
 
 ## The tools
 
