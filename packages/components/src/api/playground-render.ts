@@ -102,7 +102,7 @@ export function renderPlaygroundForm(op: Operation, servers: Server[]): string {
   )}${paramGroup("Query", query)}${paramGroup(
     "Headers",
     header,
-  )}${bodyField}${authField}</form><div class="rs-pf__actions"><button type="button" class="rs-pf__send" data-rs-pf-send>Send</button></div><pre class="rs-pf__curl" data-rs-pf-curl>${esc(
+  )}${bodyField}${authField}</form><div class="rs-pf__actions"><button type="button" class="rs-pf__send" data-rs-pf-send>Send</button><label class="rs-pf__direct" title="If the API allows CORS, send from your browser so your credentials never reach Readsmith. Falls back to the proxy otherwise."><input type="checkbox" data-rs-pf-direct> Direct from browser</label></div><pre class="rs-pf__curl" data-rs-pf-curl>${esc(
     initialCurl,
   )}</pre><div class="rs-pf__response" data-rs-pf-response hidden></div></div>`;
 }

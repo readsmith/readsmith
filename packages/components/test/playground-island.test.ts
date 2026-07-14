@@ -116,3 +116,56 @@ describe("playground island (Send -> proxy -> response)", () => {
     expect(text).toContain("not available");
   });
 });
+
+describe("playground island (direct mode, FR-9)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("fetches from the browser and labels it direct when CORS allows", async () => {
+    const mount = mountForm();
+    q<HTMLInputElement>(mount, "[data-rs-pf-direct]").checked = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes("/_readsmith/api/proxy"))
+          throw new Error("proxy must not be hit");
+        return new Response('{"direct":true}', {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+    q<HTMLButtonElement>(mount, "[data-rs-pf-send]").click();
+    await flush();
+    const text = q<HTMLElement>(mount, "[data-rs-pf-response]").textContent ?? "";
+    expect(text).toContain("Sent directly from your browser");
+    expect(text).toContain('"direct": true');
+  });
+
+  it("falls back to the proxy when the direct fetch is blocked", async () => {
+    const mount = mountForm();
+    q<HTMLInputElement>(mount, "[data-rs-pf-direct]").checked = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes("/_readsmith/api/proxy")) {
+          return {
+            status: 200,
+            json: async () => ({
+              status: 200,
+              headers: {},
+              bodyBase64: btoa("from-proxy"),
+              truncated: false,
+              timing: { totalMs: 5 },
+            }),
+          } as unknown as Response;
+        }
+        throw new TypeError("Failed to fetch"); // CORS/CSP blocks the direct request
+      }),
+    );
+    q<HTMLButtonElement>(mount, "[data-rs-pf-send]").click();
+    await flush();
+    const text = q<HTMLElement>(mount, "[data-rs-pf-response]").textContent ?? "";
+    expect(text).toContain("Direct request was blocked");
+    expect(text).toContain("from-proxy");
+  });
+});

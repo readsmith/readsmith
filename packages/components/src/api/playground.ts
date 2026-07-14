@@ -1,4 +1,10 @@
-import { type HarRequest, type HarSource, buildHarRequest, curlSample } from "./code-samples.js";
+import {
+  type HarRequest,
+  type HarSource,
+  buildHarRequest,
+  curlSample,
+  fullUrl,
+} from "./code-samples.js";
 
 /**
  * The playground request model. A form's state maps to one canonical HAR (via
@@ -111,4 +117,28 @@ export function formToWireRequest(op: HarSource, form: PlaygroundForm): WireRequ
   }
   if (form.auth && form.auth.kind !== "none") req.auth = form.auth;
   return req;
+}
+
+/** A concrete browser request for direct mode (auth injected into headers/query, no proxy). */
+export interface DirectRequest {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  body?: string;
+}
+
+/**
+ * The request the browser sends directly to the target when the API allows CORS
+ * (FR-9): auth is injected here (not by the proxy), so the reader's credential
+ * never transits our infrastructure. Same underlying HAR as the curl and the
+ * proxy request, so all three are the one request.
+ */
+export function formToFetch(op: HarSource, form: PlaygroundForm): DirectRequest {
+  const har = applyAuth(formToHar(op, form), form.auth ?? { kind: "none" });
+  return {
+    method: har.method,
+    url: fullUrl(har),
+    headers: collectHeaders(har) ?? {},
+    body: har.postData?.text,
+  };
 }

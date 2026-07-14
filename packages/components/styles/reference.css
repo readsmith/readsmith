@@ -715,6 +715,26 @@ select.rs-pf__input {
 }
 .rs-pf__actions {
   display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.rs-pf__direct {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--rs-font-mono);
+  font-size: 11px;
+  color: var(--rs-con-muted);
+  cursor: pointer;
+}
+.rs-pf__direct input {
+  cursor: pointer;
+  accent-color: var(--rs-con-accent);
+}
+.rs-pf__rmode {
+  font-family: var(--rs-font-mono);
+  font-size: 10.5px;
+  color: var(--rs-con-faint);
 }
 .rs-pf__send {
   padding: 7px 18px;

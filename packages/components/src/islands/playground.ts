@@ -3,6 +3,7 @@ import {
   type AuthInput,
   type PlaygroundForm,
   formToCurl,
+  formToFetch,
   formToWireRequest,
 } from "../api/playground.js";
 
@@ -59,7 +60,10 @@ export function enhancePlayground(mount: HTMLElement): void {
   const sendBtn = mount.querySelector<HTMLButtonElement>("[data-rs-pf-send]");
   const responseEl = mount.querySelector<HTMLElement>("[data-rs-pf-response]");
   if (sendBtn && responseEl) {
-    sendBtn.addEventListener("click", () => void send(seed, readForm(), sendBtn, responseEl));
+    sendBtn.addEventListener(
+      "click",
+      () => void send(mount, seed, readForm(), sendBtn, responseEl),
+    );
   }
 }
 
@@ -77,15 +81,79 @@ interface ProxyResult {
   error?: string | { code?: string; message?: string };
 }
 
+interface Rendered {
+  status: number;
+  headers: Record<string, string>;
+  bodyText: string;
+  timing?: number;
+  truncated?: boolean;
+  mode: "direct" | "proxy";
+  note?: string;
+}
+
 async function send(
+  mount: HTMLElement,
   seed: HarSource,
   form: PlaygroundForm,
   btn: HTMLButtonElement,
   host: HTMLElement,
 ): Promise<void> {
+  const wantDirect = mount.querySelector<HTMLInputElement>("[data-rs-pf-direct]")?.checked ?? false;
   btn.disabled = true;
   const label = btn.textContent;
   btn.textContent = "Sending…";
+  try {
+    // Direct mode (FR-9): try the browser fetch first; a CORS/CSP block throws,
+    // and we transparently fall back to the proxy (NF-3: never fail silently).
+    if (wantDirect) {
+      const direct = await tryDirect(seed, form);
+      if (direct) {
+        renderResult(host, direct);
+        return;
+      }
+    }
+    await viaProxy(seed, form, host, wantDirect);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+
+async function tryDirect(seed: HarSource, form: PlaygroundForm): Promise<Rendered | null> {
+  const req = formToFetch(seed, form);
+  const started = performance.now();
+  try {
+    const res = await fetch(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+      mode: "cors",
+    });
+    const headers: Record<string, string> = {};
+    res.headers.forEach((value, name) => {
+      headers[name] = value;
+    });
+    return {
+      status: res.status,
+      headers,
+      bodyText: prettyIfJson(await res.text(), headers),
+      timing: performance.now() - started,
+      mode: "direct",
+    };
+  } catch {
+    return null; // CORS or CSP blocked the direct fetch; fall back to the proxy
+  }
+}
+
+async function viaProxy(
+  seed: HarSource,
+  form: PlaygroundForm,
+  host: HTMLElement,
+  directFellBack: boolean,
+): Promise<void> {
+  const note = directFellBack
+    ? "Direct request was blocked; sent via the Readsmith proxy."
+    : undefined;
   try {
     const res = await fetch(proxyUrl(), {
       method: "POST",
@@ -93,13 +161,26 @@ async function send(
       body: JSON.stringify(formToWireRequest(seed, form)),
     });
     const data = (await res.json().catch(() => null)) as ProxyResult | null;
-    renderResponse(host, res.status, data);
+    if (!data || data.error !== undefined) {
+      renderError(host, res.status, data, note);
+      return;
+    }
+    renderResult(host, {
+      status: typeof data.status === "number" ? data.status : res.status,
+      headers: data.headers ?? {},
+      bodyText: prettyIfJson(decodeBody(data.bodyBase64 ?? ""), data.headers),
+      timing: data.timing?.totalMs,
+      truncated: data.truncated,
+      mode: "proxy",
+      note,
+    });
   } catch {
-    renderResponse(host, 0, { error: "The request could not be sent." });
-  } finally {
-    btn.disabled = false;
-    btn.textContent = label;
+    renderError(host, 0, { error: "The request could not be sent." }, note);
   }
+}
+
+function modeLabel(mode: "direct" | "proxy"): string {
+  return mode === "direct" ? "Sent directly from your browser" : "Sent via the Readsmith proxy";
 }
 
 function el(tag: string, className?: string, text?: string): HTMLElement {
@@ -129,50 +210,53 @@ function prettyIfJson(text: string, headers?: Record<string, string>): string {
   }
 }
 
-/** Render the proxy result as inert, escaped DOM (the response body is untrusted). */
-function renderResponse(host: HTMLElement, httpStatus: number, data: ProxyResult | null): void {
+/** Render a normalized result as inert, escaped DOM (the response body is untrusted). */
+function renderResult(host: HTMLElement, r: Rendered): void {
   host.hidden = false;
   host.replaceChildren(el("div", "rs-pf__rlabel", "Response"));
-
-  if (!data || data.error !== undefined) {
-    const message = !data
-      ? "The server returned an unreadable response."
-      : typeof data.error === "string"
-        ? data.error
-        : (data.error?.message ?? "The request failed.");
-    const card = el("div", "rs-pf__rcard is-error");
-    card.append(
-      el(
-        "div",
-        "rs-pf__rstatus is-error",
-        httpStatus === 503 ? "Unavailable" : `Error ${httpStatus || ""}`.trim(),
-      ),
-      el("div", "rs-pf__rmsg", message),
-    );
-    host.append(card);
-    return;
-  }
-
-  const upstream = typeof data.status === "number" ? data.status : httpStatus;
-  const ok = upstream >= 200 && upstream < 400;
+  const ok = r.status >= 200 && r.status < 400;
   const card = el("div", "rs-pf__rcard");
   const status = el("div", `rs-pf__rstatus ${ok ? "is-ok" : "is-error"}`);
-  status.append(el("b", undefined, String(upstream)));
-  if (typeof data.timing?.totalMs === "number") {
-    status.append(el("span", "rs-pf__rtime", `${Math.round(data.timing.totalMs)} ms`));
+  status.append(el("b", undefined, String(r.status)));
+  if (typeof r.timing === "number") {
+    status.append(el("span", "rs-pf__rtime", `${Math.round(r.timing)} ms`));
   }
-  card.append(status);
-
-  if (data.headers && Object.keys(data.headers).length > 0) {
-    const lines = Object.entries(data.headers)
+  card.append(status, el("div", "rs-pf__rmode", r.note ?? modeLabel(r.mode)));
+  if (Object.keys(r.headers).length > 0) {
+    const lines = Object.entries(r.headers)
       .map(([name, value]) => `${name}: ${value}`)
       .join("\n");
     card.append(el("pre", "rs-pf__rheaders", lines));
   }
+  card.append(el("pre", "rs-pf__rbody", r.bodyText));
+  if (r.truncated) card.append(el("div", "rs-pf__rnote", "Response truncated at the size cap."));
+  host.append(card);
+}
+
+/** Render a proxy/network error, with an optional direct-fallback note. */
+function renderError(
+  host: HTMLElement,
+  httpStatus: number,
+  data: ProxyResult | null,
+  note?: string,
+): void {
+  host.hidden = false;
+  host.replaceChildren(el("div", "rs-pf__rlabel", "Response"));
+  const message = !data
+    ? "The server returned an unreadable response."
+    : typeof data.error === "string"
+      ? data.error
+      : (data.error?.message ?? "The request failed.");
+  const card = el("div", "rs-pf__rcard is-error");
   card.append(
-    el("pre", "rs-pf__rbody", prettyIfJson(decodeBody(data.bodyBase64 ?? ""), data.headers)),
+    el(
+      "div",
+      "rs-pf__rstatus is-error",
+      httpStatus === 503 ? "Unavailable" : `Error ${httpStatus || ""}`.trim(),
+    ),
+    el("div", "rs-pf__rmsg", message),
   );
-  if (data.truncated) card.append(el("div", "rs-pf__rnote", "Response truncated at the size cap."));
+  if (note) card.append(el("div", "rs-pf__rmode", note));
   host.append(card);
 }
 

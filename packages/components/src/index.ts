@@ -31,8 +31,8 @@ export {
   renderCodeSamples,
 } from "./api/code-samples.js";
 export type { HarRequest, HarNameValue, RequestOverrides } from "./api/code-samples.js";
-export { formToCurl, formToHar, formToWireRequest } from "./api/playground.js";
-export type { AuthInput, PlaygroundForm, WireRequest } from "./api/playground.js";
+export { formToCurl, formToFetch, formToHar, formToWireRequest } from "./api/playground.js";
+export type { AuthInput, DirectRequest, PlaygroundForm, WireRequest } from "./api/playground.js";
 export { playgroundSeed, renderPlaygroundForm } from "./api/playground-render.js";
 export {
   hydrate,
