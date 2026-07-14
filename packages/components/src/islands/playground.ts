@@ -1,5 +1,10 @@
 import type { HarSource } from "../api/code-samples.js";
-import { type AuthInput, type PlaygroundForm, formToCurl } from "../api/playground.js";
+import {
+  type AuthInput,
+  type PlaygroundForm,
+  formToCurl,
+  formToWireRequest,
+} from "../api/playground.js";
 
 /**
  * Hydrate an API-playground form. Editing any input rebuilds the live curl from
@@ -50,6 +55,125 @@ export function enhancePlayground(mount: HTMLElement): void {
     update();
   });
   update();
+
+  const sendBtn = mount.querySelector<HTMLButtonElement>("[data-rs-pf-send]");
+  const responseEl = mount.querySelector<HTMLElement>("[data-rs-pf-response]");
+  if (sendBtn && responseEl) {
+    sendBtn.addEventListener("click", () => void send(seed, readForm(), sendBtn, responseEl));
+  }
+}
+
+function proxyUrl(): string {
+  const base = document.documentElement.dataset.rsBase ?? "";
+  return `${base}/_readsmith/api/proxy`;
+}
+
+interface ProxyResult {
+  status?: number;
+  headers?: Record<string, string>;
+  bodyBase64?: string;
+  truncated?: boolean;
+  timing?: { totalMs?: number };
+  error?: string | { code?: string; message?: string };
+}
+
+async function send(
+  seed: HarSource,
+  form: PlaygroundForm,
+  btn: HTMLButtonElement,
+  host: HTMLElement,
+): Promise<void> {
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = "Sending…";
+  try {
+    const res = await fetch(proxyUrl(), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(formToWireRequest(seed, form)),
+    });
+    const data = (await res.json().catch(() => null)) as ProxyResult | null;
+    renderResponse(host, res.status, data);
+  } catch {
+    renderResponse(host, 0, { error: "The request could not be sent." });
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+
+function el(tag: string, className?: string, text?: string): HTMLElement {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text; // untrusted content stays inert (SR-13/NF-4)
+  return node;
+}
+
+function decodeBody(base64: string): string {
+  if (base64 === "") return "";
+  try {
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return "";
+  }
+}
+
+function prettyIfJson(text: string, headers?: Record<string, string>): string {
+  const type = headers?.["content-type"] ?? "";
+  if (!type.includes("json")) return text;
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
+
+/** Render the proxy result as inert, escaped DOM (the response body is untrusted). */
+function renderResponse(host: HTMLElement, httpStatus: number, data: ProxyResult | null): void {
+  host.hidden = false;
+  host.replaceChildren(el("div", "rs-pf__rlabel", "Response"));
+
+  if (!data || data.error !== undefined) {
+    const message = !data
+      ? "The server returned an unreadable response."
+      : typeof data.error === "string"
+        ? data.error
+        : (data.error?.message ?? "The request failed.");
+    const card = el("div", "rs-pf__rcard is-error");
+    card.append(
+      el(
+        "div",
+        "rs-pf__rstatus is-error",
+        httpStatus === 503 ? "Unavailable" : `Error ${httpStatus || ""}`.trim(),
+      ),
+      el("div", "rs-pf__rmsg", message),
+    );
+    host.append(card);
+    return;
+  }
+
+  const upstream = typeof data.status === "number" ? data.status : httpStatus;
+  const ok = upstream >= 200 && upstream < 400;
+  const card = el("div", "rs-pf__rcard");
+  const status = el("div", `rs-pf__rstatus ${ok ? "is-ok" : "is-error"}`);
+  status.append(el("b", undefined, String(upstream)));
+  if (typeof data.timing?.totalMs === "number") {
+    status.append(el("span", "rs-pf__rtime", `${Math.round(data.timing.totalMs)} ms`));
+  }
+  card.append(status);
+
+  if (data.headers && Object.keys(data.headers).length > 0) {
+    const lines = Object.entries(data.headers)
+      .map(([name, value]) => `${name}: ${value}`)
+      .join("\n");
+    card.append(el("pre", "rs-pf__rheaders", lines));
+  }
+  card.append(
+    el("pre", "rs-pf__rbody", prettyIfJson(decodeBody(data.bodyBase64 ?? ""), data.headers)),
+  );
+  if (data.truncated) card.append(el("div", "rs-pf__rnote", "Response truncated at the size cap."));
+  host.append(card);
 }
 
 function readAuth(value: (key: string) => string): AuthInput {

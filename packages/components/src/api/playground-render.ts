@@ -102,5 +102,7 @@ export function renderPlaygroundForm(op: Operation, servers: Server[]): string {
   )}${paramGroup("Query", query)}${paramGroup(
     "Headers",
     header,
-  )}${bodyField}${authField}</form><pre class="rs-pf__curl" data-rs-pf-curl>${esc(initialCurl)}</pre></div>`;
+  )}${bodyField}${authField}</form><div class="rs-pf__actions"><button type="button" class="rs-pf__send" data-rs-pf-send>Send</button></div><pre class="rs-pf__curl" data-rs-pf-curl>${esc(
+    initialCurl,
+  )}</pre><div class="rs-pf__response" data-rs-pf-response hidden></div></div>`;
 }

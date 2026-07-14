@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import type { Operation, Server } from "@readsmith/model";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderPlaygroundForm } from "../src/api/playground-render.js";
 import { enhancePlayground } from "../src/islands/playground.js";
 
@@ -63,5 +63,56 @@ describe("playground island (hydration + live curl)", () => {
     token.value = "TK";
     token.dispatchEvent(new Event("input", { bubbles: true }));
     expect(q(mount, "[data-rs-pf-curl]").textContent).toContain("Authorization: Bearer TK");
+  });
+});
+
+function stubFetch(status: number, body: unknown): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({ status, json: async () => body }) as unknown as Response),
+  );
+}
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe("playground island (Send -> proxy -> response)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("posts to the proxy and renders the decoded response", async () => {
+    const mount = mountForm();
+    stubFetch(200, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+      bodyBase64: btoa('{"ok":true}'),
+      truncated: false,
+      timing: { totalMs: 12 },
+    });
+    q<HTMLButtonElement>(mount, "[data-rs-pf-send]").click();
+    await flush();
+    const resp = q<HTMLElement>(mount, "[data-rs-pf-response]");
+    expect(resp.hidden).toBe(false);
+    const text = resp.textContent ?? "";
+    expect(text).toContain("200");
+    expect(text).toContain('"ok": true'); // pretty-printed JSON body
+    expect(text).toContain("content-type: application/json");
+  });
+
+  it("renders a typed proxy error message", async () => {
+    const mount = mountForm();
+    stubFetch(403, {
+      error: { code: "DENIED_NOT_ALLOWLISTED", message: "This server isn't declared." },
+    });
+    q<HTMLButtonElement>(mount, "[data-rs-pf-send]").click();
+    await flush();
+    expect(q(mount, "[data-rs-pf-response]").textContent).toContain("This server isn't declared.");
+  });
+
+  it("handles the playground-disabled 503", async () => {
+    const mount = mountForm();
+    stubFetch(503, { error: "The API playground is not available on this site." });
+    q<HTMLButtonElement>(mount, "[data-rs-pf-send]").click();
+    await flush();
+    const text = q(mount, "[data-rs-pf-response]").textContent ?? "";
+    expect(text).toContain("Unavailable");
+    expect(text).toContain("not available");
   });
 });
