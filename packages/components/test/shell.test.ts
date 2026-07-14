@@ -115,6 +115,17 @@ describe("renderShellBody", () => {
     expect(html).toContain('href="/api"');
   });
 
+  it("injects a pre-resolved tab icon before the tab label", () => {
+    const svg = '<svg class="rs-nav__icon" aria-hidden="true"><path d="M1 1"/></svg>';
+    const tabbed: ShellSite = {
+      ...site,
+      tabs: [{ label: "Guides", url: "/g", active: true, icon: svg }],
+    };
+    const html = renderShellBody(tabbed, page);
+    expect(html).toContain(svg);
+    expect(html.indexOf("rs-nav__icon")).toBeLessThan(html.indexOf("Guides"));
+  });
+
   it("renders a logo image in place of the wordmark when a logo is set", () => {
     const html = renderShellBody({ ...site, logo: "/logo.svg" }, page);
     expect(html).toContain('class="rs-brand__logo"');

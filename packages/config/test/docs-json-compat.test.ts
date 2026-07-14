@@ -2,26 +2,26 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { docsJsonCompat } from "../src/docs-json-compat.js";
 import { loadConfig } from "../src/load.js";
-import { mintlifyCompat } from "../src/mintlify.js";
 
-const codes = (r: ReturnType<typeof mintlifyCompat>) => r.diagnostics.map((d) => d.code);
-const data = (input: unknown) => mintlifyCompat(input).data as Record<string, unknown>;
+const codes = (r: ReturnType<typeof docsJsonCompat>) => r.diagnostics.map((d) => d.code);
+const data = (input: unknown) => docsJsonCompat(input).data as Record<string, unknown>;
 
-describe("mintlifyCompat", () => {
+describe("docsJsonCompat", () => {
   it("passes a native config through unchanged with no diagnostics", () => {
     const native = {
       site: { name: "Docs" },
       navigation: ["index", { group: "Start", pages: ["a", "b"] }],
     };
-    const r = mintlifyCompat(native);
+    const r = docsJsonCompat(native);
     expect(r.data).toEqual(native);
     expect(r.diagnostics).toEqual([]);
   });
 
   it("passes a non-object input through unchanged", () => {
-    expect(mintlifyCompat("nope").data).toBe("nope");
-    expect(mintlifyCompat(null).diagnostics).toEqual([]);
+    expect(docsJsonCompat("nope").data).toBe("nope");
+    expect(docsJsonCompat(null).diagnostics).toEqual([]);
   });
 
   it("lifts top-level name/logo/favicon under site and clears the top-level name", () => {
@@ -35,9 +35,9 @@ describe("mintlifyCompat", () => {
     expect(out.site).toEqual({ name: "Kept" });
   });
 
-  it("drops Mintlify colors with a diagnostic", () => {
-    const r = mintlifyCompat({ name: "Acme", colors: { primary: "#0f8b7e" } });
-    expect(codes(r)).toContain("mintlify-colors");
+  it("drops docs.json colors with a diagnostic", () => {
+    const r = docsJsonCompat({ name: "Acme", colors: { primary: "#0f8b7e" } });
+    expect(codes(r)).toContain("compat-colors");
     expect((r.data as Record<string, unknown>).colors).toBeUndefined();
   });
 
@@ -54,40 +54,48 @@ describe("mintlifyCompat", () => {
     expect(out.navigation).toBeUndefined();
   });
 
+  it("carries a tab icon from docs.json tabs", () => {
+    const out = data({
+      site: { name: "x" },
+      navigation: { tabs: [{ tab: "Guides", icon: "book", pages: ["a"] }] },
+    });
+    expect(out.tabs).toEqual([{ tab: "Guides", pages: ["a"], icon: "book" }]);
+  });
+
   it("drops a tab dropdown menu with a diagnostic but keeps the tab and its other pages", () => {
-    const r = mintlifyCompat({
+    const r = docsJsonCompat({
       site: { name: "x" },
       navigation: { tabs: [{ tab: "API", pages: ["api/intro"], menu: [{ item: "Ref" }] }] },
     });
-    expect(codes(r)).toContain("mintlify-tab-menu");
+    expect(codes(r)).toContain("compat-tab-menu");
     expect((r.data as Record<string, unknown>).tabs).toEqual([
       { tab: "API", pages: ["api/intro"] },
     ]);
   });
 
   it("degrades products to tabs with a diagnostic", () => {
-    const r = mintlifyCompat({
+    const r = docsJsonCompat({
       site: { name: "x" },
       navigation: { products: [{ product: "Core", pages: ["core/index"] }] },
     });
-    expect(codes(r)).toContain("mintlify-products");
+    expect(codes(r)).toContain("compat-products");
     expect((r.data as Record<string, unknown>).tabs).toEqual([
       { tab: "Core", pages: ["core/index"] },
     ]);
   });
 
   it("degrades dropdowns to tabs with a diagnostic", () => {
-    const r = mintlifyCompat({
+    const r = docsJsonCompat({
       site: { name: "x" },
       navigation: { dropdowns: [{ dropdown: "Tools", pages: ["tools/x"] }] },
     });
-    expect(codes(r)).toContain("mintlify-dropdowns");
+    expect(codes(r)).toContain("compat-dropdowns");
     expect((r.data as Record<string, unknown>).tabs).toEqual([
       { tab: "Tools", pages: ["tools/x"] },
     ]);
   });
 
-  it("carries a group icon in both the string and object Mintlify forms", () => {
+  it("carries a group icon in both the string and object docs.json forms", () => {
     const asString = data({
       site: { name: "x" },
       navigation: { groups: [{ group: "G", icon: "book", pages: ["a"] }] },
@@ -102,7 +110,7 @@ describe("mintlifyCompat", () => {
     expect(asObject.navigation).toEqual([{ group: "G", pages: ["a"], icon: "book" }]);
   });
 
-  it("carries group tag and expanded from Mintlify groups", () => {
+  it("carries group tag and expanded from docs.json groups", () => {
     const out = data({
       site: { name: "x" },
       navigation: {
@@ -123,16 +131,16 @@ describe("mintlifyCompat", () => {
   });
 
   it("drops anchors/versions/languages/global with one diagnostic each", () => {
-    const r = mintlifyCompat({
+    const r = docsJsonCompat({
       site: { name: "x" },
       navigation: { pages: ["a"], anchors: [{}], versions: [{}], languages: [{}], global: {} },
     });
     expect(codes(r)).toEqual(
       expect.arrayContaining([
-        "mintlify-anchors",
-        "mintlify-versions",
-        "mintlify-languages",
-        "mintlify-global",
+        "compat-anchors",
+        "compat-versions",
+        "compat-languages",
+        "compat-global",
       ]),
     );
   });
@@ -154,12 +162,11 @@ describe("mintlifyCompat", () => {
     ]);
   });
 
-  it("end-to-end: a real Mintlify docs.json now loads (was two parse errors)", async () => {
+  it("end-to-end: a real docs.json config now loads (was two parse errors)", async () => {
     const dir = await mkdtemp(join(tmpdir(), "rs-mint-"));
     await writeFile(
       join(dir, "docs.json"),
       JSON.stringify({
-        $schema: "https://mintlify.com/docs.json",
         theme: "mint",
         name: "Acme Docs",
         colors: { primary: "#0f8b7e" },

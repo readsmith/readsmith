@@ -72,7 +72,7 @@ export function rssXmlResponse(bundle: Bundle): Response {
 }
 
 /**
- * The root skill entry point (Mintlify-compatible behavior): a single skill
+ * The root skill entry point (docs.json-compatible behavior): a single skill
  * serves its SKILL.md directly; several redirect to the discovery index so
  * the client picks. Assembly guarantees at least the fallback skill.
  */

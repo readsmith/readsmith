@@ -35,6 +35,20 @@ describe("compileSite", () => {
     expect(group?.icon).toContain("M12 15v5"); // real lucide rocket path, resolved + inlined
   });
 
+  it("resolves a tab icon name to inline SVG in the finalized tabs", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "rs-tabicon-"));
+    await writeFile(
+      join(dir, "docs.yaml"),
+      "site:\n  name: Tabbed\ntabs:\n  - tab: Guides\n    icon: rocket\n    pages:\n      - index\n",
+    );
+    await writeFile(join(dir, "index.md"), "# Home\n\nHi.\n");
+    const { bundle } = await compileSite({ contentDir: dir });
+    const tab = bundle.site.build.tabs?.[0];
+    expect(tab?.label).toBe("Guides");
+    expect(tab?.icon).toContain('class="rs-nav__icon"');
+    expect(tab?.icon).toContain("M12 15v5"); // real lucide rocket path
+  });
+
   it("carries group tag and expanded into the finalized nav model", async () => {
     const dir = await mkdtemp(join(tmpdir(), "rs-navtag-"));
     await writeFile(

@@ -57,7 +57,7 @@ export const ICONS = {
 } as const;
 
 /**
- * Footer social icons by platform key (the Mintlify-compatible `footer.socials`
+ * Footer social icons by platform key (the docs.json-compatible `footer.socials`
  * shape). Unknown platforms fall back to the generic link icon, so a new
  * network never breaks a site.
  */

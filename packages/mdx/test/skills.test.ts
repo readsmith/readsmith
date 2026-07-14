@@ -111,7 +111,7 @@ describe("authored skills", () => {
     ]);
   });
 
-  it("names a frontmatter-less root skill.md after the site (Mintlify parity)", async () => {
+  it("names a frontmatter-less root skill.md after the site (docs.json parity)", async () => {
     const build = await assembleSite(inputOf([skill(null, "skill.md", "# My own skill\n")]));
     expect(build.skills).toHaveLength(1);
     expect(build.skills[0]?.name).toBe("pets-api-docs");
@@ -127,7 +127,7 @@ describe("authored skills", () => {
     );
     expect(build.skills[0]?.files.map((f) => f.path)).toEqual(["SKILL.md"]);
     expect(build.diagnostics).toMatchObject([
-      { severity: "info", code: "skills-mintlify-dir" },
+      { severity: "info", code: "skills-legacy-dir" },
       { severity: "warning", code: "skill-file-too-large" },
     ]);
   });

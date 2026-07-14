@@ -2,34 +2,35 @@ import type { Diagnostic } from "@readsmith/model";
 import type { NavItemInput, NavTabInput } from "./schema.js";
 
 /*
- * Mintlify docs.json compatibility. A genuine Mintlify export differs from our
- * config in two structural ways: it keeps site fields (name/logo/favicon) at the
- * top level rather than under `site`, and it models `navigation` as an object of
- * divisions (tabs/groups/pages/products/dropdowns/anchors) rather than an array.
- * Either would fail our `safeParse`, so this runs between parse and validation
- * and translates the Mintlify shape into our `ConfigInput`. It auto-detects the
- * shape per transform, so a native config (a `site` object + an array
- * `navigation`) passes through untouched. Unsupported divisions are dropped with
- * a warning rather than silently, so a migration is honest about what it lost.
+ * Compatibility for the `docs.json` config shape. A `docs.json` export differs
+ * from our native config in two structural ways: it keeps site fields
+ * (name/logo/favicon) at the top level rather than under `site`, and it models
+ * `navigation` as an object of divisions (tabs/groups/pages/products/dropdowns/
+ * anchors) rather than an array. Either would fail our `safeParse`, so this runs
+ * between parse and validation and translates the `docs.json` shape into our
+ * `ConfigInput`. It auto-detects the shape per transform, so a native config (a
+ * `site` object + an array `navigation`) passes through untouched. Unsupported
+ * divisions are dropped with a warning rather than silently, so an import is
+ * honest about what it lost.
  */
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 
-/** Mintlify icon: a string name, or an object `{ name, library, style }`. */
+/** A `docs.json` icon: a string name, or an object `{ name, library, style }`. */
 function iconName(v: unknown): string {
   if (typeof v === "string") return v;
   if (isObj(v) && typeof v.name === "string") return v.name;
   return "";
 }
 
-export interface MintlifyCompatResult {
+export interface DocsJsonCompatResult {
   data: unknown;
   diagnostics: Diagnostic[];
 }
 
-export function mintlifyCompat(input: unknown): MintlifyCompatResult {
+export function docsJsonCompat(input: unknown): DocsJsonCompatResult {
   if (!isObj(input)) return { data: input, diagnostics: [] };
   const diagnostics: Diagnostic[] = [];
   const warn = (code: string, message: string): void => {
@@ -47,7 +48,7 @@ export function mintlifyCompat(input: unknown): MintlifyCompatResult {
   return { data, diagnostics };
 }
 
-/** Lift Mintlify's top-level site fields under our `site`, when it is missing. */
+/** Lift a `docs.json`'s top-level site fields under our `site`, when it is missing. */
 function liftSite(data: Obj, warn: (c: string, m: string) => void): void {
   if (typeof data.name !== "string" || isObj(data.site)) return;
   const site: Obj = { name: data.name };
@@ -60,8 +61,8 @@ function liftSite(data: Obj, warn: (c: string, m: string) => void): void {
   if (data.colors !== undefined) {
     data.colors = undefined;
     warn(
-      "mintlify-colors",
-      "Mintlify `colors` are not migrated; set `site.theme` to brand the site.",
+      "compat-colors",
+      "docs.json `colors` are not migrated; set `site.theme` to brand the site.",
     );
   }
   if (typeof data.theme === "string") data.theme = undefined; // preset name, not ours
@@ -76,26 +77,20 @@ function mapNavigation(
 
   if (Array.isArray(nav.tabs)) {
     for (const t of nav.tabs) {
-      if (isObj(t) && typeof t.tab === "string") {
-        tabs.push({ tab: t.tab, pages: sectionPages(t, t.tab, warn) });
-      }
+      if (isObj(t) && typeof t.tab === "string") tabs.push(tabItem(t.tab, t, warn));
     }
   }
   if (Array.isArray(nav.products)) {
     for (const p of nav.products) {
-      if (isObj(p) && typeof p.product === "string") {
-        tabs.push({ tab: p.product, pages: sectionPages(p, p.product, warn) });
-      }
+      if (isObj(p) && typeof p.product === "string") tabs.push(tabItem(p.product, p, warn));
     }
-    warn("mintlify-products", "Mintlify `products` were mapped to top-level tabs.");
+    warn("compat-products", "docs.json `products` were mapped to top-level tabs.");
   }
   if (Array.isArray(nav.dropdowns)) {
     for (const d of nav.dropdowns) {
-      if (isObj(d) && typeof d.dropdown === "string") {
-        tabs.push({ tab: d.dropdown, pages: sectionPages(d, d.dropdown, warn) });
-      }
+      if (isObj(d) && typeof d.dropdown === "string") tabs.push(tabItem(d.dropdown, d, warn));
     }
-    warn("mintlify-dropdowns", "Mintlify `dropdowns` were mapped to top-level tabs.");
+    warn("compat-dropdowns", "docs.json `dropdowns` were mapped to top-level tabs.");
   }
   if (Array.isArray(nav.groups)) navigation.push(...mapGroups(nav.groups, warn));
   if (Array.isArray(nav.pages)) navigation.push(...mapPages(nav.pages, warn));
@@ -103,12 +98,20 @@ function mapNavigation(
   for (const key of ["anchors", "global", "versions", "languages"]) {
     if (nav[key] !== undefined) {
       warn(
-        `mintlify-${key}`,
-        `Mintlify \`navigation.${key}\` is not yet supported and was dropped.`,
+        `compat-${key}`,
+        `docs.json \`navigation.${key}\` is not yet supported and was dropped.`,
       );
     }
   }
   return { navigation, tabs };
+}
+
+/** A `docs.json` tab / product / dropdown -> our tab, carrying its icon. */
+function tabItem(label: string, source: Obj, warn: (c: string, m: string) => void): NavTabInput {
+  const item: NavTabInput = { tab: label, pages: sectionPages(source, label, warn) };
+  const icon = iconName(source.icon);
+  if (icon) item.icon = icon;
+  return item;
 }
 
 /** The pages of a tab / product / dropdown: its groups then its loose pages. */
@@ -122,7 +125,7 @@ function sectionPages(
   if (Array.isArray(section.pages)) pages.push(...mapPages(section.pages, warn));
   if (section.menu !== undefined) {
     warn(
-      "mintlify-tab-menu",
+      "compat-tab-menu",
       `Tab "${label}" dropdown menu is not yet supported; its destinations were dropped.`,
     );
   }
@@ -137,7 +140,7 @@ function mapGroups(groups: unknown[], warn: (c: string, m: string) => void): Nav
   return out;
 }
 
-/** A Mintlify group object -> our group nav item, carrying tag/expanded. */
+/** A `docs.json` group object -> our group nav item, carrying icon/tag/expanded. */
 function groupItem(g: Obj, warn: (c: string, m: string) => void): NavItemInput {
   const item: Extract<NavItemInput, { group: string }> = {
     group: g.group as string,
@@ -162,7 +165,7 @@ function mapPages(items: unknown[], warn: (c: string, m: string) => void): NavIt
     }
     // else: an external { page, href } or an unrecognized item — dropped.
     else if (isObj(item) && str(item.page) === "" && str(item.href) !== "") {
-      warn("mintlify-nav-link", "An external navigation link item was dropped.");
+      warn("compat-nav-link", "An external navigation link item was dropped.");
     }
   }
   return out;

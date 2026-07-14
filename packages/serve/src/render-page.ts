@@ -30,7 +30,12 @@ function resolveTabs(
     tabs.findIndex((tab) => navHasSlug(tab.nav, slug)),
   );
   const active = tabs[activeIndex] ?? tabs[0];
-  const bar = tabs.map((tab, i) => ({ label: tab.label, url: tab.url, active: i === activeIndex }));
+  const bar = tabs.map((tab, i) => ({
+    label: tab.label,
+    url: tab.url,
+    active: i === activeIndex,
+    ...(tab.icon ? { icon: tab.icon } : {}),
+  }));
   return { nav: active?.nav ?? fallbackNav, bar };
 }
 
@@ -51,7 +56,7 @@ export function renderPageFromBundle(bundle: Bundle, slug: string): RenderedPage
   if (!page) return null;
 
   const { nav, bar } = resolveTabs(build.tabs, build.nav, slug);
-  // The API reference joins the tab bar (the Mintlify pattern: one product, one
+  // The API reference joins the tab bar (the common pattern: one product, one
   // row). In pages mode the build already carries its tab; in single mode it is
   // appended here. A tabless site keeps the header cross-link instead.
   // Tab URLs from the build already carry any subpath prefix; the config path

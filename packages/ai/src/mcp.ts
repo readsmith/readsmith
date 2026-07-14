@@ -139,7 +139,7 @@ export function createMcpServer(deps: McpDeps): McpServer {
   }
 
   // Agent skills as resources: a connected client discovers and reads them
-  // without installing anything (the Mintlify pattern). URIs mirror the HTTP
+  // without installing anything (the common pattern). URIs mirror the HTTP
   // discovery paths when the site has a canonical URL, so the same string works
   // in a browser; a URL-less self-host gets a readsmith:// scheme instead.
   const base = deps.siteUrl?.replace(/\/+$/, "") || "readsmith://site";

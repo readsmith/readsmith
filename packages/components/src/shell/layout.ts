@@ -32,7 +32,7 @@ export interface ShellSite {
   links?: { label: string; href: string }[];
   /** Show the "Powered by Readsmith" badge. Defaults to true; false white-labels. */
   poweredBy?: boolean;
-  /** Content footer: social links by platform (Mintlify-compatible `footer.socials`). */
+  /** Content footer: social links by platform (docs.json-compatible `footer.socials`). */
   footer?: { socials?: Record<string, string> };
 }
 
@@ -40,6 +40,8 @@ export interface ShellTab {
   label: string;
   url: string;
   active: boolean;
+  /** Pre-resolved inline SVG for the tab icon (from the bundled icon set). */
+  icon?: string;
 }
 
 const READSMITH_URL = "https://readsmith.dev";
@@ -233,7 +235,7 @@ export function tabbar(site: ShellSite): string {
       (tab) =>
         `<a class="rs-tab${tab.active ? " is-active" : ""}" href="${esc(tab.url)}"${
           tab.active ? ' aria-current="page"' : ""
-        }>${esc(tab.label)}</a>`,
+        }>${tab.icon ?? ""}${esc(tab.label)}</a>`,
     )
     .join("");
   return `<nav class="rs-tabbar" aria-label="Sections">${tabs}</nav>`;

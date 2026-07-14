@@ -18,7 +18,7 @@ const navItemInputSchema: z.ZodType<NavItemInput> = z.lazy(() =>
       pages: z.array(navItemInputSchema),
       /** An icon name shown beside the group label (a bundled Lucide name). */
       icon: z.string().optional(),
-      /** A short badge shown beside the group label (Mintlify-compatible). */
+      /** A short badge shown beside the group label (docs.json-compatible). */
       tag: z.string().optional(),
       /** Start collapsed when false; groups default to open. */
       expanded: z.boolean().optional(),
@@ -30,11 +30,14 @@ const navItemInputSchema: z.ZodType<NavItemInput> = z.lazy(() =>
 export interface NavTabInput {
   tab: string;
   pages: NavItemInput[];
+  /** An icon name shown beside the tab label (a bundled Lucide name). */
+  icon?: string;
 }
 
 const navTabInputSchema = z.object({
   tab: z.string(),
   pages: z.array(navItemInputSchema),
+  icon: z.string().optional(),
 });
 
 /**
@@ -105,7 +108,7 @@ export type SiteTheme = z.infer<typeof themeSchema>;
 
 /**
  * A brand image (logo, favicon): one URL for both themes, or a per-theme pair
- * (the Mintlify-compatible shape). A first-class dark theme makes a single
+ * (the docs.json-compatible shape). A first-class dark theme makes a single
  * asset wrong in one mode, so the pair is the recommended form.
  */
 export const siteImageSchema = z.union([
@@ -152,7 +155,7 @@ export const configInputSchema = z.object({
     publisher: z.object({ name: z.string().min(1), url: z.string().optional() }).optional(),
     theme: themeSchema.optional(),
   }),
-  /** First-visit color scheme (Mintlify-compatible shape). "system" (default)
+  /** First-visit color scheme (docs.json-compatible shape). "system" (default)
    * follows the visitor's OS; "light"/"dark" pin that mode until the visitor
    * toggles, which persists their own choice. */
   appearance: z.object({ default: z.enum(["system", "light", "dark"]).optional() }).optional(),
@@ -232,7 +235,7 @@ export const configInputSchema = z.object({
     })
     .optional(),
   variables: z.record(z.string(), z.unknown()).optional(),
-  /** Content footer. `socials` maps platform to URL (Mintlify-compatible shape),
+  /** Content footer. `socials` maps platform to URL (docs.json-compatible shape),
    * e.g. { github: "https://github.com/acme", x: "https://x.com/acme" }. */
   footer: z.object({ socials: z.record(z.string(), z.string()).optional() }).optional(),
   /** Show the "Powered by Readsmith" badge. Defaults to true; set false to white-label. */
@@ -271,6 +274,7 @@ export type NavNode =
 export interface NavTab {
   label: string;
   nav: NavNode[];
+  icon?: string;
 }
 
 /** The fully resolved, defaulted config plus the discovered content. */
@@ -315,7 +319,7 @@ export interface ResolvedConfig {
   tabs?: NavTab[];
   /** A read-only API reference from an OpenAPI spec, when configured. */
   apiReference?: { spec: string; path: string; label: string; layout: "single" | "pages" };
-  /** Content footer: social links by platform (Mintlify-compatible shape). */
+  /** Content footer: social links by platform (docs.json-compatible shape). */
   footer?: { socials?: Record<string, string> };
   /** Whether to show the "Powered by Readsmith" badge (white-label when false). */
   branding: boolean;
@@ -330,8 +334,8 @@ export const DEFAULT_INCLUDE = ["**/*.md", "**/*.mdx"];
  * Always excluded. A user's `content.exclude` is merged on top of these, never
  * substituted for them: writing `exclude: ["SECURITY.md"]` must not silently
  * re-enable a walk of `node_modules`.
- * `snippets/` is the reserved home of `<Snippet>` sources (the Mintlify
- * convention too): included content, never pages of its own.
+ * `snippets/` is the reserved home of `<Snippet>` sources (a common docs
+ * convention): included content, never pages of its own.
  */
 export const DEFAULT_EXCLUDE = ["**/node_modules/**", "**/.git/**", "snippets/**"];
 

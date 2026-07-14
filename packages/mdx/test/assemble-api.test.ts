@@ -126,7 +126,7 @@ describe("openapi frontmatter binding", () => {
     expect(build.diagnostics).toHaveLength(0);
   });
 
-  it("accepts the Mintlify file-token form and warns on a mismatch", async () => {
+  it("accepts the docs.json file-token form and warns on a mismatch", async () => {
     const ok = await assembleSite(
       inputOf(fixture({ "a.mdx": '---\nopenapi: "openapi.json GET /pets"\n---\n\nBody.\n' })),
     );

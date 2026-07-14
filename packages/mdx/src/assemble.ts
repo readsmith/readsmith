@@ -59,6 +59,8 @@ export interface SitePage {
 export interface NavTab {
   label: string;
   nav: NavNode[];
+  /** An icon name (resolved to inline SVG during finalization). */
+  icon?: string;
 }
 
 /** The subset of a resolved config that assembly consumes. */
@@ -112,7 +114,7 @@ export interface AssembleInput {
   basePath?: string;
   /**
    * The normalized API spec for hybrid `openapi:` frontmatter pages, plus the
-   * config-relative source path it was ingested from (validates Mintlify-style
+   * config-relative source path it was ingested from (validates docs.json-style
    * file tokens like `openapi: "openapi.json GET /pets"`).
    */
   apiReference?: ApiReferenceInput | null;
@@ -281,6 +283,8 @@ export interface FinalNavTab {
   label: string;
   url: string;
   nav: FinalNavNode[];
+  /** Pre-resolved inline SVG for the tab icon (from the bundled icon set). */
+  icon?: string;
 }
 
 export interface SiteBuild {
@@ -404,7 +408,13 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
     tabs = config.tabs.map((tab) => {
       const tabNav = finalizeNav(tab.nav, bySlug, input.resolveNavIcon);
       applyNavRelations(tabNav, bySlug);
-      return { label: tab.label, url: firstPageUrl(tabNav) ?? "/", nav: tabNav };
+      const icon = tab.icon !== undefined ? input.resolveNavIcon?.(tab.icon) : undefined;
+      return {
+        label: tab.label,
+        url: firstPageUrl(tabNav) ?? "/",
+        nav: tabNav,
+        ...(icon ? { icon } : {}),
+      };
     });
     // Pages mode: the reference joins the tab row as its own tab. Explicitly
     // placed pages appear via their mirrors, which take relations here while
@@ -632,7 +642,7 @@ interface OpenapiRef {
 
 /**
  * Parse an `openapi:` frontmatter value: `METHOD /path`, optionally preceded by
- * a spec-file token (the Mintlify multi-spec form): `openapi.json GET /pets`.
+ * a spec-file token (the multi-spec file-token form): `openapi.json GET /pets`.
  */
 function parseOpenapiRef(value: string): OpenapiRef | null {
   const parts = value.trim().split(/\s+/);
@@ -717,7 +727,7 @@ function applyApiBindings(
       model.diagnostics.push({ severity, code, message, source: model.path });
     };
 
-    // Data-model pages: `openapi-schema: "Pet"` (optionally with the Mintlify
+    // Data-model pages: `openapi-schema: "Pet"` (optionally with the multi-spec
     // file token). When a page carries BOTH keys, the operation wins and the
     // schema key is diagnosed: one page, one generated subject.
     const rawSchema = model.frontmatter["openapi-schema"];
@@ -762,7 +772,7 @@ function applyApiBindings(
       deprecated: model.frontmatter.deprecated === true,
     };
 
-    // Mintlify pages may carry a `version` key; versioning is a later milestone.
+    // docs.json pages may carry a `version` key; versioning is a later milestone.
     if (model.frontmatter.version !== undefined) {
       fail(
         "info",
@@ -1472,7 +1482,7 @@ function assembleSkills(
   if (sorted.some((s) => s.source.startsWith(".mintlify/"))) {
     diagnostics.push({
       severity: "info",
-      code: "skills-mintlify-dir",
+      code: "skills-legacy-dir",
       message:
         'Skills were read from ".mintlify/skills/" (migration fallback). Move them to ".readsmith/skills/" when convenient.',
       source: ".mintlify/skills",
@@ -1493,7 +1503,7 @@ function assembleSkills(
       continue;
     }
     const fm = skillFrontmatter(skillFile.content);
-    // The root-level skill.md may lean on the site for identity (Mintlify
+    // The root-level skill.md may lean on the site for identity (docs.json
     // parity); a directory skill must carry its own frontmatter.
     const isRoot = entry.dir === null;
     if (!fm && !isRoot) {

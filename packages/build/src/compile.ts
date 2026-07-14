@@ -255,8 +255,8 @@ async function readSkills(contentRoot: string): Promise<AuthoredSkill[]> {
   const out: AuthoredSkill[] = [];
   let root: string | null = join(contentRoot, ".readsmith/skills");
   if (!existsSync(root)) {
-    const mintlify = join(contentRoot, ".mintlify/skills");
-    root = existsSync(mintlify) ? mintlify : null;
+    const legacy = join(contentRoot, ".mintlify/skills");
+    root = existsSync(legacy) ? legacy : null;
   }
   if (root) {
     const dirs = (await readdir(root, { withFileTypes: true }))

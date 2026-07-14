@@ -394,6 +394,11 @@
   height: 14px;
   color: var(--rs-ink-faint);
 }
+/* The same glyph in a tab: follows the tab's own color (muted, or accent when active). */
+.rs-tab .rs-nav__icon {
+  margin-right: 6px;
+  color: currentColor;
+}
 /* A group's badge (e.g. NEW): a hallmark-gold stamp pushed to the row's end. */
 .rs-nav__tag {
   margin-left: auto;
