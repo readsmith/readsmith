@@ -42,11 +42,18 @@ export interface ShellSite {
   /** Which page-actions menu items to show (docs.json-compatible `contextual.options`).
    * Undefined falls back to the default set. */
   contextual?: ContextualOption[];
-  /** The site's MCP endpoint, present only when it serves MCP. Enables the
-   * "Add to Cursor / VS Code / Copy MCP URL" connect group. `path` is the alias
-   * (default "/mcp"); the absolute URL is built here from url + basePath. */
-  mcp?: { path: string };
+  /** True when the site serves an MCP endpoint. Enables the "Add to Cursor /
+   * VS Code / Copy MCP URL" connect group; the endpoint URL is built here from
+   * url + basePath + the canonical MCP path. */
+  mcp?: boolean;
 }
+
+/**
+ * The MCP endpoint's canonical path. The friendly `/mcp` alias is a per-host
+ * rewrite that exists on the standalone app but not on the multi-tenant serve,
+ * so agent-facing links use the canonical path, which answers on every host.
+ */
+const MCP_ENDPOINT_PATH = "/_readsmith/mcp";
 
 /** A destination in a tab's dropdown menu. */
 export interface ShellTabMenuItem {
@@ -298,9 +305,10 @@ function topbar(site: ShellSite, page: ShellPage): string {
     `Read ${absMd} and help me with questions about the "${page.title}" page.`,
   );
   // The MCP connect group needs an absolute endpoint URL. The endpoint lives at
-  // <basePath>/mcp, where basePath is the site's mount subpath (site.url's
-  // pathname), so agents connect to the same host a browser would.
-  const mcpUrl = site.mcp && origin ? origin + siteBasePathOf(site.url) + site.mcp.path : undefined;
+  // <basePath>/_readsmith/mcp, where basePath is the site's mount subpath
+  // (site.url's pathname), so agents connect to the same host a browser would.
+  const mcpUrl =
+    site.mcp && origin ? origin + siteBasePathOf(site.url) + MCP_ENDPOINT_PATH : undefined;
   const menuBody = renderContextMenu({
     mdUrl,
     prompt,

@@ -95,19 +95,8 @@ export interface RenderedPage {
  * single-site app uses, so tenant serving can never drift from self-host.
  */
 export function renderPageFromBundle(bundle: Bundle, slug: string): RenderedPage | null {
-  const {
-    build,
-    name,
-    branding,
-    url,
-    logo,
-    homeUrl,
-    apiReference,
-    footer,
-    contextual,
-    mcpPath,
-    ai,
-  } = bundle.site;
+  const { build, name, branding, url, logo, homeUrl, apiReference, footer, contextual, ai } =
+    bundle.site;
   const page = build.pages.find((p) => p.slug === slug);
   if (!page) return null;
 
@@ -136,7 +125,7 @@ export function renderPageFromBundle(bundle: Bundle, slug: string): RenderedPage
     footer,
     // The "connect an agent" group only appears when the site serves MCP, which
     // tracks the presence of an AI config block (the host mounts MCP with it).
-    ...(ai != null ? { mcp: { path: mcpPath ?? "/mcp" } } : {}),
+    ...(ai != null ? { mcp: true } : {}),
     ...(contextual?.options ? { contextual: contextual.options as ContextualOption[] } : {}),
   };
 

@@ -89,8 +89,6 @@ export interface CompiledSiteEnvelope {
   footer?: ResolvedConfig["footer"];
   /** Per-page contextual menu options (docs.json `contextual.options`), when configured. */
   contextual?: ResolvedConfig["contextual"];
-  /** The MCP endpoint alias (`docs.yaml` `mcp.path`), so the shell can link agents to it. */
-  mcpPath?: string;
   ai: unknown;
   /**
    * Static assets by serving path (leading slash), each naming its
@@ -454,7 +452,6 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
     apiReference: config.apiReference,
     footer: config.footer,
     contextual: config.contextual,
-    mcpPath: config.mcp.path,
     ai: config.ai ?? null,
     ...(assetFiles.length > 0 ? { assets } : {}),
   };

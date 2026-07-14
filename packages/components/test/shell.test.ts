@@ -100,20 +100,17 @@ describe("renderShellBody", () => {
     expect(renderShellBody(site, page)).not.toContain("rs-tabbar");
   });
 
-  it("adds the MCP connect group with a basePath-correct endpoint only when the site serves MCP", () => {
+  it("adds the MCP connect group with a basePath-correct canonical endpoint only when the site serves MCP", () => {
     const bare = renderShellBody(site, page);
     expect(bare).not.toContain("Add to Cursor"); // no site.mcp -> no connect group
 
-    const connected: ShellSite = {
-      ...site,
-      url: "https://acme.dev/docs",
-      mcp: { path: "/mcp" },
-    };
+    const connected: ShellSite = { ...site, url: "https://acme.dev/docs", mcp: true };
     const html = renderShellBody(connected, page);
     expect(html).toContain("Add to Cursor");
     expect(html).toContain("Add to VS Code");
-    // the endpoint carries the site's subpath (site.url pathname), not the root
-    expect(html).toContain('data-rs-mcp-url="https://acme.dev/docs/mcp"');
+    // canonical MCP path (answers on standalone AND multi-tenant), carrying the
+    // site's subpath from site.url's pathname
+    expect(html).toContain('data-rs-mcp-url="https://acme.dev/docs/_readsmith/mcp"');
   });
 
   it("honors a trimmed contextual.options list", () => {
