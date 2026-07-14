@@ -25,10 +25,14 @@ export {
 export type { ReferenceOptions } from "./api/reference.js";
 export {
   buildHarRequest,
+  curlSample,
+  fullUrl,
   operationSamples,
   renderCodeSamples,
 } from "./api/code-samples.js";
-export type { HarRequest, HarNameValue } from "./api/code-samples.js";
+export type { HarRequest, HarNameValue, RequestOverrides } from "./api/code-samples.js";
+export { formToCurl, formToHar, formToWireRequest } from "./api/playground.js";
+export type { AuthInput, PlaygroundForm, WireRequest } from "./api/playground.js";
 export {
   hydrate,
   initShell,

@@ -22,14 +22,34 @@ export interface HarRequest {
   postData?: { mimeType: string; text: string };
 }
 
-/** A minimal HAR request seed for an operation, with example-filled parameters. */
-export function buildHarRequest(op: Operation, baseUrl = ""): HarRequest {
+/** Reader-supplied overrides from the playground form; each falls back to the example. */
+export interface RequestOverrides {
+  /** The selected server base URL. */
+  baseUrl?: string;
+  /** Parameter values keyed `${in}:${name}` (e.g. `path:id`, `query:page`). */
+  params?: Record<string, string>;
+  /** The request body text (JSON). */
+  body?: string;
+}
+
+/**
+ * The canonical HAR request seed for an operation. With no overrides it is the
+ * example-filled static sample; with a playground form's overrides it is exactly
+ * what "Try It" would send. One function, so the copyable curl and the sent
+ * request are the same shape by construction (spec FR-14).
+ */
+export function buildHarRequest(op: Operation, overrides: RequestOverrides = {}): HarRequest {
+  const baseUrl = overrides.baseUrl ?? "";
   let path = op.path;
   const queryString: HarNameValue[] = [];
   const headers: HarNameValue[] = [];
 
   for (const param of op.parameters) {
-    const value = exampleString(param.example ?? param.schema.example ?? param.schema.default);
+    const override = overrides.params?.[`${param.in}:${param.name}`];
+    const value =
+      override !== undefined && override !== ""
+        ? override
+        : exampleString(param.example ?? param.schema.example ?? param.schema.default);
     if (param.in === "path") {
       path = path.replace(`{${param.name}}`, value || `{${param.name}}`);
     } else if (param.in === "query") {
@@ -49,7 +69,10 @@ export function buildHarRequest(op: Operation, baseUrl = ""): HarRequest {
   const json = op.requestBody?.content["application/json"];
   if (json) {
     headers.push({ name: "Content-Type", value: "application/json" });
-    request.postData = { mimeType: "application/json", text: sampleBody(json.schema) };
+    request.postData = {
+      mimeType: "application/json",
+      text: overrides.body ?? sampleBody(json.schema),
+    };
   }
   return request;
 }
@@ -71,7 +94,7 @@ const GENERATORS: Generator[] = [
  * authored `x-codeSamples` (which replace a generated language or add a new one).
  */
 export function operationSamples(op: Operation, baseUrl: string): CodeSample[] {
-  const har = buildHarRequest(op, baseUrl);
+  const har = buildHarRequest(op, { baseUrl });
   const byLang = new Map<string, CodeSample>();
   for (const gen of GENERATORS) {
     byLang.set(gen.lang, { lang: gen.lang, label: gen.label, source: gen.generate(har) });
@@ -82,7 +105,7 @@ export function operationSamples(op: Operation, baseUrl: string): CodeSample[] {
   return [...byLang.values()];
 }
 
-function fullUrl(har: HarRequest): string {
+export function fullUrl(har: HarRequest): string {
   if (har.queryString.length === 0) return har.url;
   const query = har.queryString
     .map((q) => `${encodeURIComponent(q.name)}=${encodeURIComponent(q.value)}`)
@@ -90,7 +113,7 @@ function fullUrl(har: HarRequest): string {
   return `${har.url}?${query}`;
 }
 
-function curlSample(har: HarRequest): string {
+export function curlSample(har: HarRequest): string {
   const lines = [`curl ${quote(fullUrl(har))}`];
   if (har.method !== "GET") lines.push(`  -X ${har.method}`);
   for (const header of har.headers) lines.push(`  -H ${quote(`${header.name}: ${header.value}`)}`);
