@@ -5,6 +5,7 @@ import {
   curlSample,
   fullUrl,
 } from "./code-samples.js";
+import { jsoncToJson } from "./schema-sample.js";
 
 /**
  * The playground request model. A form's state maps to one canonical HAR (via
@@ -74,7 +75,11 @@ function applyAuth(har: HarRequest, auth: AuthInput): HarRequest {
 
 /** The canonical HAR for a form (shared by the curl and the wire request). */
 export function formToHar(op: HarSource, form: PlaygroundForm): HarRequest {
-  return buildHarRequest(op, { baseUrl: form.baseUrl, params: form.params, body: form.body });
+  // The body is authored as JSONC (skeleton comments, trailing commas); normalize
+  // it to valid JSON here so the curl, the proxy request, and direct mode are the
+  // one identical request and none of them ever carries a comment (spec FR-14).
+  const body = form.body === undefined ? undefined : jsoncToJson(form.body);
+  return buildHarRequest(op, { baseUrl: form.baseUrl, params: form.params, body });
 }
 
 /** The live curl a reader copies, reflecting the current form (params, body, auth). */

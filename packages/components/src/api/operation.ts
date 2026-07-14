@@ -9,6 +9,7 @@ import type {
 import { esc } from "../shell/util.js";
 import { operationSamples, renderCodeSamples } from "./code-samples.js";
 import { renderPlaygroundForm } from "./playground-render.js";
+import { synthExample } from "./schema-sample.js";
 import { type SchemaContext, renderSchema } from "./schema-viewer.js";
 
 /*
@@ -222,63 +223,12 @@ ${renderOperationSections(op, spec)}`;
  * for reflection-generated specs). Resolves `ref` nodes against the component
  * schemas, drops write-only fields from responses, and bounds cycles and depth.
  */
-function synthExample(
-  schema: NormalizedSchema | undefined,
-  schemas: Record<string, NormalizedSchema>,
-  seen: ReadonlySet<string>,
-  depth: number,
-): unknown {
-  if (!schema || depth > 8) return null;
-  if (schema.example !== undefined) return schema.example;
-  if (schema.ref !== undefined) {
-    if (seen.has(schema.ref)) return null; // cycle
-    const target = schemas[schema.ref];
-    if (!target) return null;
-    return synthExample(target, schemas, new Set([...seen, schema.ref]), depth + 1);
-  }
-  if (schema.enum && schema.enum.length > 0) return schema.enum[0];
-  if (schema.properties) {
-    const out: Record<string, unknown> = {};
-    for (const [key, prop] of Object.entries(schema.properties)) {
-      if (prop.writeOnly) continue;
-      out[key] = synthExample(prop, schemas, seen, depth + 1);
-    }
-    return out;
-  }
-  const type = (schema.type ?? []).find((t) => t !== "null");
-  if (type === "array") return [synthExample(schema.items, schemas, seen, depth + 1)];
-  if (type === "object") return {};
-  if (schema.default !== undefined) return schema.default;
-  switch (type) {
-    case "integer":
-    case "number":
-      return 0;
-    case "boolean":
-      return false;
-    case "string":
-      switch (schema.format) {
-        case "date-time":
-          return "2026-01-02T15:04:05Z";
-        case "date":
-          return "2026-01-02";
-        case "uuid":
-          return "00000000-0000-0000-0000-000000000000";
-        case "binary":
-          return "<binary>";
-        default:
-          return "string";
-      }
-    default:
-      return null;
-  }
-}
-
 function responseExample(response: ApiResponse | undefined, spec: NormalizedSpec): string | null {
   const json = response?.content?.["application/json"];
   if (!json) return null;
   const explicit = json.examples?.[0]?.value ?? json.schema.example;
   const value =
-    explicit !== undefined ? explicit : synthExample(json.schema, spec.schemas, new Set(), 0);
+    explicit !== undefined ? explicit : synthExample(json.schema, spec.schemas, "response");
   return value === undefined || value === null ? null : JSON.stringify(value, null, 2);
 }
 
@@ -310,6 +260,7 @@ export function renderOperationConsole(op: Operation, spec: NormalizedSpec): str
   return `<div class="rs-console"><div class="rs-console__label">Request</div><div class="rs-console__card">${samples}</div><div class="rs-console__label">Try it</div><div class="rs-console__card">${renderPlaygroundForm(
     op,
     spec.servers,
+    spec.schemas,
   )}</div>${responseCard}</div>`;
 }
 

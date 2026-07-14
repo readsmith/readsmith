@@ -1,7 +1,8 @@
-import type { Operation, Server } from "@readsmith/model";
+import type { NormalizedSchema, Operation, Server } from "@readsmith/model";
 import { esc } from "../shell/util.js";
-import { type HarSource, buildHarRequest, exampleString } from "./code-samples.js";
+import { type HarSource, exampleString } from "./code-samples.js";
 import { formToCurl } from "./playground.js";
+import { sampleBodySkeleton } from "./schema-sample.js";
 
 /**
  * The trimmed operation the playground island embeds and rebuilds the request
@@ -64,10 +65,20 @@ function paramGroup(title: string, params: HarSource["parameters"]): string {
  * `Playground` island: editing any input rebuilds the live curl. The Send button
  * (wiring to the proxy) lands in the next slice.
  */
-export function renderPlaygroundForm(op: Operation, servers: Server[]): string {
+export function renderPlaygroundForm(
+  op: Operation,
+  servers: Server[],
+  schemas: Record<string, NormalizedSchema> = {},
+): string {
   const seed = playgroundSeed(op);
   const baseUrl = servers[0]?.url ?? "";
-  const initialCurl = formToCurl(seed, { baseUrl });
+
+  // The editable body: required keys filled with placeholders, optional keys
+  // left as `//` commented lines (jsoncToJson normalizes it before it is sent).
+  const bodySchema = op.requestBody?.content["application/json"]?.schema;
+  const bodyText = bodySchema ? sampleBodySkeleton(bodySchema, schemas) : undefined;
+  // The curl and every sent request run through the same body, so they match.
+  const initialCurl = formToCurl(seed, { baseUrl, body: bodyText });
 
   const serverControl =
     servers.length > 1
@@ -80,12 +91,12 @@ export function renderPlaygroundForm(op: Operation, servers: Server[]): string {
   const query = seed.parameters.filter((p) => p.in === "query");
   const header = seed.parameters.filter((p) => p.in === "header");
 
-  const bodyText = buildHarRequest(seed, { baseUrl }).postData?.text;
+  const bodyRows = bodyText ? Math.min(Math.max(bodyText.split("\n").length + 1, 4), 16) : 6;
   const bodyField =
     bodyText !== undefined
       ? field(
           "Body",
-          `<textarea class="rs-pf__input rs-pf__body" data-rs-pf="body" rows="6" spellcheck="false">${esc(bodyText)}</textarea>`,
+          `<textarea class="rs-pf__input rs-pf__body" data-rs-pf="body" rows="${bodyRows}" spellcheck="false">${esc(bodyText)}</textarea>`,
         )
       : "";
 
