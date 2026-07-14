@@ -1,0 +1,44 @@
+---
+title: Try It playground
+description: Call any API operation from its reference page. The request is built from your spec, sent SSRF-safely, and rendered as the real response, with the curl kept in sync.
+---
+
+# Try It playground
+
+Every operation in a generated [API reference](/api-reference-guide/setup) carries an interactive **Try It** console. A reader fills in parameters and a body, sends the request, and sees the real response, without leaving the page or copying anything into a separate tool.
+
+## When it appears
+
+The console mounts on an operation's reference page when two things are true:
+
+- the operation's OpenAPI spec declares one or more `servers`, and
+- the site's request proxy is enabled (it is, by default, for any site whose spec has servers).
+
+No servers means no live target, so the page shows the request samples without the Send control. Nothing to configure per operation: the console is generated from the same normalized spec that renders the reference.
+
+## What a reader does
+
+1. **Fill the request.** Path, query, and header parameters become inputs, prefilled from the spec's examples. A request body gets an editor per media type.
+2. **Add auth.** The console offers the operation's scheme: a bearer token, an API key (header, query, or cookie), or basic credentials. OAuth2 is entered as a pasted bearer token; there is no redirect dance.
+3. **Send.** The response comes back with its status, timing, headers, and body, the body highlighted and pretty-printed when it is JSON.
+
+The `curl` sample above the console updates as the reader types, so what they would copy is always exactly what the console sends.
+
+## How the request travels
+
+By default the request goes through Readsmith's **proxy**: a server-side sender that validates the target against the spec's servers and refuses to reach anything else. This is what lets a browser call an API that does not send permissive CORS headers.
+
+A reader can opt into **direct mode** (a checkbox in the console), which sends the request straight from the browser. When the target allows it via CORS the response is direct and fast; when the browser blocks it, the console falls back to the proxy and says so, rather than failing silently.
+
+## Safety
+
+The playground is built to be safe to hand to the public:
+
+- **Reader credentials stay in the browser.** A pasted token is used to build the request and is never persisted, never hydrated into the page, and never written to a log.
+- **The proxy is SSRF-safe.** It only reaches the spec's declared servers, rejects private and link-local addresses, resolves and pins the target to defeat DNS rebinding, and caps request and response size and time.
+- **Upstream headers are data.** The target's response headers come back inside the JSON payload, never re-emitted as the page's own headers, so a `Set-Cookie` from the target can never set a cookie on your docs.
+- Requests share the site's rate limiting, like search and Ask AI.
+
+<Tip>
+The Try It console and the static `curl` sample are generated from one request model, so they can never drift. Whatever a reader copies is what the console would send.
+</Tip>

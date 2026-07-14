@@ -1,11 +1,11 @@
 ---
 title: MCP server
-description: "Every site serves a Model Context Protocol endpoint: live search, endpoint lookup, and skill resources for connected agents."
+description: "Every site serves a Model Context Protocol endpoint: live search, page and endpoint reads, page feedback, and skill resources for connected agents."
 ---
 
 # MCP server
 
-Every Readsmith site is an MCP server. An agent that connects gets live tools over the same indexes the site's own search uses, read-only by design: connected agents can look things up, never change them.
+Every Readsmith site is an MCP server. An agent that connects gets live tools over the same indexes the site's own search uses: it can search the docs, read any page as Markdown, look up API operations, and flag a page that is wrong. It cannot modify your content or run code, so connecting an agent is safe by construction.
 
 ## Connect
 
@@ -19,17 +19,24 @@ The endpoint answers at `/mcp` over the streamable HTTP transport:
 }
 ```
 
-If a docs page claims the `/mcp` URL, the endpoint stays reachable at its canonical `/_readsmith/mcp`, and `mcp.path` in config can set a different alias.
+The friendly `/mcp` alias is a convenience on a standalone deploy. The canonical endpoint is `/_readsmith/mcp`, which answers on every host, so it is the reliable form to hand an agent. The quickest way to get the exact URL for your site is the **Copy MCP URL** action in any page's actions menu, which also offers one-click **Add to Cursor** and **Add to VS Code**. You can set a different alias with `mcp.path` in config.
 
 ## The tools
 
 | Tool | What it does |
 | --- | --- |
 | `search_docs` | Hybrid search returning ranked passages with full chunk text, sized for model grounding rather than display |
+| `list_docs` | Every documentation page with its path and description |
+| `get_page` | One or more pages in full, as Markdown, by path (pass an array to read several at once) |
 | `list_endpoints` | The API reference's operations, optionally filtered by tag |
 | `get_endpoint` | One operation in full: parameters, request and response shapes |
+| `submit_feedback` | Report that a page is wrong, outdated, or confusing, so the maintainers can fix it |
 
-The endpoint tools appear when the site has an [API reference](/api-reference-guide/setup) configured.
+`search_docs`, `list_docs`, and `get_page` are always available. The endpoint tools appear when the site has an [API reference](/api-reference-guide/setup) configured.
+
+### Flagging a page
+
+`submit_feedback` is the one tool that writes, and it is non-destructive: it records a feedback signal (the same "was this helpful" the reading UI collects), nothing more. The path is validated against the site's real pages, the comment is length-capped, and the unauthenticated endpoint caps how many an agent can send per session. An agent can tell you a page is wrong; it cannot change the page.
 
 ## Skill resources
 

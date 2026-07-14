@@ -15,12 +15,22 @@ A small status label: this feature is <Badge variant="new">New</Badge>, that fla
 This feature is <Badge variant="new">New</Badge>.
 ```
 
+An `icon` (a name from the bundled [Lucide set](/components/icon)) renders before the label: <Badge variant="new" icon="sparkles">New</Badge>, <Badge variant="warning" icon="triangle-alert">Deprecated</Badge>.
+
+```mdx
+<Badge variant="new" icon="sparkles">New</Badge>
+```
+
 | Variant | Reads as |
 | --- | --- |
 | unset | Neutral label |
 | `new`, `tip` | Positive: fresh or recommended |
+| `note`, `info` | Informational |
 | `warning` | Caution: deprecated, experimental |
+| `danger` | Critical: removed, breaking |
 | `accent` | Brand-colored emphasis |
+
+`color` is accepted as an alias for `variant`. An unknown value renders the neutral pill rather than a broken style.
 
 ## Kbd
 

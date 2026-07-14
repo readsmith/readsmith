@@ -8,7 +8,7 @@ site:
   url: https://readsmith.dev/docs
   description: The Fair Source documentation platform. Precompiled MDX, a beautiful API reference, and agent-ready outputs from the first build.
 variables:
-  version: 0.9.3
+  version: 0.13.0
 footer:
   socials:
     github: https://github.com/readsmith/readsmith
@@ -41,12 +41,14 @@ tabs:
           - api-reference-guide/setup
           - api-reference-guide/hybrid-pages
           - api-reference-guide/schema-pages
+          - api-reference-guide/try-it
       - group: AI and agents
         pages:
           - ai/search-and-ask
           - ai/search-api
           - ai/agent-outputs
           - ai/mcp
+          - ai/agent-connect
           - ai/agent-skills
   - tab: Components
     pages:
@@ -55,6 +57,8 @@ tabs:
         pages:
           - components/callouts
           - components/accordions
+          - components/expandable
+          - components/banner
           - components/tabs
           - components/steps
           - components/cards
@@ -62,6 +66,7 @@ tabs:
           - components/diagrams
           - components/frames
           - components/inline
+          - components/icon
           - components/updates
           - components/operation
   - tab: Self-host

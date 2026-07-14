@@ -1,0 +1,51 @@
+---
+title: Icon
+description: A named icon from the bundled Lucide set, resolved to inline SVG at build time. No runtime, no network, no CDN.
+---
+
+# Icon
+
+`Icon` renders a named icon from the bundled [Lucide](https://lucide.dev) set. The name is resolved to inline SVG **at build time**, so nothing loads at runtime and no request leaves for a CDN. Only the icons your pages actually name are read, so the set is tree-shaken by construction.
+
+The same names power navigation: [group and tab icons](/configuration/navigation) accept any Lucide name too.
+
+## Basic
+
+Reach for one inline: <Icon icon="rocket" /> ship it, <Icon icon="book-open" /> read it, <Icon icon="sparkles" /> polish it.
+
+```mdx
+<Icon icon="rocket" />
+```
+
+Names are kebab-case, exactly as Lucide lists them (`book-open`, `triangle-alert`, `circle-check`).
+
+## Size and color
+
+<Icon icon="star" size={16} /> <Icon icon="star" size={24} /> <Icon icon="star" size={32} />
+
+```mdx
+<Icon icon="star" size={24} color="#0c6e6e" />
+```
+
+| Prop | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `icon` | string | required | A Lucide name, or an `http(s)` URL for an external image |
+| `size` | number | `16` | Width and height in pixels |
+| `color` | hex string | `currentColor` | A valid `#hex`; anything else is ignored |
+| `label` | string | none | Makes the icon an announced `role="img"`; without it the icon is decorative (`aria-hidden`) |
+
+## Accessibility
+
+By default an icon is decorative and hidden from assistive technology, because it usually sits beside a word that already says what it means. When an icon carries meaning on its own, give it a `label`:
+
+```mdx
+<Icon icon="circle-check" label="Supported" />
+```
+
+## Unknown and external names
+
+An unknown name degrades to a neutral placeholder glyph rather than breaking the build, so a typo is visible but never fatal. An `http(s)` name renders as an external `<img>` instead of an inline icon (subject to your image CSP).
+
+<Tip>
+Prefer a named Lucide icon over an external URL: it is inlined, themed with `currentColor`, and never makes a network request. Browse names at [lucide.dev](https://lucide.dev).
+</Tip>

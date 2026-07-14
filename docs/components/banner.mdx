@@ -1,0 +1,62 @@
+---
+title: Banner
+description: A prominent top-of-page announcement. Optionally dismissible, and it stays dismissed across pages.
+---
+
+# Banner
+
+A `Banner` is a wide, prominent notice for the top of a page: a new release, a migration deadline, a deprecation. It is louder than a [callout](/components/callouts), which sits inline with the prose; a banner announces.
+
+## Basic
+
+<Banner icon="rocket">
+**Readsmith 0.13** is here. See the [changelog](/changelog) for what shipped.
+</Banner>
+
+```mdx
+<Banner icon="rocket">
+**Readsmith 0.13** is here. See the [changelog](/changelog).
+</Banner>
+```
+
+The `icon` is a name from the bundled [Lucide set](/components/icon), resolved to inline SVG at build time.
+
+## Variants
+
+A `variant` tints the banner with a semantic color; the default is the site's accent.
+
+<Banner variant="warning" icon="triangle-alert">
+The legacy config format is deprecated and will be removed in a future release.
+</Banner>
+
+```mdx
+<Banner variant="warning" icon="triangle-alert">
+The legacy config format is deprecated...
+</Banner>
+```
+
+Available variants: `info`, `tip`, `warning`, `danger`, `accent`.
+
+## Dismissible
+
+Add `dismissible` and the banner gets a close control. Once a reader dismisses it, it stays dismissed, keyed by its content, so the same announcement does not reappear as they move between pages, and a new announcement (new text) shows again.
+
+```mdx
+<Banner variant="tip" icon="megaphone" dismissible>
+Join the community call this Thursday.
+</Banner>
+```
+
+A plain banner ships zero JavaScript; only a dismissible one adds the small script that remembers the reader's choice.
+
+## Props
+
+| Prop | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `variant` | `info`, `tip`, `warning`, `danger`, `accent` | accent | Semantic tint (`color` is an alias) |
+| `icon` | string | none | A leading [Lucide](/components/icon) icon |
+| `dismissible` | boolean | `false` | Show a close control and remember the dismissal |
+
+<Tip>
+Use a banner for something time-bound that every reader should see once. For guidance that belongs next to specific prose, reach for a [callout](/components/callouts) instead.
+</Tip>

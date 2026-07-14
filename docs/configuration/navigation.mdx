@@ -50,6 +50,43 @@ tabs:
 
 The active tab scopes the sidebar, breadcrumbs, and previous/next links, so readers move within a section rather than across the whole site. This site's own tab row is exactly this configuration.
 
+## Group icons, tags, and default state
+
+A group can carry an [icon](/components/icon), a small tag, and its default open or closed state:
+
+```yaml title="docs.yaml"
+navigation:
+  - group: Guides
+    icon: book-open        # a Lucide icon name, resolved to inline SVG at build
+    expanded: true         # open by default (groups start collapsed otherwise)
+    pages: [quickstart, authoring/pages]
+  - group: Reference
+    icon: braces
+    tag: Beta              # a small badge beside the group label
+    pages: [api-reference-guide/setup]
+```
+
+Icons are drawn from the [bundled Lucide set](/components/icon), so no name reaches the network. `tag` is plain text.
+
+## Dropdown menus on tabs
+
+A tab can be a dropdown instead of a single destination. Give it a `menu` of items, each with its own pages and optional icon:
+
+```yaml title="docs.yaml"
+tabs:
+  - tab: Products
+    icon: box
+    menu:
+      - item: Core API
+        icon: server
+        pages: [api-reference-guide/setup]
+      - item: Webhooks
+        icon: webhook
+        pages: [guides/webhooks]
+```
+
+The tab opens a menu of its items; selecting one scopes the sidebar to that item's pages. The disclosure works without JavaScript and is keyboard-operable. A tab without a `menu` stays a plain link.
+
 ## The API reference joins the row
 
 With `apiReference.layout: pages`, the generated reference appears as its own tab, a complete catalog of every operation. An operation page you explicitly place in another tab keeps that home, and the catalog still lists it so the reference stays complete. With the single-page layout, the reference is linked from the header instead.

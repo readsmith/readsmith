@@ -1,0 +1,44 @@
+---
+title: Page actions and agent connect
+description: Every page carries an actions menu: copy or view it as Markdown, open it in an AI chat with the page preloaded, or connect an agent to the site's MCP server in one click.
+---
+
+# Page actions and agent connect
+
+Every page has an actions menu (the kebab in the top bar). It turns the page a reader is looking at into something they can hand to a tool: copy it as Markdown, open it in an AI chat already loaded with the page, or connect their agent to the whole site.
+
+## What is in the menu
+
+| Action | What it does |
+| --- | --- |
+| **Copy page URL** | The page's canonical URL |
+| **Copy as Markdown** | The page's source Markdown, for pasting into a tool |
+| **View as Markdown** | Opens the page's raw Markdown (the `/md/` mirror) |
+| **Open in ChatGPT / Claude / Perplexity** | Opens the chat with a prompt that points it at this page |
+| **Add to Cursor / VS Code** | One-click install of this site's [MCP server](/ai/mcp) into the editor |
+| **Copy MCP URL** | The site's MCP endpoint, to paste into any other client |
+
+The "Open in..." actions preload the page so the reader can ask about it immediately, without pasting anything. The "Add to..." actions use the fact that [every Readsmith site is an MCP server](/ai/mcp): one click connects the editor's agent to live search and the whole documentation set, not a stale copy.
+
+## Choosing what shows
+
+By default the menu shows everything. Trim or reorder it with `contextual.options`:
+
+```yaml title="docs.yaml"
+contextual:
+  options: [copy, view, chatgpt, claude, perplexity, cursor, vscode, mcp]
+```
+
+| Option | Menu item |
+| --- | --- |
+| `copy` | Copy as Markdown |
+| `view` | View as Markdown |
+| `chatgpt`, `claude`, `perplexity` | Open in that assistant |
+| `cursor`, `vscode` | Add to that editor (only when the site serves MCP) |
+| `mcp` | Copy MCP URL (only when the site serves MCP) |
+
+Copy page URL is always present. The agent-connect options (`cursor`, `vscode`, `mcp`) appear only on a site that serves an MCP endpoint, which is any site with AI configured.
+
+<Tip>
+The connect links point at the canonical MCP endpoint, which answers on every host (a standalone deploy or a hosted tenant), so "Add to Cursor" works the same everywhere. See the [MCP server](/ai/mcp) page for the endpoint and its tools.
+</Tip>

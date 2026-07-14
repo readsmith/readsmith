@@ -1,0 +1,57 @@
+---
+title: Expandable
+description: Lightweight nested disclosure on the native details element. Lighter than an accordion, tuned for nesting details inside prose or a field list.
+---
+
+# Expandable
+
+`Expandable` is progressive disclosure for a small amount of detail: the sub-fields of a parameter, an optional note, an aside a reader can open in place. Like [Accordion](/components/accordions) it is built on the native `<details>` element, so it is keyboard-operable and screen-reader-correct with zero JavaScript. Where an accordion is a bordered card, an expandable is a light hairline, sized to nest.
+
+## Basic
+
+<Expandable title="Advanced options">
+These settings are optional. Most sites never touch them, which is why they start collapsed.
+</Expandable>
+
+```mdx
+<Expandable title="Advanced options">
+These settings are optional...
+</Expandable>
+```
+
+## Open by default
+
+Pass `defaultOpen` to start expanded:
+
+<Expandable title="Shown by default" defaultOpen>
+Readers can still collapse it. The state is the native element's, not a script's.
+</Expandable>
+
+```mdx
+<Expandable title="Shown by default" defaultOpen>
+...
+</Expandable>
+```
+
+## Nesting
+
+Because it is light, `Expandable` nests cleanly, for example under a field to reveal its sub-properties:
+
+<Expandable title="user" defaultOpen>
+An expandable reads as part of the surrounding text, not as a separate panel, so a tree of them stays legible.
+
+<Expandable title="address">
+Nested detail, one level deeper.
+</Expandable>
+</Expandable>
+
+## Props
+
+| Prop | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `title` | string | `Show more` | The always-visible summary line |
+| `defaultOpen` | boolean | `false` | Start expanded (`open` is accepted too) |
+
+<Tip>
+Reach for `Expandable` when the detail belongs *inside* a sentence or a field list. Use an [Accordion](/components/accordions) for a standalone, card-shaped FAQ or an `AccordionGroup` stack.
+</Tip>
