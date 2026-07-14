@@ -35,6 +35,46 @@ function mountForm(): HTMLElement {
   return mount;
 }
 
+describe("playground island (focused modal)", () => {
+  it("keeps the trigger hidden until hydration, then reveals it", () => {
+    document.body.innerHTML = renderPlaygroundForm(op, servers);
+    const trigger = q<HTMLButtonElement>(document, "[data-rs-pf-open]");
+    expect(trigger.hidden).toBe(true); // no JS yet
+    enhancePlayground(q<HTMLElement>(document, ".rs-playground"));
+    expect(trigger.hidden).toBe(false);
+    expect(trigger.textContent).toContain("Try it");
+  });
+
+  it("opens the dialog on the trigger and closes it on the close button", () => {
+    const mount = mountForm();
+    const dialog = q<HTMLDialogElement>(mount, "[data-rs-pf-dialog]");
+    expect(dialog.open).toBeFalsy();
+    q<HTMLButtonElement>(mount, "[data-rs-pf-open]").click();
+    expect(dialog.hasAttribute("open") || dialog.open).toBeTruthy();
+    q<HTMLButtonElement>(mount, "[data-rs-pf-close]").click();
+    expect(dialog.open).toBeFalsy();
+  });
+
+  it("copies the live curl to the clipboard", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const mount = mountForm();
+    q<HTMLButtonElement>(mount, "[data-rs-pf-copy]").click();
+    await flush();
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining("https://api.example.com/pets/p1"),
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("shows an empty-state before the first send", () => {
+    const mount = mountForm();
+    expect(q(mount, "[data-rs-pf-response]").textContent).toContain(
+      "Send a request to see the response",
+    );
+  });
+});
+
 describe("playground island (hydration + live curl)", () => {
   it("renders inputs prefilled from examples and an initial curl", () => {
     const mount = mountForm();

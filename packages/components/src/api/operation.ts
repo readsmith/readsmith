@@ -257,7 +257,7 @@ export function renderOperationConsole(op: Operation, spec: NormalizedSpec): str
     )}</div>${body}</div>`;
   }
 
-  return `<div class="rs-console"><div class="rs-console__label">Request</div><div class="rs-console__card">${samples}</div><div class="rs-console__label">Try it</div><div class="rs-console__card">${renderPlaygroundForm(
+  return `<div class="rs-console"><div class="rs-console__label">Request</div><div class="rs-console__card">${samples}</div><div class="rs-console__try">${renderPlaygroundForm(
     op,
     spec.servers,
     spec.schemas,

@@ -57,6 +57,9 @@ export function enhancePlayground(mount: HTMLElement): void {
   });
   update();
 
+  wireModal(mount);
+  wireCopy(mount, curlEl);
+
   const sendBtn = mount.querySelector<HTMLButtonElement>("[data-rs-pf-send]");
   const responseEl = mount.querySelector<HTMLElement>("[data-rs-pf-response]");
   if (sendBtn && responseEl) {
@@ -65,6 +68,59 @@ export function enhancePlayground(mount: HTMLElement): void {
       () => void send(mount, seed, readForm(), sendBtn, responseEl),
     );
   }
+}
+
+/**
+ * Reveal the trigger (the flow needs JS, so it stays hidden until now) and wire
+ * the focused modal. The native `<dialog>` gives us focus-trap, Esc-to-close,
+ * an inert background, and top-layer stacking for free (WCAG-AA), so we only add
+ * open, close, backdrop-dismiss, and focus return.
+ */
+function wireModal(mount: HTMLElement): void {
+  const trigger = mount.querySelector<HTMLButtonElement>("[data-rs-pf-open]");
+  const dialog = mount.querySelector<HTMLDialogElement>("[data-rs-pf-dialog]");
+  if (!trigger || !dialog) return;
+  trigger.hidden = false;
+
+  const open = (): void => {
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+    const first = dialog.querySelector<HTMLElement>(
+      "input:not([type=hidden]):not([hidden]), textarea, select, [data-rs-pf-send]",
+    );
+    first?.focus();
+  };
+  const close = (): void => {
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.removeAttribute("open");
+    trigger.focus(); // return focus to the opener
+  };
+
+  trigger.addEventListener("click", open);
+  mount.querySelector("[data-rs-pf-close]")?.addEventListener("click", close);
+  // A click landing on the dialog element itself (not its content) is the backdrop.
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) close();
+  });
+}
+
+/** Copy the live curl to the clipboard, with a brief "Copied" confirmation. */
+function wireCopy(mount: HTMLElement, curlEl: HTMLElement): void {
+  const btn = mount.querySelector<HTMLButtonElement>("[data-rs-pf-copy]");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    if (!navigator.clipboard) return;
+    void navigator.clipboard
+      .writeText(curlEl.textContent ?? "")
+      .then(() => {
+        const label = btn.textContent;
+        btn.textContent = "Copied";
+        setTimeout(() => {
+          btn.textContent = label;
+        }, 1200);
+      })
+      .catch(() => undefined);
+  });
 }
 
 function proxyUrl(): string {
@@ -213,7 +269,7 @@ function prettyIfJson(text: string, headers?: Record<string, string>): string {
 /** Render a normalized result as inert, escaped DOM (the response body is untrusted). */
 function renderResult(host: HTMLElement, r: Rendered): void {
   host.hidden = false;
-  host.replaceChildren(el("div", "rs-pf__rlabel", "Response"));
+  host.replaceChildren();
   const ok = r.status >= 200 && r.status < 400;
   const card = el("div", "rs-pf__rcard");
   const status = el("div", `rs-pf__rstatus ${ok ? "is-ok" : "is-error"}`);
@@ -241,7 +297,7 @@ function renderError(
   note?: string,
 ): void {
   host.hidden = false;
-  host.replaceChildren(el("div", "rs-pf__rlabel", "Response"));
+  host.replaceChildren();
   const message = !data
     ? "The server returned an unreadable response."
     : typeof data.error === "string"
