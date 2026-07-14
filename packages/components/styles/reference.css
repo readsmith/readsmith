@@ -7,7 +7,7 @@
   /* Method palette: platform semantics, never the brand accent. GET is green,
    * POST blue, PUT/PATCH amber, DELETE red: the cross-platform convention, so
    * a reader's instincts from other API docs transfer. */
-  --rs-m-get: #1f8a5b;
+  --rs-m-get: #1a7d52;
   --rs-m-post: #2f6b9c;
   --rs-m-put: #a85a17;
   --rs-m-patch: #a85a17;
@@ -46,7 +46,7 @@
   --rs-m-default: #7c828a;
 }
 :root[data-theme="light"] {
-  --rs-m-get: #1f8a5b;
+  --rs-m-get: #1a7d52;
   --rs-m-post: #2f6b9c;
   --rs-m-put: #a85a17;
   --rs-m-patch: #a85a17;
