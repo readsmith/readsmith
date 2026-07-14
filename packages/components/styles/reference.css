@@ -228,13 +228,18 @@ html:has(.rs-apiref) {
 
 .rs-op__id {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 .rs-op__path {
+  min-width: 0;
   font-family: var(--rs-font-mono);
   font-size: 16px;
   color: var(--rs-ink);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .rs-op__path-base {
   color: var(--rs-ink-faint);
@@ -466,14 +471,20 @@ html:has(.rs-apiref) {
   align-items: center;
   gap: 2px;
   padding: 7px 10px;
+  overflow-x: auto;
   border-bottom: 1px solid var(--rs-con-rule);
   background: linear-gradient(var(--rs-con-panel2), var(--rs-con-panel));
+}
+.rs-console .rs-codegroup__tab {
+  flex: 0 0 auto;
 }
 .rs-console__reqline {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
   margin-right: auto;
+  overflow: hidden;
   font-family: var(--rs-font-mono);
   font-size: 11.5px;
 }
@@ -485,7 +496,10 @@ html:has(.rs-apiref) {
   font-weight: 600;
 }
 .rs-console__u {
+  overflow: hidden;
   color: var(--rs-con-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rs-console .rs-codegroup__tab {
   font-family: var(--rs-font-mono);
@@ -828,6 +842,30 @@ html:has(.rs-apiref) {
     border-right: none;
     border-bottom: 1px solid var(--rs-con-rule);
   }
+  /* 16px minimum keeps iOS Safari from zooming the viewport on focus. */
+  .rs-pf__input,
+  .rs-pf__body,
+  select.rs-pf__input {
+    font-size: 16px;
+  }
+  /* Lift the primary modal controls to a ~44px touch target. */
+  .rs-pf__dclose {
+    width: 44px;
+    height: 44px;
+  }
+  .rs-pf__send,
+  .rs-pf__copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+  }
+  .rs-console .rs-codegroup__tab {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 12px;
+  }
 }
 .rs-pf__form {
   display: grid;
@@ -867,6 +905,7 @@ html:has(.rs-apiref) {
   text-overflow: ellipsis;
 }
 .rs-pf__input {
+  box-sizing: border-box;
   width: 100%;
   min-width: 0;
   padding: 6px 8px;

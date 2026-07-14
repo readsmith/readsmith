@@ -122,6 +122,13 @@
 .rs-code__copy--float:focus-visible {
   opacity: 1;
 }
+/* Touch devices have no hover and a tap grants no :focus-visible, so keep the
+   floating copy button visible where a pointer cannot reveal it. */
+@media (hover: none), (pointer: coarse) {
+  .rs-code__copy--float {
+    opacity: 1;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .rs-code__copy {

@@ -910,8 +910,12 @@
   .rs-search {
     min-width: 0;
     padding: 0;
-    width: 34px;
+    width: 40px;
+    height: 40px;
     justify-content: center;
+  }
+  .rs-headerlink--ask {
+    height: 40px;
   }
   .rs-nav-col {
     position: fixed;
@@ -929,6 +933,19 @@
   }
   .rs-main {
     padding: 24px 22px 70px;
+  }
+  /* Enlarge the drawer's touch targets on mobile (its only nav surface). */
+  .rs-nav__link {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .rs-nav__label {
+    min-height: 44px;
+  }
+  .rs-icon-btn {
+    width: 40px;
+    height: 40px;
   }
 }
 
