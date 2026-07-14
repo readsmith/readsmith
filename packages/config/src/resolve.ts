@@ -261,9 +261,19 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
   let tabs: ResolvedConfig["tabs"];
   if (input?.tabs) {
     tabs = input.tabs.map((tab) => {
-      const built = buildExplicitNav(tab.pages, pages);
+      const built = buildExplicitNav(tab.pages ?? [], pages);
       diagnostics.push(...built.diagnostics);
-      return { label: tab.tab, nav: built.nav, ...(tab.icon ? { icon: tab.icon } : {}) };
+      const menu = tab.menu?.map((item) => {
+        const itemNav = buildExplicitNav(item.pages, pages);
+        diagnostics.push(...itemNav.diagnostics);
+        return { label: item.item, nav: itemNav.nav, ...(item.icon ? { icon: item.icon } : {}) };
+      });
+      return {
+        label: tab.tab,
+        nav: built.nav,
+        ...(tab.icon ? { icon: tab.icon } : {}),
+        ...(menu && menu.length > 0 ? { menu } : {}),
+      };
     });
   }
 

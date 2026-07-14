@@ -62,15 +62,32 @@ describe("docsJsonCompat", () => {
     expect(out.tabs).toEqual([{ tab: "Guides", pages: ["a"], icon: "book" }]);
   });
 
-  it("drops a tab dropdown menu with a diagnostic but keeps the tab and its other pages", () => {
+  it("carries a tab dropdown menu into our tab.menu (flattening its groups/pages)", () => {
     const r = docsJsonCompat({
       site: { name: "x" },
-      navigation: { tabs: [{ tab: "API", pages: ["api/intro"], menu: [{ item: "Ref" }] }] },
+      navigation: {
+        tabs: [
+          {
+            tab: "API",
+            menu: [
+              { item: "REST", icon: "code", pages: ["api/rest"] },
+              { item: "SDKs", groups: [{ group: "Langs", pages: ["sdk/ts"] }] },
+            ],
+          },
+        ],
+      },
     });
-    expect(codes(r)).toContain("compat-tab-menu");
     expect((r.data as Record<string, unknown>).tabs).toEqual([
-      { tab: "API", pages: ["api/intro"] },
+      {
+        tab: "API",
+        pages: [],
+        menu: [
+          { item: "REST", pages: ["api/rest"], icon: "code" },
+          { item: "SDKs", pages: [{ group: "Langs", pages: ["sdk/ts"] }] },
+        ],
+      },
     ]);
+    expect(codes(r)).not.toContain("compat-tab-menu"); // supported now, not dropped
   });
 
   it("degrades products to tabs with a diagnostic", () => {

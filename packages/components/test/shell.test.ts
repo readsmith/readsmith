@@ -115,6 +115,28 @@ describe("renderShellBody", () => {
     expect(html).toContain('href="/api"');
   });
 
+  it("renders a tab dropdown (details) with destinations and marks the active one", () => {
+    const dropdown: ShellSite = {
+      ...site,
+      tabs: [
+        {
+          label: "API",
+          url: "/api/rest",
+          active: true,
+          menu: [
+            { label: "REST", url: "/api/rest", active: true },
+            { label: "SDKs", url: "/sdk/ts", active: false },
+          ],
+        },
+      ],
+    };
+    const html = renderShellBody(dropdown, page);
+    expect(html).toContain('class="rs-tab-menu"');
+    expect(html).toContain("<summary");
+    expect(html).toContain('class="rs-tab-menu__item is-active"');
+    expect(html).toContain('href="/sdk/ts"');
+  });
+
   it("injects a pre-resolved tab icon before the tab label", () => {
     const svg = '<svg class="rs-nav__icon" aria-hidden="true"><path d="M1 1"/></svg>';
     const tabbed: ShellSite = {

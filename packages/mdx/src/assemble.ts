@@ -55,12 +55,21 @@ export interface SitePage {
   slug: string;
 }
 
+/** A dropdown destination inside a tab, as consumed by assembly. */
+export interface NavMenuItem {
+  label: string;
+  nav: NavNode[];
+  icon?: string;
+}
+
 /** A top-level navigation tab as consumed by assembly: a label and its nav subtree. */
 export interface NavTab {
   label: string;
   nav: NavNode[];
   /** An icon name (resolved to inline SVG during finalization). */
   icon?: string;
+  /** Dropdown destinations; present when the tab is a dropdown. */
+  menu?: NavMenuItem[];
 }
 
 /** The subset of a resolved config that assembly consumes. */
@@ -278,6 +287,14 @@ export type FinalNavNode =
       expanded?: boolean;
     };
 
+/** A finalized dropdown destination: label, landing URL, resolved icon, nav. */
+export interface FinalNavMenuItem {
+  label: string;
+  url: string;
+  nav: FinalNavNode[];
+  icon?: string;
+}
+
 /** A finalized top-level tab: label, landing URL (first page), and its nav tree. */
 export interface FinalNavTab {
   label: string;
@@ -285,6 +302,8 @@ export interface FinalNavTab {
   nav: FinalNavNode[];
   /** Pre-resolved inline SVG for the tab icon (from the bundled icon set). */
   icon?: string;
+  /** Finalized dropdown destinations; present when the tab is a dropdown. */
+  menu?: FinalNavMenuItem[];
 }
 
 export interface SiteBuild {
@@ -409,11 +428,26 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
       const tabNav = finalizeNav(tab.nav, bySlug, input.resolveNavIcon);
       applyNavRelations(tabNav, bySlug);
       const icon = tab.icon !== undefined ? input.resolveNavIcon?.(tab.icon) : undefined;
+      const menu = tab.menu?.map((item) => {
+        const itemNav = finalizeNav(item.nav, bySlug, input.resolveNavIcon);
+        applyNavRelations(itemNav, bySlug);
+        const itemIcon = item.icon !== undefined ? input.resolveNavIcon?.(item.icon) : undefined;
+        return {
+          label: item.label,
+          url: firstPageUrl(itemNav) ?? "/",
+          nav: itemNav,
+          ...(itemIcon ? { icon: itemIcon } : {}),
+        };
+      });
+      // A dropdown tab has no section of its own; its landing is the first
+      // destination, so a click (or a no-JS user) still reaches content.
+      const url = firstPageUrl(tabNav) ?? menu?.[0]?.url ?? "/";
       return {
         label: tab.label,
-        url: firstPageUrl(tabNav) ?? "/",
+        url,
         nav: tabNav,
         ...(icon ? { icon } : {}),
+        ...(menu && menu.length > 0 ? { menu } : {}),
       };
     });
     // Pages mode: the reference joins the tab row as its own tab. Explicitly

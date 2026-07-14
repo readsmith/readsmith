@@ -35,6 +35,25 @@ describe("compileSite", () => {
     expect(group?.icon).toContain("M12 15v5"); // real lucide rocket path, resolved + inlined
   });
 
+  it("finalizes a tab dropdown menu with resolved destination navs, urls, and icons", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "rs-tabmenu-"));
+    await writeFile(
+      join(dir, "docs.yaml"),
+      "site:\n  name: Menued\ntabs:\n  - tab: API\n    menu:\n      - item: REST\n        icon: rocket\n        pages:\n          - rest\n      - item: SDKs\n        pages:\n          - sdk\n",
+    );
+    await writeFile(join(dir, "rest.md"), "# REST\n\nHi.\n");
+    await writeFile(join(dir, "sdk.md"), "# SDK\n\nHi.\n");
+    const { bundle } = await compileSite({ contentDir: dir });
+    const tab = bundle.site.build.tabs?.[0];
+    expect(tab?.label).toBe("API");
+    expect(tab?.url).toBe("/rest"); // no direct section -> first destination
+    expect(tab?.menu?.map((m) => m.label)).toEqual(["REST", "SDKs"]);
+    expect(tab?.menu?.[0]?.url).toBe("/rest");
+    expect(tab?.menu?.[0]?.icon).toContain('class="rs-nav__icon"'); // resolved icon
+    const dest = tab?.menu?.[0]?.nav?.[0];
+    expect(dest?.type === "page" && dest.slug).toBe("rest");
+  });
+
   it("resolves a tab icon name to inline SVG in the finalized tabs", async () => {
     const dir = await mkdtemp(join(tmpdir(), "rs-tabicon-"));
     await writeFile(

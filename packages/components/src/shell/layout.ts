@@ -36,12 +36,23 @@ export interface ShellSite {
   footer?: { socials?: Record<string, string> };
 }
 
+/** A destination in a tab's dropdown menu. */
+export interface ShellTabMenuItem {
+  label: string;
+  url: string;
+  active: boolean;
+  /** Pre-resolved inline SVG for the item icon. */
+  icon?: string;
+}
+
 export interface ShellTab {
   label: string;
   url: string;
   active: boolean;
   /** Pre-resolved inline SVG for the tab icon (from the bundled icon set). */
   icon?: string;
+  /** Dropdown destinations; when present, the tab is a disclosure dropdown. */
+  menu?: ShellTabMenuItem[];
 }
 
 const READSMITH_URL = "https://readsmith.dev";
@@ -228,17 +239,39 @@ export function header(site: ShellSite): string {
 </header>`;
 }
 
+const TAB_CARET =
+  '<svg class="rs-tab__caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+
 export function tabbar(site: ShellSite): string {
   if (!site.tabs || site.tabs.length === 0) return "";
-  const tabs = site.tabs
+  const tabs = site.tabs.map((tab) => renderTab(tab)).join("");
+  return `<nav class="rs-tabbar" aria-label="Sections">${tabs}</nav>`;
+}
+
+/**
+ * A tab is a link, or a native `<details>` disclosure dropdown when it carries a
+ * `menu`. The disclosure works without JavaScript and is keyboard-accessible by
+ * default; the island only adds outside-click/Esc close as an enhancement.
+ */
+function renderTab(tab: ShellTab): string {
+  if (!tab.menu || tab.menu.length === 0) {
+    return `<a class="rs-tab${tab.active ? " is-active" : ""}" href="${esc(tab.url)}"${
+      tab.active ? ' aria-current="page"' : ""
+    }>${tab.icon ?? ""}${esc(tab.label)}</a>`;
+  }
+  const items = tab.menu
     .map(
-      (tab) =>
-        `<a class="rs-tab${tab.active ? " is-active" : ""}" href="${esc(tab.url)}"${
-          tab.active ? ' aria-current="page"' : ""
-        }>${tab.icon ?? ""}${esc(tab.label)}</a>`,
+      (m) =>
+        `<a class="rs-tab-menu__item${m.active ? " is-active" : ""}" href="${esc(m.url)}"${
+          m.active ? ' aria-current="page"' : ""
+        }>${m.icon ?? ""}${esc(m.label)}</a>`,
     )
     .join("");
-  return `<nav class="rs-tabbar" aria-label="Sections">${tabs}</nav>`;
+  return `<details class="rs-tab-menu" data-rs-tabmenu><summary class="rs-tab${
+    tab.active ? " is-active" : ""
+  }">${tab.icon ?? ""}${esc(
+    tab.label,
+  )}${TAB_CARET}</summary><div class="rs-tab-menu__panel">${items}</div></details>`;
 }
 
 function topbar(site: ShellSite, page: ShellPage): string {

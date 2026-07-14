@@ -1,5 +1,5 @@
 import type { Diagnostic } from "@readsmith/model";
-import type { NavItemInput, NavTabInput } from "./schema.js";
+import type { NavItemInput, NavTabInput, TabMenuItemInput } from "./schema.js";
 
 /*
  * Compatibility for the `docs.json` config shape. A `docs.json` export differs
@@ -106,29 +106,34 @@ function mapNavigation(
   return { navigation, tabs };
 }
 
-/** A `docs.json` tab / product / dropdown -> our tab, carrying its icon. */
+/** A `docs.json` tab / product / dropdown -> our tab, carrying its icon and menu. */
 function tabItem(label: string, source: Obj, warn: (c: string, m: string) => void): NavTabInput {
-  const item: NavTabInput = { tab: label, pages: sectionPages(source, label, warn) };
+  const item: NavTabInput = { tab: label, pages: sectionPages(source, warn) };
   const icon = iconName(source.icon);
+  if (icon) item.icon = icon;
+  if (Array.isArray(source.menu)) {
+    const menu = source.menu.filter(isObj).map((m) => menuItem(m, warn));
+    if (menu.length > 0) item.menu = menu;
+  }
+  return item;
+}
+
+/** A `docs.json` tab menu destination -> our menu item, flattening its groups/pages. */
+function menuItem(m: Obj, warn: (c: string, m: string) => void): TabMenuItemInput {
+  const item: TabMenuItemInput = {
+    item: str(m.item) || str(m.dropdown) || str(m.tab),
+    pages: sectionPages(m, warn),
+  };
+  const icon = iconName(m.icon);
   if (icon) item.icon = icon;
   return item;
 }
 
-/** The pages of a tab / product / dropdown: its groups then its loose pages. */
-function sectionPages(
-  section: Obj,
-  label: string,
-  warn: (c: string, m: string) => void,
-): NavItemInput[] {
+/** The pages of a tab / product / dropdown / menu item: its groups then its pages. */
+function sectionPages(section: Obj, warn: (c: string, m: string) => void): NavItemInput[] {
   const pages: NavItemInput[] = [];
   if (Array.isArray(section.groups)) pages.push(...mapGroups(section.groups, warn));
   if (Array.isArray(section.pages)) pages.push(...mapPages(section.pages, warn));
-  if (section.menu !== undefined) {
-    warn(
-      "compat-tab-menu",
-      `Tab "${label}" dropdown menu is not yet supported; its destinations were dropped.`,
-    );
-  }
   return pages;
 }
 

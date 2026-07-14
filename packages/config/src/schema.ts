@@ -26,18 +26,39 @@ const navItemInputSchema: z.ZodType<NavItemInput> = z.lazy(() =>
   ]),
 );
 
-/** A top-level navigation tab: a named section with its own navigation. */
-export interface NavTabInput {
-  tab: string;
+/** A destination inside a tab's dropdown menu: a label and its own navigation. */
+export interface TabMenuItemInput {
+  item: string;
   pages: NavItemInput[];
-  /** An icon name shown beside the tab label (a bundled Lucide name). */
+  /** An icon name shown beside the menu item (a bundled Lucide name). */
   icon?: string;
 }
 
-const navTabInputSchema = z.object({
-  tab: z.string(),
+/**
+ * A top-level navigation tab: a named section with its own navigation, OR a
+ * dropdown of destinations (`menu`) each scoping their own navigation. A tab
+ * uses `pages` (a direct section) or `menu` (a dropdown), not both.
+ */
+export interface NavTabInput {
+  tab: string;
+  pages?: NavItemInput[];
+  /** An icon name shown beside the tab label (a bundled Lucide name). */
+  icon?: string;
+  /** A dropdown of destinations; when set, the tab opens a menu instead of a section. */
+  menu?: TabMenuItemInput[];
+}
+
+const tabMenuItemInputSchema = z.object({
+  item: z.string(),
   pages: z.array(navItemInputSchema),
   icon: z.string().optional(),
+});
+
+const navTabInputSchema = z.object({
+  tab: z.string(),
+  pages: z.array(navItemInputSchema).optional(),
+  icon: z.string().optional(),
+  menu: z.array(tabMenuItemInputSchema).optional(),
 });
 
 /**
@@ -271,10 +292,19 @@ export type NavNode =
     };
 
 /** A resolved top-level tab: a label and its own navigation tree. */
+/** A resolved dropdown destination: a label and its own resolved navigation. */
+export interface NavMenuItem {
+  label: string;
+  nav: NavNode[];
+  icon?: string;
+}
+
 export interface NavTab {
   label: string;
   nav: NavNode[];
   icon?: string;
+  /** Resolved dropdown destinations; present when the tab is a dropdown. */
+  menu?: NavMenuItem[];
 }
 
 /** The fully resolved, defaulted config plus the discovered content. */

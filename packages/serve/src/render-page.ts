@@ -18,25 +18,64 @@ function navHasSlug(nav: FinalNavNode[], slug: string): boolean {
   );
 }
 
-/** Resolve the sidebar nav and the tab bar for a page, given the build's tabs. */
+/**
+ * Resolve the sidebar nav and the tab bar for a page. A dropdown tab (one with a
+ * `menu`) is active when any of its destinations holds the page, and the sidebar
+ * then shows that destination's own nav; the bar marks the active tab and, for a
+ * dropdown, the active destination.
+ */
 function resolveTabs(
   tabs: FinalNavTab[] | undefined,
   fallbackNav: FinalNavNode[],
   slug: string,
 ): { nav: FinalNavNode[]; bar?: ShellTab[] } {
   if (!tabs || tabs.length === 0) return { nav: fallbackNav };
-  const activeIndex = Math.max(
-    0,
-    tabs.findIndex((tab) => navHasSlug(tab.nav, slug)),
-  );
-  const active = tabs[activeIndex] ?? tabs[0];
-  const bar = tabs.map((tab, i) => ({
-    label: tab.label,
-    url: tab.url,
-    active: i === activeIndex,
-    ...(tab.icon ? { icon: tab.icon } : {}),
-  }));
-  return { nav: active?.nav ?? fallbackNav, bar };
+
+  let activeIndex = -1;
+  let activeMenuIndex = -1;
+  let activeNav: FinalNavNode[] | null = null;
+  for (let i = 0; i < tabs.length && activeIndex < 0; i++) {
+    const tab = tabs[i];
+    if (!tab) continue;
+    if (navHasSlug(tab.nav, slug)) {
+      activeIndex = i;
+      activeNav = tab.nav;
+    } else if (tab.menu) {
+      const j = tab.menu.findIndex((m) => navHasSlug(m.nav, slug));
+      if (j >= 0) {
+        activeIndex = i;
+        activeMenuIndex = j;
+        activeNav = tab.menu[j]?.nav ?? null;
+      }
+    }
+  }
+  if (activeIndex < 0) {
+    // Default to the first tab; if it is a dropdown, its first destination.
+    activeIndex = 0;
+    const first = tabs[0];
+    if (first?.nav.length) activeNav = first.nav;
+    else if (first?.menu?.length) {
+      activeMenuIndex = 0;
+      activeNav = first.menu[0]?.nav ?? null;
+    }
+  }
+
+  const bar: ShellTab[] = tabs.map((tab, i) => {
+    const shellTab: ShellTab = { label: tab.label, url: tab.url, active: i === activeIndex };
+    if (tab.icon) shellTab.icon = tab.icon;
+    if (tab.menu) {
+      shellTab.menu = tab.menu.map((m, j) => {
+        const item = {
+          label: m.label,
+          url: m.url,
+          active: i === activeIndex && j === activeMenuIndex,
+        };
+        return m.icon ? { ...item, icon: m.icon } : item;
+      });
+    }
+    return shellTab;
+  });
+  return { nav: activeNav ?? fallbackNav, bar };
 }
 
 export interface RenderedPage {

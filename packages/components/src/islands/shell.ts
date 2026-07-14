@@ -31,6 +31,39 @@ export function initShell(root: ParentNode = document): void {
   initFeedback(root);
   initAsk(root, getCaps);
   revealActiveTab(root);
+  initTabMenus(root);
+}
+
+/**
+ * Tab dropdown menus (native `<details>`): lift the open panel to position:fixed
+ * so it escapes the tab bar's horizontal-scroll clipping, close sibling
+ * dropdowns, and dismiss on outside-click or Escape. Progressive: without this
+ * the panel still opens, and the sidebar already shows the active destination.
+ */
+function initTabMenus(root: ParentNode): void {
+  const menus = [...root.querySelectorAll<HTMLDetailsElement>("details.rs-tab-menu")];
+  if (menus.length === 0) return;
+  for (const details of menus) {
+    details.addEventListener("toggle", () => {
+      if (!details.open) return;
+      for (const other of menus) if (other !== details) other.open = false;
+      const panel = details.querySelector<HTMLElement>(".rs-tab-menu__panel");
+      if (panel) {
+        const rect = details.getBoundingClientRect();
+        panel.style.position = "fixed";
+        panel.style.top = `${Math.round(rect.bottom + 5)}px`;
+        panel.style.left = `${Math.round(rect.left)}px`;
+      }
+    });
+  }
+  document.addEventListener("click", (event) => {
+    for (const details of menus) {
+      if (details.open && !details.contains(event.target as Node)) details.open = false;
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") for (const details of menus) details.open = false;
+  });
 }
 
 /**
