@@ -1,0 +1,158 @@
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { loadConfig } from "../src/load.js";
+import { mintlifyCompat } from "../src/mintlify.js";
+
+const codes = (r: ReturnType<typeof mintlifyCompat>) => r.diagnostics.map((d) => d.code);
+const data = (input: unknown) => mintlifyCompat(input).data as Record<string, unknown>;
+
+describe("mintlifyCompat", () => {
+  it("passes a native config through unchanged with no diagnostics", () => {
+    const native = {
+      site: { name: "Docs" },
+      navigation: ["index", { group: "Start", pages: ["a", "b"] }],
+    };
+    const r = mintlifyCompat(native);
+    expect(r.data).toEqual(native);
+    expect(r.diagnostics).toEqual([]);
+  });
+
+  it("passes a non-object input through unchanged", () => {
+    expect(mintlifyCompat("nope").data).toBe("nope");
+    expect(mintlifyCompat(null).diagnostics).toEqual([]);
+  });
+
+  it("lifts top-level name/logo/favicon under site and clears the top-level name", () => {
+    const out = data({ name: "Acme", logo: { light: "/l.svg" }, favicon: "/f.svg" });
+    expect(out.site).toEqual({ name: "Acme", logo: { light: "/l.svg" }, favicon: "/f.svg" });
+    expect(out.name).toBeUndefined();
+  });
+
+  it("never overwrites an existing site object", () => {
+    const out = data({ name: "Top", site: { name: "Kept" } });
+    expect(out.site).toEqual({ name: "Kept" });
+  });
+
+  it("drops Mintlify colors with a diagnostic", () => {
+    const r = mintlifyCompat({ name: "Acme", colors: { primary: "#0f8b7e" } });
+    expect(codes(r)).toContain("mintlify-colors");
+    expect((r.data as Record<string, unknown>).colors).toBeUndefined();
+  });
+
+  it("maps navigation.tabs with groups into our tabs[], inlining string pages", () => {
+    const out = data({
+      site: { name: "x" },
+      navigation: {
+        tabs: [{ tab: "Guides", groups: [{ group: "Start", pages: ["index", "quickstart"] }] }],
+      },
+    });
+    expect(out.tabs).toEqual([
+      { tab: "Guides", pages: [{ group: "Start", pages: ["index", "quickstart"] }] },
+    ]);
+    expect(out.navigation).toBeUndefined();
+  });
+
+  it("drops a tab dropdown menu with a diagnostic but keeps the tab and its other pages", () => {
+    const r = mintlifyCompat({
+      site: { name: "x" },
+      navigation: { tabs: [{ tab: "API", pages: ["api/intro"], menu: [{ item: "Ref" }] }] },
+    });
+    expect(codes(r)).toContain("mintlify-tab-menu");
+    expect((r.data as Record<string, unknown>).tabs).toEqual([
+      { tab: "API", pages: ["api/intro"] },
+    ]);
+  });
+
+  it("degrades products to tabs with a diagnostic", () => {
+    const r = mintlifyCompat({
+      site: { name: "x" },
+      navigation: { products: [{ product: "Core", pages: ["core/index"] }] },
+    });
+    expect(codes(r)).toContain("mintlify-products");
+    expect((r.data as Record<string, unknown>).tabs).toEqual([
+      { tab: "Core", pages: ["core/index"] },
+    ]);
+  });
+
+  it("degrades dropdowns to tabs with a diagnostic", () => {
+    const r = mintlifyCompat({
+      site: { name: "x" },
+      navigation: { dropdowns: [{ dropdown: "Tools", pages: ["tools/x"] }] },
+    });
+    expect(codes(r)).toContain("mintlify-dropdowns");
+    expect((r.data as Record<string, unknown>).tabs).toEqual([
+      { tab: "Tools", pages: ["tools/x"] },
+    ]);
+  });
+
+  it("maps top-level groups/pages into our navigation array", () => {
+    const out = data({
+      site: { name: "x" },
+      navigation: { groups: [{ group: "G", pages: ["a"] }], pages: ["b"] },
+    });
+    expect(out.navigation).toEqual([{ group: "G", pages: ["a"] }, "b"]);
+  });
+
+  it("drops anchors/versions/languages/global with one diagnostic each", () => {
+    const r = mintlifyCompat({
+      site: { name: "x" },
+      navigation: { pages: ["a"], anchors: [{}], versions: [{}], languages: [{}], global: {} },
+    });
+    expect(codes(r)).toEqual(
+      expect.arrayContaining([
+        "mintlify-anchors",
+        "mintlify-versions",
+        "mintlify-languages",
+        "mintlify-global",
+      ]),
+    );
+  });
+
+  it("recurses nested groups, inlines a bare { pages }, and drops external link items", () => {
+    const out = data({
+      site: { name: "x" },
+      navigation: {
+        pages: [
+          { group: "Outer", pages: ["a", { group: "Inner", pages: ["b"] }] },
+          { pages: ["c"] },
+          { page: "", href: "https://x.com" },
+        ],
+      },
+    });
+    expect(out.navigation).toEqual([
+      { group: "Outer", pages: ["a", { group: "Inner", pages: ["b"] }] },
+      "c",
+    ]);
+  });
+
+  it("end-to-end: a real Mintlify docs.json now loads (was two parse errors)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "rs-mint-"));
+    await writeFile(
+      join(dir, "docs.json"),
+      JSON.stringify({
+        $schema: "https://mintlify.com/docs.json",
+        theme: "mint",
+        name: "Acme Docs",
+        colors: { primary: "#0f8b7e" },
+        logo: { light: "/logo/light.svg", dark: "/logo/dark.svg" },
+        navigation: {
+          tabs: [
+            { tab: "Guides", groups: [{ group: "Start", pages: ["index", "quickstart"] }] },
+            { tab: "API", menu: [{ item: "Reference", pages: ["api/intro"] }] },
+          ],
+        },
+      }),
+    );
+    const { config, diagnostics } = await loadConfig(dir);
+    expect(config).not.toBeNull();
+    expect(config?.site.name).toBe("Acme Docs");
+    expect(config?.tabs?.[0]).toEqual({
+      tab: "Guides",
+      pages: [{ group: "Start", pages: ["index", "quickstart"] }],
+    });
+    // Only warnings survive; no error diagnostics (it parses).
+    expect(diagnostics.every((d) => d.severity === "warning")).toBe(true);
+  });
+});

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { Diagnostic } from "@readsmith/model";
 import { parse as parseYaml } from "yaml";
+import { mintlifyCompat } from "./mintlify.js";
 import { type ConfigInput, configInputSchema } from "./schema.js";
 
 const CONFIG_FILENAMES = ["docs.yaml", "docs.yml", "docs.json"];
@@ -42,7 +43,13 @@ export async function loadConfig(root: string): Promise<LoadedConfig> {
       return { config: null, file: path, diagnostics };
     }
 
-    const parsed = configInputSchema.safeParse(data);
+    // Translate a Mintlify-shaped docs.json (top-level site fields, an object
+    // navigation) into our config before validating; native configs are
+    // untouched. Its warnings (dropped divisions) ride alongside the result.
+    const compat = mintlifyCompat(data);
+    diagnostics.push(...compat.diagnostics);
+
+    const parsed = configInputSchema.safeParse(compat.data);
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         diagnostics.push({
