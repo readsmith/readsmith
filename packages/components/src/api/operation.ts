@@ -8,6 +8,7 @@ import type {
 } from "@readsmith/model";
 import { esc } from "../shell/util.js";
 import { operationSamples, renderCodeSamples } from "./code-samples.js";
+import { renderPlaygroundForm } from "./playground-render.js";
 import { type SchemaContext, renderSchema } from "./schema-viewer.js";
 
 /*
@@ -306,7 +307,10 @@ export function renderOperationConsole(op: Operation, spec: NormalizedSpec): str
     )}</div>${body}</div>`;
   }
 
-  return `<div class="rs-console"><div class="rs-console__label">Request</div><div class="rs-console__card">${samples}</div>${responseCard}</div>`;
+  return `<div class="rs-console"><div class="rs-console__label">Request</div><div class="rs-console__card">${samples}</div><div class="rs-console__label">Try it</div><div class="rs-console__card">${renderPlaygroundForm(
+    op,
+    spec.servers,
+  )}</div>${responseCard}</div>`;
 }
 
 /** The page-side binding of a data-model page (mirrors mdx PageSchemaApi). */

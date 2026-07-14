@@ -159,6 +159,8 @@ describe("renderOperationConsole", () => {
     expect(html).toContain('data-island="CodeGroup"');
     expect(html).toContain("cus_1"); // response example in the console
     expect(html).toContain("rs-console__status"); // 200 readout
+    expect(html).toContain('data-island="Playground"'); // the interactive Try-It form
+    expect(html).toContain("data-rs-pf-curl"); // its live curl
   });
 });
 
