@@ -387,6 +387,18 @@
   color: var(--rs-ink-muted);
   background: var(--rs-surface);
 }
+/* A group's badge (e.g. NEW): a hallmark-gold stamp pushed to the row's end. */
+.rs-nav__tag {
+  margin-left: auto;
+  flex: none;
+  padding: 1px 6px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--rs-hallmark-ink);
+  background: var(--rs-hallmark-wash);
+  border-radius: 5px;
+}
 .rs-nav__label::-webkit-details-marker {
   display: none;
 }

@@ -97,7 +97,13 @@ export function buildExplicitNav(
         }
         out.push({ type: "page", slug });
       } else {
-        out.push({ type: "group", label: item.group, children: resolveItems(item.pages) });
+        out.push({
+          type: "group",
+          label: item.group,
+          children: resolveItems(item.pages),
+          ...(item.tag !== undefined ? { tag: item.tag } : {}),
+          ...(item.expanded !== undefined ? { expanded: item.expanded } : {}),
+        });
       }
     }
     return out;

@@ -125,12 +125,21 @@ function sectionPages(
 function mapGroups(groups: unknown[], warn: (c: string, m: string) => void): NavItemInput[] {
   const out: NavItemInput[] = [];
   for (const g of groups) {
-    // icon / tag / expanded / root are carried once the nav schema supports them.
-    if (isObj(g) && typeof g.group === "string") {
-      out.push({ group: g.group, pages: Array.isArray(g.pages) ? mapPages(g.pages, warn) : [] });
-    }
+    if (isObj(g) && typeof g.group === "string") out.push(groupItem(g, warn));
   }
   return out;
+}
+
+/** A Mintlify group object -> our group nav item, carrying tag/expanded. */
+function groupItem(g: Obj, warn: (c: string, m: string) => void): NavItemInput {
+  const item: Extract<NavItemInput, { group: string }> = {
+    group: g.group as string,
+    pages: Array.isArray(g.pages) ? mapPages(g.pages, warn) : [],
+  };
+  // icon / root are carried once the nav schema supports them (later slices).
+  if (typeof g.tag === "string") item.tag = g.tag;
+  if (typeof g.expanded === "boolean") item.expanded = g.expanded;
+  return item;
 }
 
 function mapPages(items: unknown[], warn: (c: string, m: string) => void): NavItemInput[] {
@@ -139,10 +148,7 @@ function mapPages(items: unknown[], warn: (c: string, m: string) => void): NavIt
     if (typeof item === "string") {
       out.push(item);
     } else if (isObj(item) && typeof item.group === "string") {
-      out.push({
-        group: item.group,
-        pages: Array.isArray(item.pages) ? mapPages(item.pages, warn) : [],
-      });
+      out.push(groupItem(item, warn));
     } else if (isObj(item) && Array.isArray(item.pages)) {
       out.push(...mapPages(item.pages, warn)); // a bare { pages } wrapper: inline it
     }

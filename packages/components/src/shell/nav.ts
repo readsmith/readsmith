@@ -29,12 +29,15 @@ function navItems(nodes: FinalNavNode[], current: string): string {
           active ? " is-active" : ""
         }" href="${esc(node.url)}"${active ? ' aria-current="page"' : ""}>${label}</a>`;
       }
-      // Groups render open by default and stay open across navigations (the state
-      // is not recomputed per page), so a section never collapses on its own. The
-      // reader can still collapse a group by hand via the native disclosure.
-      return `<details class="rs-nav__group" open><summary class="rs-nav__label">${CHEVRON}<span>${esc(
+      // Groups default open and stay open across navigations (the state is not
+      // recomputed per page), so a section never collapses on its own; a reader
+      // can still collapse one by hand. An authored `expanded: false` starts it
+      // collapsed. A `tag` renders a stamped badge beside the label.
+      const open = node.expanded === false ? "" : " open";
+      const tag = node.tag ? `<span class="rs-nav__tag">${esc(node.tag)}</span>` : "";
+      return `<details class="rs-nav__group"${open}><summary class="rs-nav__label">${CHEVRON}<span>${esc(
         node.label,
-      )}</span></summary><div class="rs-nav__children">${navItems(node.children, current)}</div></details>`;
+      )}</span>${tag}</summary><div class="rs-nav__children">${navItems(node.children, current)}</div></details>`;
     })
     .join("");
 }

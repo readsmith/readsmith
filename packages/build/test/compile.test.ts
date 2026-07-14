@@ -22,6 +22,18 @@ describe("compileSite", () => {
     expect(bundle.apiReference).toBeNull();
   });
 
+  it("carries group tag and expanded into the finalized nav model", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "rs-navtag-"));
+    await writeFile(
+      join(dir, "docs.yaml"),
+      "site:\n  name: Tagged\nnavigation:\n  - group: Start\n    tag: NEW\n    expanded: false\n    pages:\n      - index\n",
+    );
+    await writeFile(join(dir, "index.md"), "# Home\n\nHi.\n");
+    const { bundle } = await compileSite({ contentDir: dir });
+    const group = bundle.site.build.nav.find((n) => n.type === "group");
+    expect(group).toMatchObject({ type: "group", label: "Start", tag: "NEW", expanded: false });
+  });
+
   it("renders <Icon> to inline Lucide SVG through the wired resolver", async () => {
     const dir = await mkdtemp(join(tmpdir(), "rs-icon-"));
     await writeFile(

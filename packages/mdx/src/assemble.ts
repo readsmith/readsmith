@@ -38,7 +38,7 @@ import { transform } from "./transform.js";
 /** A resolved navigation node (matches the config package's output shape). */
 export type NavNode =
   | { type: "page"; slug: string }
-  | { type: "group"; label: string; children: NavNode[] };
+  | { type: "group"; label: string; children: NavNode[]; tag?: string; expanded?: boolean };
 
 export interface SitePage {
   /** Path relative to the content root, POSIX separators. */
@@ -253,7 +253,15 @@ export type FinalNavNode =
       /** HTTP method badge for hybrid API-operation pages, e.g. "GET". */
       method?: string;
     }
-  | { type: "group"; label: string; children: FinalNavNode[] };
+  | {
+      type: "group";
+      label: string;
+      children: FinalNavNode[];
+      /** A short badge shown beside the group label. */
+      tag?: string;
+      /** Start collapsed when false; groups default to open. */
+      expanded?: boolean;
+    };
 
 /** A finalized top-level tab: label, landing URL (first page), and its nav tree. */
 export interface FinalNavTab {
@@ -1270,7 +1278,15 @@ function finalizeNav(nav: NavNode[], bySlug: Map<string, PageModel>): FinalNavNo
       });
     } else {
       const children = finalizeNav(node.children, bySlug);
-      if (children.length > 0) out.push({ type: "group", label: node.label, children });
+      if (children.length > 0) {
+        out.push({
+          type: "group",
+          label: node.label,
+          children,
+          ...(node.tag !== undefined ? { tag: node.tag } : {}),
+          ...(node.expanded !== undefined ? { expanded: node.expanded } : {}),
+        });
+      }
     }
   }
   return out;

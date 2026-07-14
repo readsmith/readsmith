@@ -6,7 +6,9 @@ import type { CspExtensions } from "./security.js";
  * A navigation item in the user-authored config: either a page reference (a
  * slug or path) or a named group with its own child items. Recursive.
  */
-export type NavItemInput = string | { group: string; pages: NavItemInput[] };
+export type NavItemInput =
+  | string
+  | { group: string; pages: NavItemInput[]; tag?: string; expanded?: boolean };
 
 const navItemInputSchema: z.ZodType<NavItemInput> = z.lazy(() =>
   z.union([
@@ -14,6 +16,10 @@ const navItemInputSchema: z.ZodType<NavItemInput> = z.lazy(() =>
     z.object({
       group: z.string(),
       pages: z.array(navItemInputSchema),
+      /** A short badge shown beside the group label (Mintlify-compatible). */
+      tag: z.string().optional(),
+      /** Start collapsed when false; groups default to open. */
+      expanded: z.boolean().optional(),
     }),
   ]),
 );
@@ -250,7 +256,7 @@ export interface PageRef {
 /** A resolved navigation node (the output tree the renderer consumes). */
 export type NavNode =
   | { type: "page"; slug: string }
-  | { type: "group"; label: string; children: NavNode[] };
+  | { type: "group"; label: string; children: NavNode[]; tag?: string; expanded?: boolean };
 
 /** A resolved top-level tab: a label and its own navigation tree. */
 export interface NavTab {

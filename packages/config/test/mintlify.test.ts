@@ -87,6 +87,18 @@ describe("mintlifyCompat", () => {
     ]);
   });
 
+  it("carries group tag and expanded from Mintlify groups", () => {
+    const out = data({
+      site: { name: "x" },
+      navigation: {
+        groups: [{ group: "Start", tag: "BETA", expanded: false, pages: ["a"] }],
+      },
+    });
+    expect(out.navigation).toEqual([
+      { group: "Start", pages: ["a"], tag: "BETA", expanded: false },
+    ]);
+  });
+
   it("maps top-level groups/pages into our navigation array", () => {
     const out = data({
       site: { name: "x" },
