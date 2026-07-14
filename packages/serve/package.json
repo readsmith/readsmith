@@ -23,6 +23,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@readsmith/ai": "workspace:*",
     "@readsmith/api": "workspace:*",
+    "@readsmith/exec": "workspace:*",
     "@readsmith/cache": "workspace:*",
     "@readsmith/components": "workspace:*",
     "@readsmith/config": "workspace:*",

@@ -18,6 +18,7 @@ export * from "./site.js";
 export * from "./db.js";
 export * from "./ai.js";
 export * from "./analytics.js";
+export * from "./exec.js";
 export * from "./boot.js";
 export * from "./git.js";
 export * from "./indexing.js";

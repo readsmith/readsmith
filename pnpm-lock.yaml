@@ -388,6 +388,9 @@ importers:
       '@readsmith/db':
         specifier: workspace:*
         version: link:../db
+      '@readsmith/exec':
+        specifier: workspace:*
+        version: link:../exec
       '@readsmith/git':
         specifier: workspace:*
         version: link:../git

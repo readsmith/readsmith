@@ -2,6 +2,7 @@ import { createApiApp } from "@readsmith/api";
 import { getAiServices } from "../ai.js";
 import { getAnalyticsService } from "../analytics.js";
 import { getDb } from "../db.js";
+import { getExecService } from "../exec.js";
 import { getGitService } from "../git.js";
 import { getRateLimiter } from "../rate-limit.js";
 
@@ -14,16 +15,18 @@ let appPromise: Promise<ReturnType<typeof createApiApp>> | undefined;
 
 function getApp(): Promise<ReturnType<typeof createApiApp>> {
   if (!appPromise) {
-    appPromise = Promise.all([getAiServices(), getRateLimiter()]).then(([ai, rateLimit]) =>
-      // Next.js exposes no socket address, so the limiter identifies callers by the
-      // operator's configured trusted proxy header (READSMITH_TRUSTED_IP_HEADER).
-      createApiApp({
-        db: getDb(),
-        ai,
-        git: getGitService(),
-        analytics: getAnalyticsService(),
-        rateLimit,
-      }),
+    appPromise = Promise.all([getAiServices(), getRateLimiter(), getExecService()]).then(
+      ([ai, rateLimit, exec]) =>
+        // Next.js exposes no socket address, so the limiter identifies callers by the
+        // operator's configured trusted proxy header (READSMITH_TRUSTED_IP_HEADER).
+        createApiApp({
+          db: getDb(),
+          ai,
+          git: getGitService(),
+          analytics: getAnalyticsService(),
+          rateLimit,
+          exec,
+        }),
     );
   }
   return appPromise;
