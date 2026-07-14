@@ -147,6 +147,20 @@ export interface SiteImage {
   dark: string;
 }
 
+/** The items the per-page contextual menu can show (docs.json-compatible). */
+export const CONTEXTUAL_OPTIONS = [
+  "copy",
+  "view",
+  "chatgpt",
+  "claude",
+  "perplexity",
+  "cursor",
+  "vscode",
+  "mcp",
+] as const;
+export type ContextualOption = (typeof CONTEXTUAL_OPTIONS)[number];
+const contextualOptionSchema = z.enum(CONTEXTUAL_OPTIONS);
+
 /**
  * The user-authored site config (our `docs.yaml` shape). Everything except
  * `site.name` is optional. When `navigation` is omitted the site auto-discovers
@@ -238,6 +252,9 @@ export const configInputSchema = z.object({
   links: linksSchema.optional(),
   /** The MCP endpoint alias. Defaults to "/mcp" when no docs page claims it. */
   mcp: z.object({ path: z.string().min(1).optional() }).optional(),
+  /** Which items the per-page contextual ("page actions") menu shows
+   * (docs.json-compatible `contextual.options`). Absent = the default set. */
+  contextual: z.object({ options: z.array(contextualOptionSchema).optional() }).optional(),
   navigation: z.array(navItemInputSchema).optional(),
   /** Top-level navigation tabs. When set, the sidebar is scoped to the active tab. */
   tabs: z.array(navTabInputSchema).optional(),
@@ -342,6 +359,8 @@ export interface ResolvedConfig {
   links: { repo?: string; branch: string };
   /** MCP alias override from `docs.yaml`. */
   mcp: { path?: string };
+  /** Per-page contextual menu options (docs.json-compatible), when configured. */
+  contextual?: { options?: ContextualOption[] };
   variables: Record<string, unknown>;
   pages: PageRef[];
   nav: NavNode[];

@@ -1,4 +1,9 @@
-import { type ShellSite, type ShellTab, renderShellBody } from "@readsmith/components";
+import {
+  type ContextualOption,
+  type ShellSite,
+  type ShellTab,
+  renderShellBody,
+} from "@readsmith/components";
 import { siteBasePath } from "@readsmith/config";
 import type { FinalNavNode, FinalNavTab, PageModel } from "@readsmith/mdx";
 import { type Bundle, getBundle } from "./site.js";
@@ -90,7 +95,19 @@ export interface RenderedPage {
  * single-site app uses, so tenant serving can never drift from self-host.
  */
 export function renderPageFromBundle(bundle: Bundle, slug: string): RenderedPage | null {
-  const { build, name, branding, url, logo, homeUrl, apiReference, footer } = bundle.site;
+  const {
+    build,
+    name,
+    branding,
+    url,
+    logo,
+    homeUrl,
+    apiReference,
+    footer,
+    contextual,
+    mcpPath,
+    ai,
+  } = bundle.site;
   const page = build.pages.find((p) => p.slug === slug);
   if (!page) return null;
 
@@ -117,6 +134,10 @@ export function renderPageFromBundle(bundle: Bundle, slug: string): RenderedPage
     homeUrl,
     links,
     footer,
+    // The "connect an agent" group only appears when the site serves MCP, which
+    // tracks the presence of an AI config block (the host mounts MCP with it).
+    ...(ai != null ? { mcp: { path: mcpPath ?? "/mcp" } } : {}),
+    ...(contextual?.options ? { contextual: contextual.options as ContextualOption[] } : {}),
   };
 
   // Hybrid operation and data-model pages render their generated sections from

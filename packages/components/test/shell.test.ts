@@ -100,6 +100,29 @@ describe("renderShellBody", () => {
     expect(renderShellBody(site, page)).not.toContain("rs-tabbar");
   });
 
+  it("adds the MCP connect group with a basePath-correct endpoint only when the site serves MCP", () => {
+    const bare = renderShellBody(site, page);
+    expect(bare).not.toContain("Add to Cursor"); // no site.mcp -> no connect group
+
+    const connected: ShellSite = {
+      ...site,
+      url: "https://acme.dev/docs",
+      mcp: { path: "/mcp" },
+    };
+    const html = renderShellBody(connected, page);
+    expect(html).toContain("Add to Cursor");
+    expect(html).toContain("Add to VS Code");
+    // the endpoint carries the site's subpath (site.url pathname), not the root
+    expect(html).toContain('data-rs-mcp-url="https://acme.dev/docs/mcp"');
+  });
+
+  it("honors a trimmed contextual.options list", () => {
+    const html = renderShellBody({ ...site, contextual: ["copy"] }, page);
+    expect(html).toContain("Copy as Markdown");
+    expect(html).not.toContain("chatgpt.com");
+    expect(html).not.toContain("View as Markdown");
+  });
+
   it("renders a tab bar and marks the active tab when tabs are present", () => {
     const tabbed: ShellSite = {
       ...site,

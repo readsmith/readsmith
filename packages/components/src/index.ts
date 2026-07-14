@@ -12,6 +12,13 @@ export {
   themeInitScript,
 } from "./shell/index.js";
 export type { ShellSite, ShellTab, ShellPage, DocumentOptions } from "./shell/index.js";
+export {
+  type ContextualOption,
+  DEFAULT_CONTEXTUAL_OPTIONS,
+  renderContextMenu,
+  cursorInstallUrl,
+  vscodeInstallUrl,
+} from "./shell/index.js";
 export { themeToCss } from "./shell/theme-css.js";
 export type { SiteThemeInput, ModalColor } from "./shell/theme-css.js";
 export { renderSchema } from "./api/schema-viewer.js";

@@ -313,6 +313,7 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
       branch: input?.links?.branch ?? "main",
     },
     mcp: { path: input?.mcp?.path },
+    contextual: input?.contextual,
     variables: input?.variables ?? {},
     pages,
     nav,

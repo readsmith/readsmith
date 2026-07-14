@@ -6,6 +6,11 @@ import {
   renderOperationMain,
   renderSchemaMain,
 } from "../api/operation.js";
+import {
+  type ContextualOption,
+  DEFAULT_CONTEXTUAL_OPTIONS,
+  renderContextMenu,
+} from "./contextual.js";
 import { renderNav } from "./nav.js";
 import { renderToc } from "./toc.js";
 import { HALLMARK_SVG, HALLMARK_SVG_SHIMMER, ICONS, esc, socialIcon } from "./util.js";
@@ -34,6 +39,13 @@ export interface ShellSite {
   poweredBy?: boolean;
   /** Content footer: social links by platform (docs.json-compatible `footer.socials`). */
   footer?: { socials?: Record<string, string> };
+  /** Which page-actions menu items to show (docs.json-compatible `contextual.options`).
+   * Undefined falls back to the default set. */
+  contextual?: ContextualOption[];
+  /** The site's MCP endpoint, present only when it serves MCP. Enables the
+   * "Add to Cursor / VS Code / Copy MCP URL" connect group. `path` is the alias
+   * (default "/mcp"); the absolute URL is built here from url + basePath. */
+  mcp?: { path: string };
 }
 
 /** A destination in a tab's dropdown menu. */
@@ -285,20 +297,33 @@ function topbar(site: ShellSite, page: ShellPage): string {
   const prompt = encodeURIComponent(
     `Read ${absMd} and help me with questions about the "${page.title}" page.`,
   );
+  // The MCP connect group needs an absolute endpoint URL. The endpoint lives at
+  // <basePath>/mcp, where basePath is the site's mount subpath (site.url's
+  // pathname), so agents connect to the same host a browser would.
+  const mcpUrl = site.mcp && origin ? origin + siteBasePathOf(site.url) + site.mcp.path : undefined;
+  const menuBody = renderContextMenu({
+    mdUrl,
+    prompt,
+    ...(mcpUrl ? { mcpUrl } : {}),
+    serverName: mcpServerName(site.name),
+    options: site.contextual ?? DEFAULT_CONTEXTUAL_OPTIONS,
+  });
   return `<div class="rs-topbar">
   ${breadcrumbs(page.breadcrumbs)}
   <div class="rs-menu-wrap">
     <button class="rs-icon-btn" data-rs-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Page actions">${ICONS.kebab}</button>
-    <div class="rs-menu" data-rs-menu role="menu" hidden>
-      <button role="menuitem" data-rs-copy-md data-rs-md-url="${esc(mdUrl)}">${ICONS.markdown}Copy as Markdown</button>
-      <button role="menuitem" data-rs-copy-url>${ICONS.link}Copy page URL</button>
-      <div class="rs-menu__sep"></div>
-      <a role="menuitem" href="${esc(mdUrl)}" target="_blank" rel="noopener">${ICONS.markdown}View as Markdown</a>
-      <a role="menuitem" href="https://chatgpt.com/?q=${prompt}" target="_blank" rel="noopener">${ICONS.ai}Open in ChatGPT</a>
-      <a role="menuitem" href="https://claude.ai/new?q=${prompt}" target="_blank" rel="noopener">${ICONS.ai}Open in Claude</a>
-    </div>
+    <div class="rs-menu" data-rs-menu role="menu" hidden>${menuBody}</div>
   </div>
 </div>`;
+}
+
+/** A stable, URL-safe server name for the MCP install links. */
+function mcpServerName(siteName: string): string {
+  const slug = siteName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug ? `${slug}-docs` : "readsmith-docs";
 }
 
 function breadcrumbs(items: Breadcrumb[]): string {
@@ -384,6 +409,17 @@ function siteOriginOf(url: string | undefined): string {
   if (!url) return "";
   try {
     return new URL(url).origin;
+  } catch {
+    return "";
+  }
+}
+
+/** The subpath the site is mounted under, from `site.url`'s pathname ("" at a root). */
+function siteBasePathOf(url: string | undefined): string {
+  if (!url) return "";
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, "");
+    return path === "/" ? "" : path;
   } catch {
     return "";
   }

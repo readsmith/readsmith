@@ -41,6 +41,17 @@ describe("docsJsonCompat", () => {
     expect((r.data as Record<string, unknown>).colors).toBeUndefined();
   });
 
+  it("keeps supported contextual.options and drops unknown ones with a diagnostic", () => {
+    const r = docsJsonCompat({
+      site: { name: "x" },
+      contextual: { options: ["copy", "chatgpt", "cursor", "gemini"] },
+    });
+    expect((r.data as Record<string, unknown>).contextual).toEqual({
+      options: ["copy", "chatgpt", "cursor"],
+    });
+    expect(codes(r)).toContain("compat-contextual");
+  });
+
   it("maps navigation.tabs with groups into our tabs[], inlining string pages", () => {
     const out = data({
       site: { name: "x" },

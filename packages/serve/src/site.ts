@@ -44,6 +44,10 @@ export interface Site {
   apiReference?: { spec: string; path: string; label: string; layout?: "single" | "pages" };
   /** Content footer: social links by platform. */
   footer?: { socials?: Record<string, string> };
+  /** Per-page contextual menu options (docs.json `contextual.options`), when configured. */
+  contextual?: { options?: string[] };
+  /** The MCP endpoint alias (default "/mcp"), for the shell's agent-connect links. */
+  mcpPath?: string;
   /** Opaque AI config block from docs.yaml (validated at runtime by @readsmith/ai). */
   ai?: unknown;
   /** Static assets by serving path, each naming a content-addressed artifact key. */

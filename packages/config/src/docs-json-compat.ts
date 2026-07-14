@@ -1,5 +1,10 @@
 import type { Diagnostic } from "@readsmith/model";
-import type { NavItemInput, NavTabInput, TabMenuItemInput } from "./schema.js";
+import {
+  CONTEXTUAL_OPTIONS,
+  type NavItemInput,
+  type NavTabInput,
+  type TabMenuItemInput,
+} from "./schema.js";
 
 /*
  * Compatibility for the `docs.json` config shape. A `docs.json` export differs
@@ -39,6 +44,7 @@ export function docsJsonCompat(input: unknown): DocsJsonCompatResult {
   const data: Obj = { ...input };
 
   liftSite(data, warn);
+  liftContextual(data, warn);
   if (isObj(data.navigation)) {
     const { navigation, tabs } = mapNavigation(data.navigation, warn);
     data.navigation = navigation.length > 0 ? navigation : undefined;
@@ -66,6 +72,23 @@ function liftSite(data: Obj, warn: (c: string, m: string) => void): void {
     );
   }
   if (typeof data.theme === "string") data.theme = undefined; // preset name, not ours
+}
+
+const KNOWN_CONTEXTUAL = new Set<string>(CONTEXTUAL_OPTIONS);
+
+/** Keep only contextual-menu options we support; drop (with a warning) any others. */
+function liftContextual(data: Obj, warn: (c: string, m: string) => void): void {
+  if (!isObj(data.contextual) || !Array.isArray(data.contextual.options)) return;
+  const kept: string[] = [];
+  for (const option of data.contextual.options) {
+    if (typeof option === "string" && KNOWN_CONTEXTUAL.has(option)) kept.push(option);
+    else
+      warn(
+        "compat-contextual",
+        `docs.json \`contextual.options\` value ${JSON.stringify(option)} is not supported and was dropped.`,
+      );
+  }
+  data.contextual = { options: kept };
 }
 
 function mapNavigation(

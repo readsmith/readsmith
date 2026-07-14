@@ -455,6 +455,12 @@ function initContextMenu(root: ParentNode): void {
     void writeClipboard(location.href);
     flash(copyUrl, "Copied URL", close);
   });
+  const copyMcp = menu.querySelector<HTMLElement>("[data-rs-copy-mcp]");
+  copyMcp?.addEventListener("click", () => {
+    const url = copyMcp.dataset.rsMcpUrl;
+    if (url) void writeClipboard(url);
+    flash(copyMcp, "Copied MCP URL", close);
+  });
 }
 
 function initFeedback(root: ParentNode): void {
