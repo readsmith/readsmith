@@ -258,6 +258,34 @@ export const configInputSchema = z.object({
   navigation: z.array(navItemInputSchema).optional(),
   /** Top-level navigation tabs. When set, the sidebar is scoped to the active tab. */
   tabs: z.array(navTabInputSchema).optional(),
+  /**
+   * Multiple documentation versions, each a distinct content tree. The `default`
+   * version serves at the un-prefixed path; every other version serves under
+   * `/{id}`. Absent = a single-version site that builds exactly as it does today.
+   */
+  versions: z
+    .object({
+      /** The id (from `list`) served at the un-prefixed path. */
+      default: z.string().min(1),
+      list: z
+        .array(
+          z.object({
+            /** URL-safe identifier, also the path segment for non-default versions. */
+            id: z.string().regex(/^[A-Za-z0-9._-]+$/),
+            /** Selector label; defaults to the id. */
+            label: z.string().optional(),
+            /** Content directory (repo-root relative, like `content.root`);
+             * defaults to the site's `content.root`. */
+            content: z.string().optional(),
+            /** Selector badge. */
+            tag: z.enum(["latest", "beta", "deprecated"]).optional(),
+            /** Build and serve it, but omit it from the selector and discovery. */
+            hidden: z.boolean().optional(),
+          }),
+        )
+        .min(1),
+    })
+    .optional(),
   /** A read-only API reference from an OpenAPI spec, mounted alongside the docs. */
   apiReference: z
     .object({
@@ -324,6 +352,28 @@ export interface NavTab {
   menu?: NavMenuItem[];
 }
 
+/** One resolved documentation version. */
+export interface ResolvedVersion {
+  id: string;
+  /** Selector label; defaults to the id. */
+  label: string;
+  /** Content directory (repo-root relative), the version's page tree. */
+  content: string;
+  /** URL segment prefix: "" for the default version, else "/{id}". */
+  prefix: string;
+  /** True for the version served at the un-prefixed path. */
+  isDefault: boolean;
+  tag?: "latest" | "beta" | "deprecated";
+  hidden: boolean;
+}
+
+/** Resolved multi-version declaration; absent on single-version sites. */
+export interface ResolvedVersions {
+  /** The default version's id (served un-prefixed). */
+  default: string;
+  list: ResolvedVersion[];
+}
+
 /** The fully resolved, defaulted config plus the discovered content. */
 export interface AnalyticsConfig {
   ga4?: { measurementId: string };
@@ -366,6 +416,8 @@ export interface ResolvedConfig {
   nav: NavNode[];
   /** Top-level tabs, when configured. Each carries its own navigation subtree. */
   tabs?: NavTab[];
+  /** Resolved documentation versions; absent on single-version sites. */
+  versions?: ResolvedVersions;
   /** A read-only API reference from an OpenAPI spec, when configured. */
   apiReference?: { spec: string; path: string; label: string; layout: "single" | "pages" };
   /** Content footer: social links by platform (docs.json-compatible shape). */

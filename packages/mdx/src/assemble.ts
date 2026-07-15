@@ -121,6 +121,11 @@ export interface AssembleInput {
    * `site.url: https://a.dev/docs` needs nothing extra. Absolute URLs compose
    * as origin + prefixed path, never site.url + path. */
   basePath?: string;
+  /** URL segment prefix for a non-default documentation version ("/v1"), folded
+   * onto the base path so page URLs, internal links, co-located assets, and the
+   * render cache key all carry it. Empty (the default version) leaves output
+   * byte-identical to a single-version site. */
+  versionPrefix?: string;
   /**
    * The normalized API spec for hybrid `openapi:` frontmatter pages, plus the
    * config-relative source path it was ingested from (validates docs.json-style
@@ -500,6 +505,11 @@ export async function assembleSite(input: AssembleInput): Promise<SiteBuild> {
 
   const bundleHash = contentHash({
     site: config.site.name,
+    // A non-default version shares source with the default but serves under a
+    // distinct prefix; fold its identity in so the two never hash alike, even
+    // for a page carrying no internal links. Omitted (not empty) on the default
+    // version so single-version bundles stay byte-identical.
+    ...(input.versionPrefix ? { version: input.versionPrefix } : {}),
     pages: [...models]
       .sort((a, b) => a.slug.localeCompare(b.slug))
       .map((m) => ({
@@ -1700,9 +1710,12 @@ function originOfUrl(url: string | undefined): string {
   }
 }
 
-/** The effective base path for a build: an explicit override, else derived. */
+/** The effective base path for a build: subpath prefix (explicit or derived)
+ * then the documentation-version prefix, composed in that order (SP-2 extended:
+ * basePath then version then slug). */
 function basePathOf(input: AssembleInput): string {
-  return input.basePath ?? basePathOfUrl(input.baseUrl ?? input.config.site.url);
+  const base = input.basePath ?? basePathOfUrl(input.baseUrl ?? input.config.site.url);
+  return base + (input.versionPrefix ?? "");
 }
 
 function xml(value: string): string {

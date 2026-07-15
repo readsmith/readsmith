@@ -10,10 +10,12 @@ import {
   ASSET_SKIP_EXT,
   ASSET_SKIP_FILES,
   type AssetMount,
+  type ConfigInput,
   DEFAULT_EXCLUDE,
   DEFAULT_INCLUDE,
   type PageRef,
   type ResolvedConfig,
+  type ResolvedVersions,
   type SiteImage,
   type SiteImageInput,
 } from "./schema.js";
@@ -88,6 +90,53 @@ function withAnalyticsCsp(
 
 export function contentRootOf(root: string, config: { content: { root: string } }): string {
   return join(root, config.content.root);
+}
+
+/**
+ * Resolve the multi-version declaration to routing metadata: each version's URL
+ * prefix ("" for the default, "/{id}" otherwise), label, and content directory.
+ * Page discovery per version happens later (each version resolves against its
+ * own content root); this is the declaration the build fans out over.
+ */
+function resolveVersions(
+  input: ConfigInput["versions"],
+  contentRel: string,
+  diagnostics: Diagnostic[],
+): ResolvedVersions | undefined {
+  if (!input) return undefined;
+  const seen = new Set<string>();
+  const list: ResolvedVersions["list"] = [];
+  for (const v of input.list) {
+    if (seen.has(v.id)) {
+      diagnostics.push({
+        severity: "error",
+        code: "versions-duplicate",
+        message: `Duplicate version id "${v.id}".`,
+        source: "docs.yaml",
+      });
+      continue;
+    }
+    seen.add(v.id);
+    const isDefault = v.id === input.default;
+    list.push({
+      id: v.id,
+      label: v.label ?? v.id,
+      content: v.content ?? contentRel,
+      prefix: isDefault ? "" : `/${v.id}`,
+      isDefault,
+      ...(v.tag ? { tag: v.tag } : {}),
+      hidden: v.hidden ?? false,
+    });
+  }
+  if (!seen.has(input.default)) {
+    diagnostics.push({
+      severity: "error",
+      code: "versions-default",
+      message: `versions.default "${input.default}" is not in the version list.`,
+      source: "docs.yaml",
+    });
+  }
+  return { default: input.default, list };
 }
 
 /** A directory to publish, and the URL prefix it is served under. */
@@ -229,14 +278,21 @@ function resolveHome(
   return [{ path, slug: "" }, ...pages.filter((p) => p.slug !== "")];
 }
 
-export async function resolveConfig(root: string): Promise<ResolvedConfig> {
+export async function resolveConfig(
+  root: string,
+  opts?: {
+    /** Discover content from this directory instead of `content.root`. A
+     * multi-version build resolves each version against its own content tree. */
+    contentRootOverride?: string;
+  },
+): Promise<ResolvedConfig> {
   const diagnostics: Diagnostic[] = [];
 
   const loaded = await loadConfig(root);
   diagnostics.push(...loaded.diagnostics);
   const input = loaded.config;
 
-  const contentRel = input?.content?.root ?? ".";
+  const contentRel = opts?.contentRootOverride ?? input?.content?.root ?? ".";
   const contentRoot = join(root, contentRel);
   const include = input?.content?.include ?? DEFAULT_INCLUDE;
   // Merged, not replaced: a user's exclude adds to the defaults.
@@ -276,6 +332,11 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
       };
     });
   }
+
+  // Version content dirs are relative to the authored `content.root`, not the
+  // per-version override in effect for this resolve, so the declaration stays
+  // stable no matter which version is currently being built.
+  const versions = resolveVersions(input?.versions, input?.content?.root ?? ".", diagnostics);
 
   const apiReference = input?.apiReference
     ? {
@@ -318,6 +379,7 @@ export async function resolveConfig(root: string): Promise<ResolvedConfig> {
     pages,
     nav,
     tabs,
+    ...(versions ? { versions } : {}),
     apiReference,
     footer: input?.footer,
     branding: input?.branding ?? true,

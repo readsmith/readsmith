@@ -60,6 +60,19 @@ export interface CompileSiteInput {
    * `site.url` affects: page URLs, the base path, canonical and OG metadata.
    */
   siteUrl?: string;
+  /**
+   * URL segment prefix for a non-default documentation version ("/v1"). Folded
+   * onto the site base path, so this version's page URLs, internal links,
+   * co-located assets, and render cache all carry it. Empty/absent = the default
+   * version (un-prefixed), byte-identical to a single-version build.
+   */
+  versionPrefix?: string;
+  /**
+   * Discover content from this directory (repo-root relative) instead of the
+   * config's `content.root`. A multi-version build points each version at its
+   * own content tree here.
+   */
+  contentRootOverride?: string;
 }
 
 /** The API reference as it rides inside the bundle. */
@@ -343,7 +356,10 @@ function fingerprintPath(path: string, hash: string): string | null {
 
 export async function compileSite(input: CompileSiteInput): Promise<CompileSiteResult> {
   const siteId = input.siteId ?? "default";
-  const resolved = await resolveConfig(input.contentDir);
+  const resolved = await resolveConfig(
+    input.contentDir,
+    input.contentRootOverride ? { contentRootOverride: input.contentRootOverride } : undefined,
+  );
   const config = input.siteUrl ? withSiteUrl(resolved, input.siteUrl) : resolved;
   const contentRoot = contentRootOf(input.contentDir, config);
   const { reference, diagnostics: apiReferenceDiagnostics } = await buildApiReference(
@@ -365,6 +381,7 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
     renderCache: input.renderCache,
     failOnError: input.failOnError,
     baseUrl: config.site.url,
+    versionPrefix: input.versionPrefix,
     apiReference:
       reference && config.apiReference
         ? {
@@ -411,7 +428,9 @@ export async function compileSite(input: CompileSiteInput): Promise<CompileSiteR
   // assembled HTML, after the per-page render cache, so cached pages cannot
   // pin stale fingerprints and the cache key needs no asset awareness.
   if (fingerprints.length > 0) {
-    const base = siteBasePath(config.site.url);
+    // Co-located page assets carry the version prefix in their baked URLs, so the
+    // fingerprint rewrite must match on the same effective base.
+    const base = siteBasePath(config.site.url) + (input.versionPrefix ?? "");
     const rewrite = (html: string): string => {
       let out = html;
       for (const [original, fingerprinted] of fingerprints) {
