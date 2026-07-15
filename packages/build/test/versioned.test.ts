@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { RenderCache } from "@readsmith/mdx";
 import { describe, expect, it } from "vitest";
 import { compileSite } from "../src/compile.js";
-import { type CompiledVersion, compileVersionedSite } from "../src/versioned.js";
+import { type CompiledVersion, compileVersionedSite, siteVersionsOf } from "../src/versioned.js";
 
 // Byte-for-byte identical source in both version trees, so any difference in the
 // built bundles comes from the version prefix alone (the point of AC-4).
@@ -118,5 +118,23 @@ describe("compileVersionedSite", () => {
     // Correct, un-crossed links despite sharing the cache.
     expect(pageHtml(v2, "")).toContain('href="/other"');
     expect(pageHtml(v1, "")).toContain('href="/v1/other"');
+  });
+
+  it("derives the routing manifest for multi-version, and null for single-version", async () => {
+    const multi = await compileVersionedSite({ contentDir: await twoVersionRepo() });
+    expect(siteVersionsOf(multi)).toEqual({
+      default: "v2",
+      list: [
+        { id: "v2", prefix: "", isDefault: true, label: "v2", hidden: false },
+        { id: "v1", prefix: "/v1", isDefault: false, label: "v1", hidden: false },
+      ],
+    });
+
+    const dir = await mkdtemp(join(tmpdir(), "rs-plain-manifest-"));
+    await writeFile(join(dir, "docs.yaml"), "site:\n  name: Plain\ncontent:\n  root: docs\n");
+    await mkdir(join(dir, "docs"), { recursive: true });
+    await writeFile(join(dir, "docs", "index.md"), INDEX);
+    const single = await compileVersionedSite({ contentDir: dir });
+    expect(siteVersionsOf(single)).toBeNull();
   });
 });

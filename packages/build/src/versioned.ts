@@ -1,4 +1,5 @@
 import { resolveConfig } from "@readsmith/config";
+import type { SiteVersions } from "@readsmith/model";
 import { type CompileSiteInput, type CompileSiteResult, compileSite } from "./compile.js";
 
 /** One version's compiled bundle plus its routing identity. */
@@ -69,4 +70,24 @@ export async function compileVersionedSite(
     });
   }
   return { default: declared.default, versions };
+}
+
+/**
+ * The version routing table the serve stores and reads (`sites/{siteId}/
+ * versions.json`), derived from a compile result. Null for a single-version
+ * site (no `versions` block), which serves without a manifest exactly as before.
+ */
+export function siteVersionsOf(result: CompileVersionedResult): SiteVersions | null {
+  if (result.versions.length <= 1 && result.default === "") return null;
+  return {
+    default: result.default,
+    list: result.versions.map((v) => ({
+      id: v.id,
+      prefix: v.prefix,
+      isDefault: v.isDefault,
+      label: v.label,
+      ...(v.tag ? { tag: v.tag } : {}),
+      hidden: v.hidden,
+    })),
+  };
 }

@@ -8,7 +8,7 @@ import {
   createStaticSiteResolver,
 } from "@readsmith/git";
 import type { SiteBuild } from "@readsmith/mdx";
-import type { NormalizedSpec } from "@readsmith/model";
+import { type NormalizedSpec, type SiteVersions, siteVersionsSchema } from "@readsmith/model";
 import { createBundleStore, resolveStorageConfig } from "@readsmith/storage";
 import { getDb } from "./db.js";
 
@@ -83,6 +83,20 @@ const parsedSites = createMemoryCache({
   max: Number.isInteger(siteCacheMax) && siteCacheMax > 0 ? siteCacheMax : 16,
   defaultTtlMs: Number.MAX_SAFE_INTEGER,
 });
+
+/**
+ * The per-site version routing table (`sites/{siteId}/versions.json`), briefly
+ * cached. Unlike a bundle (immutable, content-addressed), the manifest is
+ * rewritten on every publish, so it carries a short TTL and is dropped on the
+ * post-publish invalidation. Absence is cached too (single-version sites have no
+ * manifest and must not pay a store read per request).
+ */
+const VERSIONS_MANIFEST_TTL_MS = 5000;
+const siteVersionsCache = createMemoryCache({
+  max: Number.isInteger(siteCacheMax) && siteCacheMax > 0 ? siteCacheMax : 16,
+  defaultTtlMs: VERSIONS_MANIFEST_TTL_MS,
+});
+const versionsManifestKey = (siteId: string) => `sites/${siteId}/versions.json`;
 
 let cached: Promise<Bundle> | null = null;
 let source: CurrentBundleSource | null | undefined;
@@ -171,17 +185,41 @@ function loadLocalBundle(): Promise<Bundle> {
  * bundle (the docs-only path); any other site without a deployment is null,
  * which a multi-site host maps to a 404.
  */
-export async function loadBundleForSite(siteId: string): Promise<Bundle | null> {
-  const current = await bundleSource()?.load(siteId);
+export async function loadBundleForSite(
+  siteId: string,
+  versionId?: string,
+): Promise<Bundle | null> {
+  const current = await bundleSource()?.load(siteId, versionId);
   if (current) {
-    const key = `${siteId}:${current.ref}`;
+    const key = `${siteId}:${versionId ?? ""}:${current.ref}`;
     const hit = await parsedSites.get<Bundle>(key);
     if (hit) return hit;
     const bundle = JSON.parse(current.json) as Bundle;
     await parsedSites.set(key, bundle);
     return bundle;
   }
-  return siteId === DEFAULT_SITE_ID ? loadLocalBundle() : null;
+  // Only the default site's default lane falls back to the locally-compiled
+  // bundle (the docs-only path); a specific version with no deployment is null.
+  return siteId === DEFAULT_SITE_ID && !versionId ? loadLocalBundle() : null;
+}
+
+/**
+ * The site's version routing table, or null when it is single-version (no
+ * manifest). The serve reads this before a bundle to map a request path to the
+ * answering version; single-version sites skip it and serve exactly as before.
+ */
+export async function loadSiteVersions(siteId: string): Promise<SiteVersions | null> {
+  const cached = await siteVersionsCache.get<SiteVersions | "none">(siteId);
+  if (cached !== undefined) return cached === "none" ? null : cached;
+  const bytes = await store.get(versionsManifestKey(siteId)).catch(() => null);
+  if (!bytes) {
+    await siteVersionsCache.set(siteId, "none");
+    return null;
+  }
+  const parsed = siteVersionsSchema.safeParse(JSON.parse(bytes.toString("utf8")));
+  const value = parsed.success ? parsed.data : null;
+  await siteVersionsCache.set(siteId, value ?? "none");
+  return value;
 }
 
 /** The default site's whole bundle (site plus API reference). Throws when absent. */
@@ -200,6 +238,10 @@ export async function getBundle(): Promise<Bundle> {
  */
 export function invalidateSiteCache(siteId?: string): void {
   bundleSource()?.invalidate(siteId);
+  // The manifest is mutable across publishes; drop it so a new version appears
+  // immediately rather than after its TTL.
+  if (siteId) void siteVersionsCache.delete(siteId);
+  else void siteVersionsCache.clear();
 }
 
 /**
@@ -212,8 +254,9 @@ export async function loadSiteAsset(
   siteId: string,
   path: string,
   request?: Request,
+  versionId?: string,
 ): Promise<Response | null> {
-  const bundle = await loadBundleForSite(siteId);
+  const bundle = await loadBundleForSite(siteId, versionId);
   const ref = bundle?.site.assets?.[path.startsWith("/") ? path : `/${path}`];
   if (!ref) return null;
   const etag = `"${ref.key.slice(ref.key.lastIndexOf("/") + 1)}"`;

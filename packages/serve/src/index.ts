@@ -24,6 +24,7 @@ export * from "./git.js";
 export * from "./indexing.js";
 export * from "./rate-limit.js";
 export * from "./render-page.js";
+export * from "./versioning.js";
 export * from "./setup.js";
 export * from "./skills.js";
 export * from "./text-routes.js";
