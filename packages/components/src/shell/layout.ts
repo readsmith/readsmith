@@ -49,6 +49,10 @@ export interface ShellSite {
   /** Multi-version selector; rendered in the header only when the site has two
    * or more versions. Entries carry pre-resolved hrefs (SSR-first, zero-JS). */
   versions?: ShellVersions;
+  /** The active version's URL segment prefix ("" for the default or a
+   * single-version site, "/v1" otherwise), so shell-constructed version-scoped
+   * URLs (the /md page-action link) carry it. */
+  versionPrefix?: string;
 }
 
 /** One version in the header selector, its href pre-resolved server-side. */
@@ -343,13 +347,15 @@ export function versionSelector(site: ShellSite): string {
 }
 
 function topbar(site: ShellSite, page: ShellPage): string {
-  // The /md route keys by slug, so build base + /md + the page's SLUG, never
-  // its baked url (page.url carries a subpath prefix, which would double up as
-  // /md/docs/... and miss the slug). base is the /md route's own mount prefix
-  // (site.basePath), empty on a proxy-served subpath tenant where the /md route
-  // sits at the root and the proxy re-adds the prefix (SP-2).
+  // The /md route keys by slug, so build base + version prefix + /md + the
+  // page's SLUG, never its baked url (page.url carries a subpath prefix, which
+  // would double up as /md/docs/... and miss the slug). base is the /md route's
+  // own mount prefix (site.basePath), empty on a proxy-served subpath tenant
+  // where the /md route sits at the root and the proxy re-adds the prefix (SP-2).
+  // A non-default version's page markdown lives at <base>/v1/md/<slug>.
   const bp = site.basePath ?? "";
-  const mdUrl = `${bp}/md${page.slug === "" ? "" : `/${page.slug}`}`;
+  const vp = site.versionPrefix ?? "";
+  const mdUrl = `${bp}${vp}/md${page.slug === "" ? "" : `/${page.slug}`}`;
   const origin = siteOriginOf(site.url);
   const absMd = origin ? origin + mdUrl : mdUrl;
   const prompt = encodeURIComponent(

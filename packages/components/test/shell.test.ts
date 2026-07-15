@@ -125,6 +125,20 @@ describe("renderShellBody", () => {
     expect(subpath).not.toContain("/md/docs/");
   });
 
+  it("prefixes the /md url with the active version (base -> version -> /md -> slug)", () => {
+    const versioned = renderShellBody(
+      { ...site, versionPrefix: "/v1" },
+      { ...page, slug: "guide/setup" },
+    );
+    expect(versioned).toContain('data-rs-md-url="/v1/md/guide/setup"');
+
+    const both = renderShellBody(
+      { ...site, basePath: "/docs", versionPrefix: "/v1" },
+      { ...page, slug: "guide" },
+    );
+    expect(both).toContain('data-rs-md-url="/docs/v1/md/guide"');
+  });
+
   it("honors a trimmed contextual.options list", () => {
     const html = renderShellBody({ ...site, contextual: ["copy"] }, page);
     expect(html).toContain("Copy as Markdown");

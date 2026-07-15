@@ -147,12 +147,10 @@ export function renderPageFromBundle(
   // each version when it exists, else that version's home). Rendered only with
   // two or more non-hidden versions, so single-version chrome is unchanged.
   if (opts?.version) {
-    const items = versionSelectorItems(
-      opts.version.versions,
-      opts.version.activeVersionId,
-      slug,
-      siteBasePath(url),
-    );
+    const { versions, activeVersionId } = opts.version;
+    // The active version's prefix, so the /md page-action link is version-scoped.
+    site.versionPrefix = versions.list.find((v) => v.id === activeVersionId)?.prefix ?? "";
+    const items = versionSelectorItems(versions, activeVersionId, slug, siteBasePath(url));
     if (items.length >= 2) {
       const active = items.find((i) => i.active) ?? items[0];
       site.versions = {
