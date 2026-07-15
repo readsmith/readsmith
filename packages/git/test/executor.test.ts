@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { cp, mkdtemp } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { contentHash } from "@readsmith/model";
@@ -7,6 +7,7 @@ import { type BundleStore, createBundleStore } from "@readsmith/storage";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createInProcessExecutor } from "../src/executor.js";
 import type { GitProvider } from "../src/provider.js";
+import { siteVersionsKey } from "../src/site-build.js";
 
 const FIXTURE = join(import.meta.dirname, "fixtures", "repo");
 
@@ -50,6 +51,59 @@ describe("InProcessExecutor", () => {
     const stored = await store.get(result.bundleKey ?? "");
     expect(stored).not.toBeNull();
     expect(contentHash(stored?.toString("utf8") ?? "")).toBe(result.bundleHash);
+  });
+
+  it("a single-version site produces one 'current' lane and no manifest", async () => {
+    const result = await createInProcessExecutor({ provider: fixtureProvider(), store }).run(job);
+    expect(result.versions).toHaveLength(1);
+    expect(result.versions[0]?.versionId).toBe("current");
+    expect(result.defaultVersionId).toBe("current");
+    expect(result.manifest).toBeNull();
+  });
+
+  it("a multi-version site writes one bundle per lane and returns the manifest (unstored)", async () => {
+    const multi: GitProvider = {
+      async fetchAtRef(_t, destDir) {
+        await writeFile(
+          join(destDir, "docs.yaml"),
+          [
+            "site:",
+            "  name: Versioned",
+            "content:",
+            "  root: docs",
+            "versions:",
+            "  default: v2",
+            "  list:",
+            "    - id: v2",
+            "    - id: v1",
+            "      content: versions/v1",
+          ].join("\n"),
+        );
+        for (const root of ["docs", "versions/v1"]) {
+          await mkdir(join(destDir, root), { recursive: true });
+          await writeFile(join(destDir, root, "index.md"), "# Home\n\nHi.\n");
+        }
+      },
+    };
+    const result = await createInProcessExecutor({ provider: multi, store }).run(job);
+    expect(result.ok).toBe(true);
+    expect(result.versions.map((v) => v.versionId).sort()).toEqual(["v1", "v2"]);
+    expect(result.defaultVersionId).toBe("v2");
+
+    const v2 = result.versions.find((v) => v.versionId === "v2");
+    const v1 = result.versions.find((v) => v.versionId === "v1");
+    // Distinct content addresses; both artifacts actually stored.
+    expect(v1?.bundleHash).not.toBe(v2?.bundleHash);
+    expect(await store.get(v2?.bundleKey ?? "")).not.toBeNull();
+    expect(await store.get(v1?.bundleKey ?? "")).not.toBeNull();
+    // Top-level fields are the default (v2) version's (back-compat).
+    expect(result.bundleKey).toBe(v2?.bundleKey);
+
+    // The manifest is returned for the dispatcher, not stored by the executor
+    // (the dispatcher writes it only after every lane is published).
+    expect(result.manifest?.default).toBe("v2");
+    expect(result.manifest?.list.map((v) => v.id)).toEqual(["v2", "v1"]);
+    expect(await store.get(siteVersionsKey(job.siteId))).toBeNull();
   });
 
   it("always deletes the ephemeral checkout, on success and on failure", async () => {

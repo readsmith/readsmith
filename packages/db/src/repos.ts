@@ -401,6 +401,20 @@ export async function markDeploymentFailed(
     WHERE id = ${id}`);
 }
 
+/**
+ * Move an opened deployment onto a version lane. A multi-version build opens its
+ * first row with the placeholder lane ('current'), then reassigns it to the
+ * default version's real id before publishing. Safe only while `building` (no
+ * `is_current` yet), which is where the build orchestration calls it.
+ */
+export async function setDeploymentVersion(
+  db: Db,
+  input: { id: string; versionId: string },
+): Promise<void> {
+  await db.query(sql`
+    UPDATE app.deployments SET version_id = ${input.versionId} WHERE id = ${input.id}`);
+}
+
 /** Attach build diagnostics to a deployment (published builds keep their warnings too). */
 export async function setDeploymentDiagnostics(
   db: Db,

@@ -53,6 +53,7 @@ export {
   listEndpointsBySpec,
   markDeploymentFailed,
   setDeploymentDiagnostics,
+  setDeploymentVersion,
   pruneSuperseded,
   publishDeployment,
   purgeAiQueries,

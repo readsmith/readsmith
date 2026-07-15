@@ -6,6 +6,7 @@ import {
   type SiteResolver,
   createDeploymentBundleSource,
   createStaticSiteResolver,
+  siteVersionsKey,
 } from "@readsmith/git";
 import type { SiteBuild } from "@readsmith/mdx";
 import { type NormalizedSpec, type SiteVersions, siteVersionsSchema } from "@readsmith/model";
@@ -96,7 +97,6 @@ const siteVersionsCache = createMemoryCache({
   max: Number.isInteger(siteCacheMax) && siteCacheMax > 0 ? siteCacheMax : 16,
   defaultTtlMs: VERSIONS_MANIFEST_TTL_MS,
 });
-const versionsManifestKey = (siteId: string) => `sites/${siteId}/versions.json`;
 
 let cached: Promise<Bundle> | null = null;
 let source: CurrentBundleSource | null | undefined;
@@ -211,7 +211,7 @@ export async function loadBundleForSite(
 export async function loadSiteVersions(siteId: string): Promise<SiteVersions | null> {
   const cached = await siteVersionsCache.get<SiteVersions | "none">(siteId);
   if (cached !== undefined) return cached === "none" ? null : cached;
-  const bytes = await store.get(versionsManifestKey(siteId)).catch(() => null);
+  const bytes = await store.get(siteVersionsKey(siteId)).catch(() => null);
   if (!bytes) {
     await siteVersionsCache.set(siteId, "none");
     return null;

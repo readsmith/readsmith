@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type Executor, createInProcessExecutor } from "../src/executor.js";
 import type { GitProvider } from "../src/provider.js";
 import { createCurrentBundleLoader } from "../src/resolve.js";
-import { deploymentLogKey, runSiteBuild } from "../src/site-build.js";
+import { deploymentLogKey, runSiteBuild, siteVersionsKey } from "../src/site-build.js";
 
 const DATABASE_URL = process.env.TEST_DATABASE_URL;
 const FIXTURE = join(import.meta.dirname, "fixtures", "repo");
@@ -109,6 +109,17 @@ describe.skipIf(!DATABASE_URL)("site.build orchestration (integration)", () => {
           ok: true,
           bundleKey: key,
           bundleHash: "not-the-real-hash",
+          defaultVersionId: "current",
+          versions: [
+            {
+              versionId: "current",
+              bundleKey: key,
+              bundleHash: "not-the-real-hash",
+              pageCount: 1,
+              rendered: 1,
+            },
+          ],
+          manifest: null,
           pageCount: 1,
           rendered: 1,
           diagnostics: [],
@@ -313,5 +324,98 @@ describe.skipIf(!DATABASE_URL)("failOnError (integration)", () => {
     );
     expect(fixed.status).toBe("ready");
     expect(fixed.is_current).toBe(true);
+  });
+});
+
+describe.skipIf(!DATABASE_URL)("multi-version publish (AC-17, integration)", () => {
+  const SITE = "versions-test";
+  let db: Db;
+  let store: BundleStore;
+
+  // A default (v2 -> docs/) and a legacy (v1 -> versions/v1/) tree.
+  const multiVersionProvider: GitProvider = {
+    async fetchAtRef(_t, destDir) {
+      await writeFile(
+        join(destDir, "docs.yaml"),
+        [
+          "site:",
+          "  name: Versioned",
+          "content:",
+          "  root: docs",
+          "versions:",
+          "  default: v2",
+          "  list:",
+          "    - id: v2",
+          "    - id: v1",
+          "      content: versions/v1",
+        ].join("\n"),
+      );
+      for (const root of ["docs", "versions/v1"]) {
+        await cp(FIXTURE, join(destDir, root), { recursive: true });
+      }
+    },
+  };
+
+  beforeAll(async () => {
+    db = createDb({
+      databaseUrl: DATABASE_URL ?? "",
+      storageRoot: ".rs-test",
+      workerConcurrency: 2,
+      logLevel: "error",
+    });
+    await runMigrations(db);
+    await upsertSite(db, { id: SITE, name: "Versions Test" });
+    await db.query(sql`DELETE FROM app.deployments WHERE site_id = ${SITE}`);
+    store = createBundleStore({ driver: "local", root: await mkdtemp(join(tmpdir(), "rs-ver-")) });
+  });
+
+  afterAll(async () => {
+    await db?.close();
+  });
+
+  it("publishes one current deployment per version lane and stores the manifest", async () => {
+    const executor = createInProcessExecutor({ provider: multiVersionProvider, store });
+    await runSiteBuild(
+      { db, store, executor },
+      {
+        siteId: SITE,
+        repo: "acme/docs",
+        ref: "refs/heads/main",
+        commitSha: "ver-1",
+      },
+    );
+
+    // A current deployment in each lane, with distinct artifacts.
+    const v2 = await getCurrentDeployment(db, { siteId: SITE, versionId: "v2" });
+    const v1 = await getCurrentDeployment(db, { siteId: SITE, versionId: "v1" });
+    expect(v2?.is_current).toBe(true);
+    expect(v1?.is_current).toBe(true);
+    expect(v2?.bundle_ref).not.toBe(v1?.bundle_ref);
+
+    // The routing manifest is stored, default v2.
+    const manifest = JSON.parse(
+      (await store.get(siteVersionsKey(SITE)))?.toString("utf8") ?? "{}",
+    ) as { default?: string; list?: { id: string; prefix: string }[] };
+    expect(manifest.default).toBe("v2");
+    expect(manifest.list?.map((v) => v.id).sort()).toEqual(["v1", "v2"]);
+  });
+
+  it("rebuilds only the changed lane's pointer, leaving the other lane untouched", async () => {
+    const v1Before = await getCurrentDeployment(db, { siteId: SITE, versionId: "v1" });
+    const executor = createInProcessExecutor({ provider: multiVersionProvider, store });
+    await runSiteBuild(
+      { db, store, executor },
+      {
+        siteId: SITE,
+        repo: "acme/docs",
+        ref: "refs/heads/main",
+        commitSha: "ver-2",
+      },
+    );
+    // Identical content => same content-addressed refs; the v1 lane's current
+    // pointer still resolves (the lane was not orphaned by the default's rebuild).
+    const v1After = await getCurrentDeployment(db, { siteId: SITE, versionId: "v1" });
+    expect(v1After?.is_current).toBe(true);
+    expect(v1After?.bundle_ref).toBe(v1Before?.bundle_ref);
   });
 });
