@@ -30,11 +30,24 @@ export interface IndexChunk extends SourceChunk {
   embedding: number[] | null;
 }
 
-/** The persistence port (backed by `@readsmith/db` repos in the host). */
+/**
+ * The persistence port (backed by `@readsmith/db` repos in the host). The diff
+ * and prune are scoped to one (site, version, locale) lane so re-indexing a
+ * version never reads or deletes another version's chunks (FR-14).
+ */
 export interface IndexStore {
-  listChunkHashes(siteId: string): Promise<{ id: string; contentHash: string }[]>;
+  listChunkHashes(input: {
+    siteId: string;
+    version: string;
+    locale: string;
+  }): Promise<{ id: string; contentHash: string }[]>;
   upsertChunks(input: { siteId: string; chunks: readonly IndexChunk[] }): Promise<number>;
-  deleteChunksNotIn(input: { siteId: string; keepIds: readonly string[] }): Promise<number>;
+  deleteChunksNotIn(input: {
+    siteId: string;
+    version: string;
+    locale: string;
+    keepIds: readonly string[];
+  }): Promise<number>;
 }
 
 export interface IndexInput {
@@ -74,7 +87,13 @@ export async function indexChunks(deps: IndexDeps, input: IndexInput): Promise<I
   const log = deps.log ?? (() => {});
 
   const existing = new Map(
-    (await store.listChunkHashes(input.siteId)).map((r) => [r.id, r.contentHash]),
+    (
+      await store.listChunkHashes({
+        siteId: input.siteId,
+        version: input.version,
+        locale: input.locale,
+      })
+    ).map((r) => [r.id, r.contentHash]),
   );
 
   const withHash = input.chunks.map((chunk) => ({ chunk, hash: contentHash(chunk.text) }));
@@ -98,6 +117,8 @@ export async function indexChunks(deps: IndexDeps, input: IndexInput): Promise<I
   await store.upsertChunks({ siteId: input.siteId, chunks: toUpsert });
   const deleted = await store.deleteChunksNotIn({
     siteId: input.siteId,
+    version: input.version,
+    locale: input.locale,
     keepIds: input.chunks.map((c) => c.id),
   });
 

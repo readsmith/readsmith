@@ -173,11 +173,11 @@ export async function upsertDocChunks(
       (id, site_id, kind, endpoint_id, page_id, path, header_path, anchor, method,
        version_id, locale, content_hash, text, embedding)
     VALUES ${joinSql(rows, ", ")}
-    ON CONFLICT (id) DO UPDATE SET
+    ON CONFLICT (site_id, version_id, locale, id) DO UPDATE SET
       kind = EXCLUDED.kind, endpoint_id = EXCLUDED.endpoint_id, page_id = EXCLUDED.page_id,
       path = EXCLUDED.path, header_path = EXCLUDED.header_path, anchor = EXCLUDED.anchor,
-      method = EXCLUDED.method, version_id = EXCLUDED.version_id, locale = EXCLUDED.locale,
-      content_hash = EXCLUDED.content_hash, text = EXCLUDED.text, embedding = EXCLUDED.embedding`);
+      method = EXCLUDED.method, content_hash = EXCLUDED.content_hash, text = EXCLUDED.text,
+      embedding = EXCLUDED.embedding`);
   return input.chunks.length;
 }
 
@@ -239,24 +239,36 @@ export async function ftsSearchChunks(
   return rows.map((r) => searchChunkRowSchema.parse(r));
 }
 
-/** The (id, contentHash) of every chunk for a site: the incremental-diff basis. */
+/**
+ * The (id, contentHash) of every chunk in one (site, version, locale) lane: the
+ * incremental-diff basis. Version/locale-scoped so re-indexing one version reads
+ * (and later prunes) only that version's chunks, never another's (FR-14).
+ */
 export async function listChunkHashes(
   db: Db,
-  input: { siteId: string },
+  input: { siteId: string; versionId?: string; locale?: string },
 ): Promise<{ id: string; contentHash: string }[]> {
   const rows = await db.query<{ id: string; content_hash: string }>(sql`
-    SELECT id, content_hash FROM app.doc_chunks WHERE site_id = ${input.siteId}`);
+    SELECT id, content_hash FROM app.doc_chunks
+    WHERE site_id = ${input.siteId}
+      AND version_id = ${input.versionId ?? "current"} AND locale = ${input.locale ?? "en"}`);
   return rows.map((r) => ({ id: r.id, contentHash: r.content_hash }));
 }
 
-/** Delete chunks for a site whose id is not in the current set (removed pages). */
+/**
+ * Delete chunks in one (site, version, locale) lane whose id is not in the
+ * current set (removed pages). Scoped to the version so pruning one version
+ * never deletes another version's chunks (FR-14).
+ */
 export async function deleteChunksNotIn(
   db: Db,
-  input: { siteId: string; keepIds: readonly string[] },
+  input: { siteId: string; versionId?: string; locale?: string; keepIds: readonly string[] },
 ): Promise<number> {
   const res = await db.query<{ id: string }>(sql`
     DELETE FROM app.doc_chunks
-    WHERE site_id = ${input.siteId} AND id <> ALL(${input.keepIds as string[]})
+    WHERE site_id = ${input.siteId}
+      AND version_id = ${input.versionId ?? "current"} AND locale = ${input.locale ?? "en"}
+      AND id <> ALL(${input.keepIds as string[]})
     RETURNING id`);
   return res.length;
 }

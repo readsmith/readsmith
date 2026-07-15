@@ -17,7 +17,7 @@ import {
 } from "@readsmith/db";
 import { z } from "zod";
 import type { ApiReference, Site } from "./site.js";
-import { loadBundleForSite } from "./site.js";
+import { loadBundleForSite, loadSiteVersions } from "./site.js";
 
 /**
  * `embed.index` as a pg-boss job: re-index the compiled bundle's chunks into
@@ -75,30 +75,54 @@ function buildSourceChunks(site: Site, apiReference: ApiReference | null): Sourc
   return [...docs, ...endpoints];
 }
 
-/** Re-index a site's current bundle into `doc_chunks` (incremental, FTS-only without a key). */
-export async function indexBundle(db: Db, siteId = SITE_ID): Promise<void> {
-  const bundle = await loadBundleForSite(siteId);
-  if (!bundle) return; // nothing deployed yet; the next publish re-enqueues
-  const site = bundle.site;
-  const apiRef = bundle.apiReference;
-  await upsertSite(db, { id: siteId, name: site.name });
+const store = (db: Db): IndexStore => ({
+  // Each call carries its version/locale lane, so the diff and prune touch only
+  // that version's chunks (FR-14).
+  listChunkHashes: ({ siteId, version, locale }) =>
+    listChunkHashes(db, { siteId, versionId: version, locale }),
+  upsertChunks: ({ siteId, chunks }) => upsertDocChunks(db, { siteId, chunks }),
+  deleteChunksNotIn: ({ siteId, version, locale, keepIds }) =>
+    deleteChunksNotIn(db, { siteId, versionId: version, locale, keepIds }),
+});
 
-  let provider: ModelProvider = NULL_PROVIDER;
+function providerFor(site: Site): ModelProvider {
   try {
     const cfg = resolveAiConfig(site.ai ?? null);
-    if (cfg) provider = createModelProvider(cfg, envKeySource());
+    return cfg ? createModelProvider(cfg, envKeySource()) : NULL_PROVIDER;
   } catch {
-    provider = NULL_PROVIDER;
+    return NULL_PROVIDER;
   }
+}
 
-  const store: IndexStore = {
-    listChunkHashes: (siteId) => listChunkHashes(db, { siteId }),
-    upsertChunks: ({ siteId, chunks }) => upsertDocChunks(db, { siteId, chunks }),
-    deleteChunksNotIn: ({ siteId, keepIds }) => deleteChunksNotIn(db, { siteId, keepIds }),
-  };
+/**
+ * Re-index a site into `doc_chunks` (incremental, FTS-only without a key). A
+ * multi-version site indexes each version into its own lane (version_id), so a
+ * search on one version never returns another's chunks; a single-version site
+ * indexes the default bundle as `current`, exactly as before.
+ */
+export async function indexBundle(db: Db, siteId = SITE_ID): Promise<void> {
+  const versions = await loadSiteVersions(siteId);
+  const lanes = versions
+    ? versions.list.map((v) => ({ versionId: v.id }))
+    : [{ versionId: undefined as string | undefined }];
 
-  await indexChunks(
-    { store, provider },
-    { siteId, version: "current", locale: "en", chunks: buildSourceChunks(site, apiRef) },
-  );
+  let named = false;
+  for (const lane of lanes) {
+    const bundle = await loadBundleForSite(siteId, lane.versionId);
+    if (!bundle) continue; // nothing deployed in this lane yet
+    const site = bundle.site;
+    if (!named) {
+      await upsertSite(db, { id: siteId, name: site.name });
+      named = true;
+    }
+    await indexChunks(
+      { store: store(db), provider: providerFor(site) },
+      {
+        siteId,
+        version: lane.versionId ?? "current",
+        locale: "en",
+        chunks: buildSourceChunks(site, bundle.apiReference),
+      },
+    );
+  }
 }
