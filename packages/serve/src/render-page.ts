@@ -6,7 +6,9 @@ import {
 } from "@readsmith/components";
 import { siteBasePath } from "@readsmith/config";
 import type { FinalNavNode, FinalNavTab, PageModel } from "@readsmith/mdx";
+import type { SiteVersions } from "@readsmith/model";
 import { type Bundle, getBundle } from "./site.js";
+import { versionSelectorItems } from "./versioning.js";
 
 /**
  * Server-only. Renders one built page into the reading shell: sidebar and tab
@@ -94,7 +96,19 @@ export interface RenderedPage {
  * request (loadBundleForSite) and renders through the exact code path the
  * single-site app uses, so tenant serving can never drift from self-host.
  */
-export function renderPageFromBundle(bundle: Bundle, slug: string): RenderedPage | null {
+/** Multi-version context for the header selector; omitted on single-version sites. */
+export interface VersionContext {
+  /** The site's version routing table (from the stored manifest). */
+  versions: SiteVersions;
+  /** The version whose bundle is being rendered (the selector marks it active). */
+  activeVersionId: string;
+}
+
+export function renderPageFromBundle(
+  bundle: Bundle,
+  slug: string,
+  opts?: { version?: VersionContext },
+): RenderedPage | null {
   const { build, name, branding, url, logo, homeUrl, apiReference, footer, contextual, ai } =
     bundle.site;
   const page = build.pages.find((p) => p.slug === slug);
@@ -128,6 +142,30 @@ export function renderPageFromBundle(bundle: Bundle, slug: string): RenderedPage
     ...(ai != null ? { mcp: true } : {}),
     ...(contextual?.options ? { contextual: contextual.options as ContextualOption[] } : {}),
   };
+
+  // The version selector: entries pre-resolved server-side (the current slug in
+  // each version when it exists, else that version's home). Rendered only with
+  // two or more non-hidden versions, so single-version chrome is unchanged.
+  if (opts?.version) {
+    const items = versionSelectorItems(
+      opts.version.versions,
+      opts.version.activeVersionId,
+      slug,
+      siteBasePath(url),
+    );
+    if (items.length >= 2) {
+      const active = items.find((i) => i.active) ?? items[0];
+      site.versions = {
+        activeLabel: active?.label ?? "",
+        items: items.map(({ label, href, active: isActive, tag }) => ({
+          label,
+          href,
+          active: isActive,
+          ...(tag ? { tag } : {}),
+        })),
+      };
+    }
+  }
 
   // Hybrid operation and data-model pages render their generated sections from
   // the normalized spec, carried in the same bundle.

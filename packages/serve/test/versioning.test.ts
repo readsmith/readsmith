@@ -1,13 +1,32 @@
 import type { PageModel, SiteBuild } from "@readsmith/mdx";
 import type { SiteVersions } from "@readsmith/model";
 import { describe, expect, it } from "vitest";
-import { resolveVersionRequest, versionSwitchTarget } from "../src/versioning.js";
+import {
+  resolveVersionRequest,
+  versionSelectorItems,
+  versionSwitchTarget,
+} from "../src/versioning.js";
 
 const versions: SiteVersions = {
   default: "v2",
   list: [
-    { id: "v2", prefix: "", isDefault: true, label: "v2 (latest)", tag: "latest", hidden: false },
-    { id: "v1", prefix: "/v1", isDefault: false, label: "v1", hidden: false },
+    {
+      id: "v2",
+      prefix: "",
+      isDefault: true,
+      label: "v2 (latest)",
+      tag: "latest",
+      hidden: false,
+      slugs: ["", "quickstart", "guides/intro"],
+    },
+    {
+      id: "v1",
+      prefix: "/v1",
+      isDefault: false,
+      label: "v1",
+      hidden: false,
+      slugs: ["", "quickstart"],
+    },
   ],
 };
 
@@ -66,5 +85,46 @@ describe("versionSwitchTarget (AC-7)", () => {
 
   it("treats a hidden page as absent for switching", () => {
     expect(versionSwitchTarget(build, "secret")).toBe("");
+  });
+});
+
+describe("versionSelectorItems (AC-5)", () => {
+  it("links each version to the current slug when it exists, marks the active one, carries tags", () => {
+    const items = versionSelectorItems(versions, "v2", "quickstart", "");
+    expect(items).toEqual([
+      { id: "v2", label: "v2 (latest)", href: "/quickstart", active: true, tag: "latest" },
+      { id: "v1", label: "v1", href: "/v1/quickstart", active: false },
+    ]);
+  });
+
+  it("falls back to the version home when the current slug is absent there (FR-9)", () => {
+    // guides/intro exists in v2, not v1: switching to v1 lands on the v1 home.
+    const items = versionSelectorItems(versions, "v2", "guides/intro", "");
+    expect(items.find((i) => i.id === "v2")?.href).toBe("/guides/intro");
+    expect(items.find((i) => i.id === "v1")?.href).toBe("/v1");
+  });
+
+  it("composes with a subpath base path (basePath -> version -> slug)", () => {
+    const items = versionSelectorItems(versions, "v2", "quickstart", "/docs");
+    expect(items.find((i) => i.id === "v2")?.href).toBe("/docs/quickstart");
+    expect(items.find((i) => i.id === "v1")?.href).toBe("/docs/v1/quickstart");
+  });
+
+  it("links the home slug to each version root", () => {
+    const items = versionSelectorItems(versions, "v2", "", "");
+    expect(items.find((i) => i.id === "v2")?.href).toBe("/");
+    expect(items.find((i) => i.id === "v1")?.href).toBe("/v1");
+  });
+
+  it("omits hidden versions from the selector", () => {
+    const withHidden: SiteVersions = {
+      default: "v2",
+      list: [
+        ...versions.list,
+        { id: "beta", prefix: "/beta", isDefault: false, label: "beta", hidden: true, slugs: [""] },
+      ],
+    };
+    const items = versionSelectorItems(withHidden, "v2", "", "");
+    expect(items.map((i) => i.id)).toEqual(["v2", "v1"]);
   });
 });

@@ -88,6 +88,8 @@ export function siteVersionsOf(result: CompileVersionedResult): SiteVersions | n
       label: v.label,
       ...(v.tag ? { tag: v.tag } : {}),
       hidden: v.hidden,
+      // Non-hidden page slugs, so the selector can pre-resolve per-version hrefs.
+      slugs: v.result.bundle.site.build.pages.filter((p) => !p.hidden).map((p) => p.slug),
     })),
   };
 }

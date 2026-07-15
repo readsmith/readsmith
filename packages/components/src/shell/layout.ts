@@ -46,6 +46,23 @@ export interface ShellSite {
    * VS Code / Copy MCP URL" connect group; the endpoint URL is built here from
    * url + basePath + the canonical MCP path. */
   mcp?: boolean;
+  /** Multi-version selector; rendered in the header only when the site has two
+   * or more versions. Entries carry pre-resolved hrefs (SSR-first, zero-JS). */
+  versions?: ShellVersions;
+}
+
+/** One version in the header selector, its href pre-resolved server-side. */
+export interface ShellVersionItem {
+  label: string;
+  href: string;
+  active: boolean;
+  tag?: "latest" | "beta" | "deprecated";
+}
+
+export interface ShellVersions {
+  /** The active version's label, shown on the selector summary. */
+  activeLabel: string;
+  items: ShellVersionItem[];
 }
 
 /**
@@ -250,6 +267,7 @@ export function header(site: ShellSite): string {
   ${(site.links ?? [])
     .map((link) => `<a class="rs-headerlink" href="${esc(link.href)}">${esc(link.label)}</a>`)
     .join("")}
+  ${versionSelector(site)}
   <span class="rs-header__spacer"></span>
   <button class="rs-headerlink rs-headerlink--ask" data-rs-ask-open aria-expanded="false" aria-label="Ask AI">${ICONS.sparkle}<span>Ask AI</span></button>
   <button class="rs-search" data-rs-palette-open aria-label="Search or ask AI">${ICONS.search}<span>Search or ask AI</span><kbd class="rs-kbd">⌘K</kbd></button>
@@ -291,6 +309,37 @@ function renderTab(tab: ShellTab): string {
   }">${tab.icon ?? ""}${esc(
     tab.label,
   )}${TAB_CARET}</summary><div class="rs-tab-menu__panel">${items}</div></details>`;
+}
+
+const VERSION_TAG_LABEL = {
+  latest: "Latest",
+  beta: "Beta",
+  deprecated: "Deprecated",
+} as const;
+
+/**
+ * The multi-version selector: a native `<details>` disclosure (like the tab
+ * dropdown) whose entries are pre-resolved `<a>` links, so switching versions is
+ * plain navigation with no JavaScript (the island only adds outside-click/Esc
+ * close, shared with the tab menu via `data-rs-tabmenu`). Renders nothing for a
+ * single-version site, keeping its chrome byte-identical (FR-12).
+ */
+export function versionSelector(site: ShellSite): string {
+  const versions = site.versions;
+  if (!versions || versions.items.length < 2) return "";
+  const items = versions.items
+    .map((item) => {
+      const badge = item.tag
+        ? `<span class="rs-verpicker__tag rs-verpicker__tag--${item.tag}">${VERSION_TAG_LABEL[item.tag]}</span>`
+        : "";
+      return `<a class="rs-verpicker__item${item.active ? " is-active" : ""}" href="${esc(
+        item.href,
+      )}"${item.active ? ' aria-current="true"' : ""}>${esc(item.label)}${badge}</a>`;
+    })
+    .join("");
+  return `<details class="rs-verpicker" data-rs-tabmenu><summary class="rs-verpicker__summary" aria-label="Select documentation version">${esc(
+    versions.activeLabel,
+  )}${TAB_CARET}</summary><div class="rs-verpicker__panel" role="menu">${items}</div></details>`;
 }
 
 function topbar(site: ShellSite, page: ShellPage): string {

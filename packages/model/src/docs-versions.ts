@@ -23,6 +23,13 @@ export const versionRouteSchema = z.object({
   tag: z.enum(["latest", "beta", "deprecated"]).optional(),
   /** Built and served at its URL, but omitted from the selector and discovery. */
   hidden: z.boolean(),
+  /**
+   * The version's non-hidden page slugs, so the version selector can pre-resolve
+   * each entry's href server-side (the current slug when it exists in that
+   * version, else the version home) without loading every version's bundle.
+   * Defaults to empty so an older manifest without it still parses.
+   */
+  slugs: z.array(z.string()).default([]),
 });
 export type VersionRoute = z.infer<typeof versionRouteSchema>;
 

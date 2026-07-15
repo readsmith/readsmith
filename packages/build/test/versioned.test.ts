@@ -122,13 +122,18 @@ describe("compileVersionedSite", () => {
 
   it("derives the routing manifest for multi-version, and null for single-version", async () => {
     const multi = await compileVersionedSite({ contentDir: await twoVersionRepo() });
-    expect(siteVersionsOf(multi)).toEqual({
-      default: "v2",
-      list: [
-        { id: "v2", prefix: "", isDefault: true, label: "v2", hidden: false },
-        { id: "v1", prefix: "/v1", isDefault: false, label: "v1", hidden: false },
-      ],
-    });
+    const manifest = siteVersionsOf(multi);
+    expect(manifest?.default).toBe("v2");
+    expect(
+      manifest?.list.map((v) => ({ id: v.id, prefix: v.prefix, isDefault: v.isDefault })),
+    ).toEqual([
+      { id: "v2", prefix: "", isDefault: true },
+      { id: "v1", prefix: "/v1", isDefault: false },
+    ]);
+    // Each version's non-hidden page slugs ride in the manifest for the selector.
+    for (const v of manifest?.list ?? []) {
+      expect(new Set(v.slugs)).toEqual(new Set(["", "other"]));
+    }
 
     const dir = await mkdtemp(join(tmpdir(), "rs-plain-manifest-"));
     await writeFile(join(dir, "docs.yaml"), "site:\n  name: Plain\ncontent:\n  root: docs\n");

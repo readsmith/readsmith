@@ -208,3 +208,31 @@ describe("renderDocument", () => {
     expect(html).toContain("</html>");
   });
 });
+
+describe("version selector", () => {
+  const withVersions = (items: NonNullable<ShellSite["versions"]>["items"]): ShellSite => ({
+    ...site,
+    versions: { activeLabel: "v2 (latest)", items },
+  });
+
+  it("renders a disclosure with entries, tag badges, and an active marker", () => {
+    const html = renderShellBody(
+      withVersions([
+        { label: "v2 (latest)", href: "/", active: true, tag: "latest" },
+        { label: "v1", href: "/v1", active: false, tag: "deprecated" },
+      ]),
+      page,
+    );
+    expect(html).toContain("rs-verpicker");
+    expect(html).toContain('aria-current="true"'); // the active version
+    expect(html).toContain("Latest"); // tag badge label
+    expect(html).toContain("Deprecated");
+    expect(html).toContain('href="/v1"');
+  });
+
+  it("renders no selector for a single version, keeping the chrome unchanged (FR-12)", () => {
+    const one = renderShellBody(withVersions([{ label: "v2", href: "/", active: true }]), page);
+    expect(one).not.toContain("rs-verpicker");
+    expect(renderShellBody(site, page)).not.toContain("rs-verpicker");
+  });
+});

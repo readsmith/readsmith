@@ -1,6 +1,10 @@
 import type { SiteBuild } from "@readsmith/mdx";
 import type { SiteVersions } from "@readsmith/model";
 
+// Re-exported so multi-tenant hosts have a single import surface (@readsmith/serve)
+// for both the resolution helpers and the manifest type they thread together.
+export type { SiteVersions, VersionRoute } from "@readsmith/model";
+
 /**
  * Multi-version request routing. Pure over its inputs so both the self-host app
  * and the multi-tenant serve share one mapping from request path to the version
@@ -45,4 +49,43 @@ export function resolveVersionRequest(versions: SiteVersions, slug: string): Ver
  */
 export function versionSwitchTarget(build: SiteBuild, slug: string): string {
   return build.pages.some((p) => p.slug === slug && !p.hidden) ? slug : "";
+}
+
+/** One entry in the reading shell's version selector, href pre-resolved. */
+export interface VersionSelectorItem {
+  id: string;
+  label: string;
+  /** basePath + version prefix + (current slug when it exists there, else home). */
+  href: string;
+  active: boolean;
+  tag?: "latest" | "beta" | "deprecated";
+}
+
+/**
+ * The version selector's entries, one per non-hidden version, each linking to
+ * the current slug in that version when it exists there (FR-11) and otherwise to
+ * the version home (FR-9), never a 404. Hrefs are pre-resolved from the manifest
+ * (which carries each version's slugs), so the shell needs no client lookup and
+ * no other version's bundle. Returns fewer than two entries when there is nothing
+ * to switch between; the caller renders no selector then (FR-12).
+ */
+export function versionSelectorItems(
+  versions: SiteVersions,
+  activeVersionId: string,
+  currentSlug: string,
+  basePath = "",
+): VersionSelectorItem[] {
+  return versions.list
+    .filter((v) => !v.hidden)
+    .map((v) => {
+      const target = v.slugs.includes(currentSlug) ? currentSlug : "";
+      const href = `${basePath}${v.prefix}${target ? `/${target}` : ""}` || "/";
+      return {
+        id: v.id,
+        label: v.label,
+        href,
+        active: v.id === activeVersionId,
+        ...(v.tag ? { tag: v.tag } : {}),
+      };
+    });
 }
