@@ -18,6 +18,14 @@ function api(): string {
   return `${document.documentElement.dataset.rsBase ?? ""}/_readsmith/api`;
 }
 
+// On a multi-version site the shell stamps the reader's active version on <html>
+// as data-rs-version; search and Ask-AI send it so retrieval stays within that
+// version. Absent (single-version) means the server's default filter applies.
+function scoped(query: string): Record<string, string> {
+  const version = document.documentElement.dataset.rsVersion;
+  return version ? { query, version } : { query };
+}
+
 export function initShell(root: ParentNode = document): void {
   // One lazy capabilities probe per hydrate, shared by the palette and console.
   // Lazy (fetched on first open) so it always reads the live rung and never
@@ -321,7 +329,7 @@ function initPalette(root: ParentNode, getCaps: GetCapabilities): void {
         const res = await fetch(`${api()}/search`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ query: q }),
+          body: JSON.stringify(scoped(q)),
           signal: controller.signal,
         });
         if (mine !== seq) return;
@@ -592,7 +600,7 @@ function initAsk(root: ParentNode, getCaps: GetCapabilities): void {
       const res = await fetch(`${api()}/ask`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ query: q }),
+        body: JSON.stringify(scoped(q)),
       });
       if (res.status === 429) {
         throttled = true;

@@ -28,7 +28,7 @@ import {
 import type { NormalizedSpec, SearchFilters } from "@readsmith/model";
 import { logSearchQuery } from "./analytics.js";
 import { getDb } from "./db.js";
-import { type Bundle, getBundle, loadBundleForSite } from "./site.js";
+import { type Bundle, getBundle, loadBundleForSite, loadSiteVersions } from "./site.js";
 
 /**
  * Composes the AI services the API routes call, from @readsmith/ai (provider,
@@ -103,9 +103,22 @@ function envAiDefaults(): unknown {
   }
 }
 
-function build(siteId: string, bundle: Bundle, aiOverride?: unknown): AiServices | null {
+function build(
+  siteId: string,
+  bundle: Bundle,
+  aiOverride?: unknown,
+  defaultVersion?: string,
+): AiServices | null {
   const db = getDb();
   if (!db) return null; // docs-only: no server search/ask.
+
+  // Retrieval hard-filters by version. A multi-version site indexes its default
+  // version under its real id (not 'current'), so that is the base filter here;
+  // the reader's active version (sent by the shell) overrides it per request.
+  const baseFilters: SearchFilters = {
+    version: defaultVersion ?? DEFAULT_FILTERS.version,
+    locale: DEFAULT_FILTERS.locale,
+  };
 
   const site = bundle.site;
   const apiRef = bundle.apiReference;
@@ -149,8 +162,8 @@ function build(siteId: string, bundle: Bundle, aiOverride?: unknown): AiServices
   };
 
   const filtersFrom = (input: { version?: string; locale?: string }): SearchFilters => ({
-    version: input.version ?? DEFAULT_FILTERS.version,
-    locale: input.locale ?? DEFAULT_FILTERS.locale,
+    version: input.version ?? baseFilters.version,
+    locale: input.locale ?? baseFilters.locale,
   });
 
   // MCP over the SDK's web-standard Streamable-HTTP transport, read-only. A
@@ -182,7 +195,7 @@ function build(siteId: string, bundle: Bundle, aiOverride?: unknown): AiServices
     const server = createMcpServer({
       search,
       siteId,
-      filters: DEFAULT_FILTERS,
+      filters: baseFilters,
       spec: mcpSpec,
       pages: mcpPages,
       feedback: async ({ path, helpful, comment }) => {
@@ -326,7 +339,12 @@ export async function getAiServicesForSite(
   siteId: string,
   options: { ai?: unknown } = {},
 ): Promise<AiServices | null> {
-  const bundle = await loadBundleForSite(siteId);
+  // A multi-version site has no 'current' lane; load its default version's
+  // bundle (for the site-level AI config, spec, pages) and use that version as
+  // the retrieval base filter. Single-version sites resolve to 'current' as before.
+  const versions = await loadSiteVersions(siteId);
+  const defaultVersion = versions?.default;
+  const bundle = await loadBundleForSite(siteId, defaultVersion);
   if (!bundle) return null;
   let variants = perBundle.get(bundle);
   if (!variants) {
@@ -334,7 +352,7 @@ export async function getAiServicesForSite(
     perBundle.set(bundle, variants);
   }
   const key = options.ai === undefined ? "" : JSON.stringify(options.ai);
-  if (!variants.has(key)) variants.set(key, build(siteId, bundle, options.ai));
+  if (!variants.has(key)) variants.set(key, build(siteId, bundle, options.ai, defaultVersion));
   return variants.get(key) ?? null;
 }
 
